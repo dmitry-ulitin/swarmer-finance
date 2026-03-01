@@ -1,7 +1,8 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
 export interface User {
   id: number;
@@ -23,9 +24,11 @@ export interface ApiResponse<T> {
 export class AuthService {
   private accessToken = signal<string | null>(localStorage.getItem('accessToken'));
   private userSignal = signal<User | null>(null);
+  private readonly _refreshCount = signal(0);
 
   readonly isAuthenticated = computed(() => !!this.accessToken());
   readonly user = computed(() => this.userSignal());
+  readonly refreshCount = this._refreshCount.asReadonly();
 
   constructor(private http: HttpClient, private router: Router) {
     const token = localStorage.getItem('accessToken');
@@ -65,18 +68,19 @@ export class AuthService {
     return this.accessToken();
   }
 
-  refreshToken() {
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
+  refreshToken(): Observable<string> {
+    const token = localStorage.getItem('refreshToken');
+    if (!token) {
       this.logout();
-      return;
+      return throwError(() => new Error('No refresh token'));
     }
-
-    this.http.post<ApiResponse<AuthResponse>>('/api/auth/refresh', { refreshToken })
-      .pipe(tap(response => this.handleAuth(response.data)))
-      .subscribe({
-        error: () => this.logout()
-      });
+    return this.http
+      .post<ApiResponse<AuthResponse>>('/api/auth/refresh', { refreshToken: token })
+      .pipe(
+        tap(response => this.handleAuth(response.data)),
+        map(response => response.data!.accessToken),
+        tap(() => this._refreshCount.update(n => n + 1)),
+      );
   }
 
   private handleAuth(data: AuthResponse | null) {

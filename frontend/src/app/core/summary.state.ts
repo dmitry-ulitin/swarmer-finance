@@ -1,7 +1,8 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { ApiService, Summary } from './api.service';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class SummaryState {
@@ -13,6 +14,15 @@ export class SummaryState {
 
   readonly summary = computed(() => this.resource.value() ?? null);
   readonly loading = this.resource.isLoading;
+
+  constructor() {
+    const auth = inject(AuthService);
+    effect(() => {
+      if (auth.refreshCount() > 0) {
+        untracked(() => this.resource.reload());
+      }
+    });
+  }
 
   reload() {
     this.resource.reload();

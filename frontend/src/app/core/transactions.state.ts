@@ -1,7 +1,8 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map, tap } from 'rxjs';
 import { ApiService, Transaction, TransactionListResponse } from './api.service';
+import { AuthService } from './auth.service';
 
 interface TransactionFilters {
   from?: string;
@@ -27,6 +28,19 @@ export class TransactionsState {
   readonly transactions = computed(() => this.resource.value()?.transactions ?? []);
   readonly total = computed(() => this.resource.value()?.total ?? 0);
   readonly loading = this.resource.isLoading;
+
+  constructor() {
+    const auth = inject(AuthService);
+    effect(() => {
+      if (auth.refreshCount() > 0) {
+        untracked(() => this.resource.reload());
+      }
+    });
+  }
+
+  reload() {
+    this.resource.reload();
+  }
 
   setFilters(filters: TransactionFilters) {
     this._filters.set(filters);

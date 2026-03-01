@@ -1,7 +1,8 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map, tap } from 'rxjs';
 import { ApiService, Category } from './api.service';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class CategoriesState {
@@ -19,6 +20,19 @@ export class CategoriesState {
       items.flatMap(item => item.children?.length ? getLeaves(item.children) : [item]);
     return getLeaves(this.categories());
   });
+
+  constructor() {
+    const auth = inject(AuthService);
+    effect(() => {
+      if (auth.refreshCount() > 0) {
+        untracked(() => this.resource.reload());
+      }
+    });
+  }
+
+  reload() {
+    this.resource.reload();
+  }
 
   create(data: { name: string; parentId: number; color?: string }) {
     return this.api.createCategory(data).pipe(tap(() => this.resource.reload()));
