@@ -17,10 +17,10 @@ CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
 
 -- Seed system root categories
-INSERT INTO categories (id, user_id, name, parent_id) VALUES
-  (1, NULL, 'Income', NULL),
-  (2, NULL, 'Expenses', NULL)
+INSERT INTO categories (id, user_id, name, color, parent_id) VALUES
+  (1, NULL, 'Income', '#14aa00', NULL),
+  (2, NULL, 'Expenses', '#b40000', NULL)
 ON CONFLICT (id) DO NOTHING;
 
 -- Advance the sequence past the explicitly-inserted IDs
-SELECT setval('categories_id_seq', (SELECT MAX(id) FROM categories));
+SELECT setval('categories_id_seq', (SELECT MAX(id) + 10 FROM categories));
