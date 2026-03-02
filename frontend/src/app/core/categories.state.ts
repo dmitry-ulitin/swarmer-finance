@@ -1,6 +1,6 @@
 import { Injectable, computed, effect, inject, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { map, tap } from 'rxjs';
+import { map, tap, of } from 'rxjs';
 import { ApiService, Category } from './api.service';
 import { AuthService } from './auth.service';
 
@@ -9,9 +9,9 @@ export class CategoriesState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
 
-  private readonly resource = rxResource<Category[], true>({
-    params: (): true | undefined => this.auth.isAuthenticated() || undefined,
-    stream: () => this.api.getCategories().pipe(map(r => r.data ?? [])),
+  private readonly resource = rxResource<Category[], boolean>({
+    params: () => this.auth.isAuthenticated(),
+    stream: ({params}) => params ? this.api.getCategories().pipe(map(r => r.data ?? [])) : of([])
   });
 
   readonly categories = computed(() => this.resource.value() ?? []);

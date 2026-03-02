@@ -1,6 +1,6 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { map, tap } from 'rxjs';
+import { map, tap, of } from 'rxjs';
 import { ApiService, Transaction, TransactionListResponse } from './api.service';
 import { AuthService } from './auth.service';
 
@@ -19,11 +19,11 @@ export class TransactionsState {
   private readonly auth = inject(AuthService);
   private readonly _filters = signal<TransactionFilters>({});
 
-  private readonly resource = rxResource<TransactionListResponse, TransactionFilters>({
-    params: () => this.auth.isAuthenticated() ? this._filters() : undefined,
-    stream: ({ params }) => this.api.getTransactions(params).pipe(
+  private readonly resource = rxResource<TransactionListResponse, boolean>({
+    params: () => this.auth.isAuthenticated(),
+    stream: ({ params }) => params ? this.api.getTransactions(this._filters()).pipe(
       map(r => r.data ?? { transactions: [], total: 0 })
-    ),
+    ) : of({ transactions: [], total: 0 })
   });
 
   readonly transactions = computed(() => this.resource.value()?.transactions ?? []);
