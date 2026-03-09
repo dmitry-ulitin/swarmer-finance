@@ -163,22 +163,6 @@ ng add @taiga-ui/cdk
 - `@taiga-ui/kit` — full component set (inputs, selects, dialogs, etc.)
 - `@taiga-ui/addon-charts` — charts (if needed)
 
-**TuiRoot must wrap the app** in `app.component.html`:
-```html
-<tui-root>
-  <router-outlet />
-</tui-root>
-```
-
-**Providers in main.ts**:
-```typescript
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideAnimations(),
-    ...
-  ]
-});
-```
 
 **Import components granularly** (tree-shaking):
 ```typescript
@@ -207,18 +191,17 @@ form = new FormGroup({
 ```
 
 **Key components to use in this project**:
-| Purpose | Taiga UI Component |
-|---|---|
-| Button | `TuiButton` |
-| Text input | `TuiTextfieldControllerModule` + `TuiInput` |
-| Number input | `TuiInputNumber` |
-| Date picker | `TuiInputDate` |
-| Select | `TuiSelect` |
-| Dialog | `TuiDialogService` |
-| Notification | `TuiAlertService` |
-| Loading | `TuiLoader` |
-| Table | `@taiga-ui/addon-table` |
-| Icons | `TuiIcon` |
+| Purpose      | Taiga UI Component                          |
+|--------------|---------------------------------------------|
+| Button       | `TuiButton`                                 |
+| Text input   | `TuiTextfield`                              |
+| Number input | `TuiInputNumber`                            |
+| Date picker  | `TuiInputDate`                              |
+| Select       | `TuiSelect`                                 |
+| Dialog       | `TuiDialogService`                          |
+| Notification | `TuiAlertService`                           |
+| Loading      | `TuiLoader`                                 |
+| Icons        | `TuiIcon`                                   |
 
 ---
 

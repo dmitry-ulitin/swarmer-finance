@@ -1,13 +1,15 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { TuiButton } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiIcon, TuiLink, TuiTextfield } from '@taiga-ui/core';
+import { TuiPassword } from '@taiga-ui/kit';
+import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TuiButton],
+  imports: [ReactiveFormsModule, RouterLink, TuiButton, TuiError, TuiIcon, TuiLink, TuiTextfield, TuiPassword],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss'
 })
@@ -21,13 +23,13 @@ export class RegisterComponent {
   });
 
   loading = signal(false);
-  error = signal('');
+  error = signal<TuiValidationError | null>(null);
 
   onSubmit() {
     if (this.form.invalid) return;
-    
+
     this.loading.set(true);
-    this.error.set('');
+    this.error.set(null);
 
     this.authService.register(
       this.form.value.email!,
@@ -38,7 +40,7 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err.error?.error || 'Registration failed');
+        this.error.set(new TuiValidationError(err.error?.error || 'Registration failed'));
       }
     });
   }
