@@ -1,14 +1,18 @@
 <div class="header">
     <button tuiButton appearance="outline" size="s" (click)="categoriesState.reload()"
         [iconStart]="'@tui.refresh-cw'">Refresh</button>
+    <button tuiButton appearance="primary" size="s" (click)="openCreateDialog()"
+        [iconStart]="'@tui.plus'">Add Category</button>
+    <button tuiButton appearance="outline" size="s" [disabled]="!selected()"
+        [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
 </div>
 <tui-loader [showLoader]="categoriesState.loading()" class="tree">
-    @for (item of categoriesState.categories(); track item.id) {
+    @for (item of categories(); track item.id) {
     <tui-tree [childrenHandler]="handler" [content]="content" [map]="map" [tuiTreeController]="false" [value]="item" />
     }
 </tui-loader>
 <ng-template #content let-item>
-    <span [class.active]="item.id===selected" (click)="setAsSelected(item)" class="category">
+    <span [class.active]="item.id===selected()" (click)="setAsSelected(item)" class="category">
         <tui-icon [icon]="'@tui.' + item.icon" class="icon" [style.color]="item.color" />{{ item.name }}
     </span>
 </ng-template>
