@@ -25,11 +25,11 @@ export class CategoriesState {
     this.resource.reload();
   }
 
-  create(data: { name: string; parentId: number; color?: string }) {
+  create(data: { name: string; parentId: number; color?: string; icon?: string }) {
     return this.api.createCategory(data).pipe(tap(() => this.resource.reload()));
   }
 
-  update(id: number, data: { name?: string; color?: string }) {
+  update(id: number, data: { name?: string; color?: string; icon?: string }) {
     return this.api.updateCategory(id, data).pipe(tap(() => this.resource.reload()));
   }
 

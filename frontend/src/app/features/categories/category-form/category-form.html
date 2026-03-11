@@ -1,0 +1,33 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+    <tui-textfield>
+        <label tuiLabel>Name</label>
+        <input tuiTextfield formControlName="name" placeholder="Category name" />
+    </tui-textfield>
+
+    <tui-textfield tuiChevron [stringify]="stringifyCategory">
+        <label tuiLabel>Parent Category</label>
+        <input tuiSelect formControlName="parentId" placeholder="None (top-level)" />
+        <tui-data-list *tuiTextfieldDropdown>
+            <button tuiOption type="button" [value]="null">None (top-level)</button>
+            @for (cat of flatCategories; track cat.id) {
+                <button tuiOption type="button" [value]="cat.id">{{ cat.name }}</button>
+            }
+        </tui-data-list>
+    </tui-textfield>
+
+    <tui-textfield>
+        <label tuiLabel>Color</label>
+        <input tuiTextfield type="color" formControlName="color" />
+    </tui-textfield>
+
+    <tui-textfield>
+        <label tuiLabel>Icon</label>
+        <input tuiTextfield formControlName="icon" placeholder="e.g. home, star, wallet" />
+    </tui-textfield>
+
+    <tui-error [error]="error()" />
+
+    <button tuiButton size="m" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Category') }}
+    </button>
+</form>
