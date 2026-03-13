@@ -8,11 +8,8 @@ import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { CategoriesState } from '../../../core/categories.state';
 import type { Category } from '../../../models/category';
-
-export interface CategoryDialogInput {
-  category?: Category;
-  categories: Category[];
-}
+import { TransactionType } from '../../../models/transaction';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-category-form',
@@ -22,17 +19,17 @@ export interface CategoryDialogInput {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CategoryForm {
-  private readonly context = inject<TuiDialogContext<void, CategoryDialogInput>>(POLYMORPHEUS_CONTEXT);
+  private readonly context = inject<TuiDialogContext<Category | null, Category>>(POLYMORPHEUS_CONTEXT);
   private readonly categoriesState = inject(CategoriesState);
 
-  readonly isEdit = !!this.context.data.category;
-  readonly flatCategories = this.context.data.categories;
+  readonly categories = this.categoriesState.categories();
 
   readonly form = new FormGroup({
-    name: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
-    parentId: new FormControl<number | null>(null),
-    color: new FormControl<string>('#6366f1', { nonNullable: true }),
-    icon: new FormControl<string>('circle', { nonNullable: true }),
+    id: new FormControl<number | null>(this.context.data?.id),
+    name: new FormControl<string>(this.context.data?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
+    parentId: new FormControl<number | null>(this.context.data?.parent_id ?? TransactionType.Income),
+    color: new FormControl<string>(this.context.data?.color ?? '#14aa00', { nonNullable: true }),
+    icon: new FormControl<string>(this.context.data?.icon ?? 'circle', { nonNullable: true }),
   });
 
   readonly loading = signal(false);
@@ -40,41 +37,27 @@ export class CategoryForm {
 
   readonly stringifyCategory: TuiStringHandler<number | null> = (id) => {
     if (id === null) return 'None (top-level)';
-    return this.flatCategories.find((c) => c.id === id)?.name ?? String(id);
+    return this.categories.find((c) => c.id === id)?.name ?? String(id);
   };
 
-  constructor() {
-    const category = this.context.data.category;
-    if (category) {
-      this.form.setValue({
-        name: category.name,
-        parentId: category.parent_id,
-        color: category.color,
-        icon: category.icon,
-      });
-    }
-  }
+  constructor() { }
 
-  onSubmit(): void {
+  async onSubmit() {
     if (this.form.invalid) return;
 
-    this.loading.set(true);
-    this.error.set(null);
+    try {
+      this.loading.set(true);
+      this.error.set(null);
 
-    const { name, parentId, color, icon } = this.form.getRawValue();
-    const obs = this.isEdit
-      ? this.categoriesState.update(this.context.data.category!.id, { name, color, icon })
-      : this.categoriesState.create({ name, parentId: parentId ?? 0, color, icon });
-
-    obs.subscribe({
-      next: () => {
-        this.context.completeWith(undefined);
-      },
-      error: (err: unknown) => {
-        this.loading.set(false);
-        const msg = (err as { error?: { error?: string } })?.error?.error ?? 'Something went wrong';
-        this.error.set(new TuiValidationError(msg));
-      },
-    });
+      const { id, name, parentId, color, icon } = this.form.getRawValue();
+      const obs = !!id
+        ? this.categoriesState.update(id, { name, color, icon })
+        : this.categoriesState.create({ name, parentId: parentId ?? 0, color, icon });
+      const responce = await firstValueFrom(obs);
+      this.context.completeWith(responce.data);
+    } catch (err) { }
+    finally {
+      this.loading.set(false);
+    }
   }
 }

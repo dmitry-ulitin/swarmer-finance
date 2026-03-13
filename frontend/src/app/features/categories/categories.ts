@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
 import { TuiTree } from '@taiga-ui/kit';
-import { Category } from '../../models/category';
+import { Category, findCategoryById } from '../../models/category';
 import { EMPTY_ARRAY, TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
-import type { CategoryDialogInput } from './category-form/category-form';
 
 @Component({
   selector: 'app-categories',
@@ -49,7 +48,7 @@ export class Categories {
     this.dialogs.open<void>(
       new PolymorpheusComponent(CategoryForm, this.injector),
       {
-        data: { categories: this.categories() } satisfies CategoryDialogInput,
+        data: null,
         label: 'Add Category',
         size: 's',
       }
@@ -59,31 +58,16 @@ export class Categories {
   async openEditDialog(): Promise<void> {
     const selectedId = this.selected();
     if (!selectedId) return;
-    const category = this.findCategoryById(selectedId, this.categories());
+    const category = findCategoryById(selectedId, this.categories());
     if (!category) return;
     const { CategoryForm } = await import('./category-form/category-form');
     this.dialogs.open<void>(
       new PolymorpheusComponent(CategoryForm, this.injector),
       {
-        data: { category, categories: this.categories() } satisfies CategoryDialogInput,
+        data: category,
         label: 'Edit Category',
         size: 's',
       }
     ).subscribe();
-  }
-
-  private findCategoryById(id: number, categories: Category[]): Category | null {
-    for (const category of categories) {
-      if (category.id === id) {
-        return category;
-      }
-      if (category.children) {
-        const found = this.findCategoryById(id, category.children);
-        if (found) {
-          return found;
-        }
-      }
-    }
-    return null;
   }
 }

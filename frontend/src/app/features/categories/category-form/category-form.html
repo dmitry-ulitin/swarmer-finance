@@ -9,7 +9,7 @@
         <input tuiSelect formControlName="parentId" placeholder="None (top-level)" />
         <tui-data-list *tuiTextfieldDropdown>
             <button tuiOption type="button" [value]="null">None (top-level)</button>
-            @for (cat of flatCategories; track cat.id) {
+            @for (cat of categories; track cat.id) {
                 <button tuiOption type="button" [value]="cat.id">{{ cat.name }}</button>
             }
         </tui-data-list>
@@ -28,6 +28,6 @@
     <tui-error [error]="error()" />
 
     <button tuiButton size="m" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Category') }}
+        {{ loading() ? 'Saving...' : (!!form.value.id ? 'Save Changes' : 'Create Category') }}
     </button>
 </form>
