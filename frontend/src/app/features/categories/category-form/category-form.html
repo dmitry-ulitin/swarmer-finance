@@ -4,22 +4,24 @@
         <input tuiTextfield formControlName="name" placeholder="Category name" />
     </tui-textfield>
 
-    <tui-textfield tuiChevron [stringify]="stringifyCategory">
+    <tui-textfield tuiChevron [stringify]="stringifyCategory" [tuiTextfieldCleaner]="false">
         <label tuiLabel>Parent Category</label>
-        <input tuiSelect formControlName="parentId" placeholder="None (top-level)" />
+        <input tuiSelect formControlName="parentId" />
         <tui-data-list *tuiTextfieldDropdown>
-            <button tuiOption type="button" [value]="null">None (top-level)</button>
-            @for (cat of categories; track cat.id) {
-                <button tuiOption type="button" [value]="cat.id">{{ cat.name }}</button>
+            @for (item of parentOptions(); track item.id) {
+            <tui-tree [childrenHandler]="treeHandler()" [content]="treeNodeContent" [map]="treeMap"
+                [tuiTreeController]="false" [value]="item" />
             }
         </tui-data-list>
     </tui-textfield>
 
-    <tui-textfield>
-        <label tuiLabel>Color</label>
-        <input tuiTextfield type="color" formControlName="color" />
-    </tui-textfield>
-
+    <div class="row">
+        <tui-textfield [tuiTextfieldCleaner]="false" iconStart=" " class="fill">
+            <label tuiLabel>Color</label>
+            <input tuiInputColor formControlName="color" />
+        </tui-textfield>
+        <tui-icon [icon]="'@tui.' + form.value.icon" [style.color]="form.value.color" />
+    </div>
     <tui-textfield>
         <label tuiLabel>Icon</label>
         <input tuiTextfield formControlName="icon" placeholder="e.g. home, star, wallet" />
@@ -31,3 +33,10 @@
         {{ loading() ? 'Saving...' : (!!form.value.id ? 'Save Changes' : 'Create Category') }}
     </button>
 </form>
+
+<ng-template #treeNodeContent let-item>
+    <button new tuiOption type="button" [value]="item.id" class="tree-option">
+        <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />
+        {{ item.name }}
+    </button>
+</ng-template>

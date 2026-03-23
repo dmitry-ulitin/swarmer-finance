@@ -1,7 +1,7 @@
 <div class="header">
     <button tuiButton appearance="outline" size="s" (click)="categoriesState.reload()"
         [iconStart]="'@tui.refresh-cw'">Refresh</button>
-    <button tuiButton appearance="primary" size="s" (click)="openCreateDialog()"
+    <button tuiButton appearance="outline" size="s" (click)="openCreateDialog()"
         [iconStart]="'@tui.plus'">Add Category</button>
     <button tuiButton appearance="outline" size="s" [disabled]="!selected()"
         [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
