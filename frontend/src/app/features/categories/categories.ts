@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
-import { TuiTree } from '@taiga-ui/kit';
+import { TUI_CONFIRM, TuiConfirmData, TuiTree } from '@taiga-ui/kit';
 import { Category, findCategoryById, flattenCategories } from '../../models/category';
 import { EMPTY_ARRAY, TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
-import { TransactionType } from '../../models/transaction';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -16,12 +15,11 @@ import { firstValueFrom } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Categories {
-  categoriesState = inject(CategoriesState);
+  readonly categoriesState = inject(CategoriesState);
   private readonly dialogs = inject(TuiDialogService);
   private readonly injector = inject(INJECTOR);
 
   protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children || EMPTY_ARRAY;
-  selected = signal<number | null>(null);
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
     const newCategories = this.categoriesState.categories();
@@ -37,7 +35,20 @@ export class Categories {
     });
     return newCategories;
   });
-
+  readonly selected = signal<number | null>(null);
+  readonly selectedCategory = computed(() => {
+    const selectedId = this.selected();
+    if (selectedId === null) return null;
+    return findCategoryById(selectedId, this.categories());
+  });
+  readonly isEditable = computed(() => {
+    const selectedCategory = this.selectedCategory();
+    return selectedCategory != null && selectedCategory.parent_id !== null;
+  });
+  readonly isDeletable = computed(() => {
+    const category = this.selectedCategory();
+    return category != null && category.parent_id !== null && (category.children?.length ?? 0) === 0;
+  });
 
   setAsSelected(node: Category) {
     this.selected.set(node.id);
@@ -52,8 +63,7 @@ export class Categories {
   }
 
   async openCreateDialog(): Promise<void> {
-    const selectedId = this.selected() ?? TransactionType.Expense;
-    const parent = findCategoryById(selectedId, this.categories());
+    const parent = this.selectedCategory();
     if (parent == null) return;
     const { CategoryForm } = await import('./category-form/category-form');
     const category = await firstValueFrom(this.dialogs.open<Category | null>(
@@ -69,10 +79,26 @@ export class Categories {
     }
   }
 
+  async openDeleteDialog(): Promise<void> {
+    const category = this.selectedCategory();
+    if (!category) return;
+    const data: TuiConfirmData = {
+      content: `Delete "${category?.name}"?`,
+      yes: 'Delete',
+      no: 'Cancel',
+    };
+    const confirmed = await firstValueFrom(
+      this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Delete Category', size: 's', data }),
+      { defaultValue: false }
+    );
+    if (confirmed) {
+      await firstValueFrom(this.categoriesState.delete(category.id));
+      this.selected.set(null);
+    }
+  }
+
   async openEditDialog(): Promise<void> {
-    const selectedId = this.selected();
-    if (!selectedId) return;
-    const category = findCategoryById(selectedId, this.categories());
+    const category = this.selectedCategory();
     if (!category) return;
     const { CategoryForm } = await import('./category-form/category-form');
     await firstValueFrom(this.dialogs.open<Category | null>(

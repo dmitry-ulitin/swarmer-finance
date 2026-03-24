@@ -3,8 +3,10 @@
         [iconStart]="'@tui.refresh-cw'">Refresh</button>
     <button tuiButton appearance="outline" size="s" (click)="openCreateDialog()"
         [iconStart]="'@tui.plus'">Add Category</button>
-    <button tuiButton appearance="outline" size="s" [disabled]="(selected() || 0) < 10"
+    <button tuiButton appearance="outline" size="s" [disabled]="!isEditable()"
         [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
+    <button tuiButton appearance="outline" size="s" [disabled]="!isDeletable()"
+        [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
 </div>
 <tui-loader [showLoader]="categoriesState.loading()" class="tree">
     @for (item of categories(); track item.id) {
