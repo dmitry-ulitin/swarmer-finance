@@ -40,9 +40,9 @@ export class CategoryForm {
   });
 
   readonly form = new FormGroup({
-    id: new FormControl<number>(this.context.data?.id ?? TransactionType.Expense, { nonNullable: true, validators: [Validators.required] }),
+    id: new FormControl<number | null>(this.context.data?.id ?? null),
+    parentId: new FormControl<number>(this.context.data?.parent_id ?? TransactionType.Expense, { nonNullable: true, validators: [Validators.required] }),
     name: new FormControl<string>(this.context.data?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
-    parentId: new FormControl<number | null>(this.context.data?.parent_id ?? null),
     color: new FormControl<string>(this.context.data?.color ?? '#14aa00', { nonNullable: true }),
     icon: new FormControl<string>(this.context.data?.icon ?? 'circle', { nonNullable: true }),
   });

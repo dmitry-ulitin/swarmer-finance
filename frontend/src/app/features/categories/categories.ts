@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
 import { TuiTree } from '@taiga-ui/kit';
-import { Category, findCategoryById } from '../../models/category';
+import { Category, findCategoryById, flattenCategories } from '../../models/category';
 import { EMPTY_ARRAY, TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
@@ -24,25 +24,31 @@ export class Categories {
   selected = signal<number | null>(null);
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
-    const categories = this.categoriesState.categories();
-    const visit = (items: Category[]) => {
-      for (const item of items) {
-        const key = [...this.map.keys()].find(n => n.id === item.id);
-        if (key) {
-          this.map.set(item, this.map.get(key) || false);
-          this.map.delete(key);
-        }
-
-        if (item.children?.length) visit(item.children);
+    const newCategories = this.categoriesState.categories();
+    const expandedIds = new Set<number>();
+    this.map.forEach((expanded, category) => {
+      if (expanded) expandedIds.add(category.id);
+    });
+    this.map.clear();
+    flattenCategories(newCategories).forEach(cat => {
+      if (expandedIds.has(cat.id)) {
+        this.map.set(cat, true);
       }
-    };
-    visit(categories);
-    return categories;
+    });
+    return newCategories;
   });
 
 
   setAsSelected(node: Category) {
     this.selected.set(node.id);
+  }
+
+  onToggled(node: Category): void {
+    const selectedId = this.selected();
+    if (selectedId === null) return;
+    if (findCategoryById(selectedId, node.children ?? [])) {
+      this.selected.set(null);
+    }
   }
 
   async openCreateDialog(): Promise<void> {
@@ -69,13 +75,13 @@ export class Categories {
     const category = findCategoryById(selectedId, this.categories());
     if (!category) return;
     const { CategoryForm } = await import('./category-form/category-form');
-    this.dialogs.open<Category | null>(
+    await firstValueFrom(this.dialogs.open<Category | null>(
       new PolymorpheusComponent(CategoryForm, this.injector),
       {
         data: category,
         label: 'Edit Category',
         size: 's',
       }
-    ).subscribe();
+    ), { defaultValue: null });
   }
 }
