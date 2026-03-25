@@ -6,14 +6,14 @@ export interface Category {
   color: string;
   icon: string;
   fullName: string;
-  rootId: number;
+  root_id: number;
   children?: Category[];
 }
 
-export const withComputedFields = (categories: Category[], ancestorPath = '', rootId = 0): Category[] =>
+export const withComputedFields = (categories: Category[], ancestorPath = '', root_id = 0): Category[] =>
   categories.map(category => {
     const isRoot = category.parent_id === null;
-    const currentRootId = isRoot ? category.id : rootId;
+    const currentRootId = isRoot ? category.id : root_id;
     const fullName = isRoot
       ? category.name
       : ancestorPath ? `${ancestorPath}/${category.name}` : category.name;
@@ -21,7 +21,7 @@ export const withComputedFields = (categories: Category[], ancestorPath = '', ro
     return {
       ...category,
       fullName,
-      rootId: currentRootId,
+      root_id: currentRootId,
       children: category.children
         ? withComputedFields(category.children, nextPath, currentRootId)
         : undefined,
