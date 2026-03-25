@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, resource, untracked } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { Category } from '../models/category';
+import { Category, withComputedFields } from '../models/category';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -18,7 +18,7 @@ export class CategoriesState {
     }
   });
 
-  readonly categories = computed(() => this.resource.value() ?? []);
+  readonly categories = computed(() => withComputedFields(this.resource.value() ?? []));
   readonly loading = this.resource.isLoading;
 
   reload() {

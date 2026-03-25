@@ -5,8 +5,28 @@ export interface Category {
   parent_id: number | null;
   color: string;
   icon: string;
+  fullName: string;
+  rootId: number;
   children?: Category[];
 }
+
+export const withComputedFields = (categories: Category[], ancestorPath = '', rootId = 0): Category[] =>
+  categories.map(category => {
+    const isRoot = category.parent_id === null;
+    const currentRootId = isRoot ? category.id : rootId;
+    const fullName = isRoot
+      ? category.name
+      : ancestorPath ? `${ancestorPath}/${category.name}` : category.name;
+    const nextPath = isRoot ? '' : fullName;
+    return {
+      ...category,
+      fullName,
+      rootId: currentRootId,
+      children: category.children
+        ? withComputedFields(category.children, nextPath, currentRootId)
+        : undefined,
+    };
+  });
 
 export const findCategoryById = (id: number, categories: Category[]): Category | null => {
   for (const category of categories) {
