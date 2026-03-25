@@ -23,6 +23,17 @@ export const findCategoryById = (id: number, categories: Category[]): Category |
   return null;
 }
 
+export const findAncestors = (id: number, categories: Category[]): Category[] | null => {
+  for (const category of categories) {
+    if (category.id === id) return [];
+    if (category.children?.length) {
+      const path = findAncestors(id, category.children);
+      if (path !== null) return [category, ...path];
+    }
+  }
+  return null;
+};
+
 export const flattenCategories = (categories: Category[]): Category[] => {
   const result: Category[] = [];
   const visit = (nodes: Category[]) => {

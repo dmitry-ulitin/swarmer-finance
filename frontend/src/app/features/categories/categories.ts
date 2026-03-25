@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
 import { TUI_CONFIRM, TuiConfirmData, TuiTree } from '@taiga-ui/kit';
-import { Category, findCategoryById, flattenCategories } from '../../models/category';
+import { Category, findAncestors, findCategoryById, flattenCategories } from '../../models/category';
 import { EMPTY_ARRAY, TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
@@ -36,11 +36,14 @@ export class Categories {
     });
     return newCategories;
   });
-  readonly selected = signal<number | null>(null);
+  readonly selectedId = signal<number | null>(null);
   readonly selectedCategory = computed(() => {
-    const selectedId = this.selected();
+    const selectedId = this.selectedId();
     if (selectedId === null) return null;
-    return findCategoryById(selectedId, this.categories());
+    const categories = this.categories();
+    const ancestors = findAncestors(selectedId, categories);
+    ancestors?.forEach(ancestor => this.map.set(ancestor, true));
+    return findCategoryById(selectedId, categories);
   });
   readonly isEditable = computed(() => {
     const selectedCategory = this.selectedCategory();
@@ -52,14 +55,14 @@ export class Categories {
   });
 
   setAsSelected(node: Category) {
-    this.selected.set(node.id);
+    this.selectedId.set(node.id);
   }
 
   onToggled(node: Category): void {
-    const selectedId = this.selected();
+    const selectedId = this.selectedId();
     if (selectedId === null) return;
     if (findCategoryById(selectedId, node.children ?? [])) {
-      this.selected.set(null);
+      this.selectedId.set(null);
     }
   }
 
@@ -75,7 +78,7 @@ export class Categories {
       }
     ), { defaultValue: null });
     if (category !== null) {
-      this.selected.set(category.id);
+      this.selectedId.set(category.id);
     }
   }
 
@@ -93,7 +96,7 @@ export class Categories {
     );
     if (confirmed) {
       await firstValueFrom(this.categoriesState.delete(category.id));
-      this.selected.set(null);
+      this.selectedId.set(null);
     }
   }
 

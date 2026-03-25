@@ -14,7 +14,7 @@
     }
 </tui-loader>
 <ng-template #content let-item>
-    <span [class.active]="item.id===selected()" (click)="setAsSelected(item)" class="category">
-        <tui-icon [icon]="'@tui.' + item.icon" class="icon" [style.color]="item.color" />{{ item.name }}
+    <span [class.active]="item.id===selectedCategory()?.id" (click)="setAsSelected(item)" class="category">
+        <tui-icon [icon]=item.icon class="icon" [style.color]="item.color" />{{ item.name }}
     </span>
 </ng-template>
