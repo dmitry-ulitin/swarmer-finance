@@ -9,9 +9,9 @@ import type { TuiDialogContext } from '@taiga-ui/core';
 import { CategoriesState } from '../../../core/categories.state';
 import type { Category } from '../../../models/category';
 import { findCategoryById } from '../../../models/category';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, pipe } from 'rxjs';
 import { TransactionType } from '../../../models/transaction';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-category-form',
@@ -47,19 +47,40 @@ export class CategoryForm {
     icon: new FormControl<string>(this.context.data?.icon ?? 'circle', { nonNullable: true }),
   });
 
+  readonly predefinedIcons = [
+    'home', 'car', 'shopping-cart', 'heart-pulse', 'briefcase',
+    'graduation-cap', 'plane', 'gift', 'music', 'gamepad-2',
+    'coffee', 'zap', 'droplets', 'pill', 'briefcase-medical',
+    'dumbbell', 'wallet', 'utensils', 'baby', 'star', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
+  ] as const;
+
   readonly loading = signal(false);
   readonly categoryId = signal(this.context.data?.id ?? null);
   readonly error = signal<TuiValidationError | null>(null);
   readonly parent = toSignal(this.form.controls.parent.valueChanges, { initialValue: this.form.controls.parent.value });
-  readonly prefix = computed(() => {
-    const parent = this.parent();
-    return parent?.parent_id ? `${parent.fullName}/ ` : '';
-  });
 
   readonly stringifyCategory: TuiStringHandler<Category | null> = (item) => {
-    return item?.name ?? 'None (top-level)';
+    return item?.fullName ?? 'None (top-level)';
   };
   readonly identityMatcher = (a: Category | null, b: Category | null): boolean => a?.id === b?.id;
+
+  constructor() {
+    this.form.controls.parent.valueChanges.pipe(takeUntilDestroyed()).subscribe(parent => this.onParentChange(parent));
+
+    let parent_id = this.form.controls.parent.value?.parent_id;
+    while (parent_id) {
+      const parent = findCategoryById(parent_id, this.categories());
+      if (!parent) break;
+      this.treeMap.set(parent, true);
+      parent_id = parent.parent_id;
+    }
+  }
+
+  onParentChange(parent: Category | null): void {
+    if (!!this.context.data?.id || !parent) return;
+    this.form.controls.color.setValue(parent.color);
+    this.form.controls.icon.setValue(parent.icon);
+  }
 
   async onSubmit() {
     if (this.form.invalid) return;

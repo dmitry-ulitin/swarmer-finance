@@ -13,3 +13,45 @@
 .fill {
     flex-grow: 1;
 }
+
+.icon-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.icon-label {
+    font: var(--tui-font-text-s);
+    color: var(--tui-text-secondary);
+}
+
+.icon-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.5rem;
+}
+
+tui-icon {
+    font-size: 1.2rem;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3rem;
+    border: 1px solid var(--tui-border-normal);
+    border-radius: var(--tui-radius-m);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+
+    &:hover {
+        background: var(--tui-background-neutral-1-hover);
+    }
+
+    &.selected {
+        border-color: var(--tui-border-focus);
+        background: var(--tui-background-neutral-1);
+    }
+}

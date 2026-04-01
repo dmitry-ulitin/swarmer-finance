@@ -11,13 +11,10 @@
         </tui-data-list>
     </tui-textfield>
 
-    <div class="row">
-        {{ prefix() }}
-        <tui-textfield class="fill">
-            <label tuiLabel>Name</label>
-            <input tuiTextfield formControlName="name" placeholder="Category name" />
-        </tui-textfield>
-    </div>
+    <tui-textfield>
+        <label tuiLabel>Name</label>
+        <input tuiTextfield formControlName="name" placeholder="Category name" />
+    </tui-textfield>
 
     <div class="row">
         <tui-textfield [tuiTextfieldCleaner]="false" iconStart=" " class="fill">
@@ -26,10 +23,29 @@
         </tui-textfield>
         <tui-icon [icon]="'@tui.' + form.value.icon" [style.color]="form.value.color" />
     </div>
-    <tui-textfield>
-        <label tuiLabel>Icon</label>
-        <input tuiTextfield formControlName="icon" placeholder="e.g. home, star, wallet" />
-    </tui-textfield>
+    <div class="icon-picker">
+        <span class="icon-label">Icon</span>
+        <div class="icon-grid">
+            @if(parent()?.root_id === 1 ) {
+            <button type="button" class="icon-btn" [class.selected]="form.value.icon === 'circle-plus'"
+                [attr.aria-label]="'circle-plus'" (click)="form.controls.icon.setValue('circle-plus')">
+                <tui-icon [icon]="'@tui.' + 'circle-plus'" />
+            </button>
+            }
+            @if(parent()?.root_id === 2 ) {
+            <button type="button" class="icon-btn" [class.selected]="form.value.icon === 'circle-minus'"
+                [attr.aria-label]="'circle-minus'" (click)="form.controls.icon.setValue('circle-minus')">
+                <tui-icon [icon]="'@tui.' + 'circle-minus'" />
+            </button>
+            }
+            @for (icon of predefinedIcons; track icon) {
+            <button type="button" class="icon-btn" [class.selected]="form.value.icon === icon" [attr.aria-label]="icon"
+                (click)="form.controls.icon.setValue(icon)">
+                <tui-icon [icon]="'@tui.' + icon" />
+            </button>
+            }
+        </div>
+    </div>
 
     <tui-error [error]="error()" />
 
