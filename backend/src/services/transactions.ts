@@ -62,7 +62,3 @@ export const deleteTransaction = async (id: number, userId: number): Promise<voi
   
   await transactionQueries.deleteTransaction(id, userId);
 };
-
-export const getSummary = async (userId: number, from: string, to: string) => {
-  return transactionQueries.getSummaryByUserId(userId, from, to);
-};

@@ -111,39 +111,3 @@ export const deleteTransaction = async (
   );
   return count > 0;
 };
-
-export const getSummaryByUserId = async (
-  userId: number,
-  from: string,
-  to: string
-): Promise<{ income: number; expense: number }> => {
-  const result = await query<{ type: string; total: string }>(
-    `SELECT 
-       CASE 
-         WHEN c.parent_id = 1 OR EXISTS (
-           SELECT 1 FROM categories c2 
-           WHERE c2.id = c.parent_id AND c2.parent_id = 1
-         ) THEN 'income'
-         ELSE 'expense'
-       END as type,
-       SUM(t.amount) as total
-     FROM transactions t
-     JOIN categories c ON t.category_id = c.id
-     WHERE t.user_id = $1 AND t.date >= $2 AND t.date <= $3
-     GROUP BY type`,
-    [userId, from, to]
-  );
-  
-  let income = 0;
-  let expense = 0;
-  
-  for (const row of result) {
-    if (row.type === 'income') {
-      income = parseFloat(row.total || '0');
-    } else {
-      expense = parseFloat(row.total || '0');
-    }
-  }
-  
-  return { income, expense };
-};
