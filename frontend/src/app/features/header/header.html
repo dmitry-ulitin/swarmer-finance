@@ -1,6 +1,9 @@
 <span>Swarmer Finance</span>
 <div class="fill"></div>
 @if(authService.isAuthenticated()) {
+<button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="accounts()" [iconStart]="'@tui.wallet'">Accounts</button>
+}
+@if(authService.isAuthenticated()) {
 <button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="categories()" [iconStart]="'@tui.folder'">Categories</button>
 }
 @if(authService.isAuthenticated()) {

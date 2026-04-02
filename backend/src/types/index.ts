@@ -16,12 +16,24 @@ export interface Category {
   children?: Category[];
 }
 
+export interface Account {
+  id: number;
+  user_id: number;
+  name: string;
+  currency: string;
+  start_balance: number;
+  created_at: Date;
+}
+
 export interface Transaction {
   id: number;
   user_id: number;
-  category_id: number;
-  amount: number;
-  currency: string;
+  category_id: number | null;
+  debit_account_id: number | null;
+  credit_account_id: number | null;
+  debit: number;
+  credit: number;
+  currency: string | null;
   date: Date;
   description: string;
   created_at: Date;

@@ -1,0 +1,22 @@
+<div class="header">
+    <button tuiButton appearance="outline" size="s" (click)="accountsState.reload()"
+        [iconStart]="'@tui.refresh-cw'">Refresh</button>
+    <button tuiButton appearance="outline" size="s" (click)="openCreateDialog()"
+        [iconStart]="'@tui.plus'">Add Account</button>
+    <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
+        [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
+    <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
+        [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
+</div>
+<tui-loader [showLoader]="accountsState.loading()" class="list">
+    @if (accountsState.accounts().length === 0 && !accountsState.loading()) {
+        <p class="empty">No accounts yet. Create one to get started.</p>
+    }
+    @for (account of accountsState.accounts(); track account.id) {
+        <div class="account" [class.active]="account.id === selectedAccount()?.id"
+             (click)="setAsSelected(account)">
+            <span class="account-name">{{ account.name }}</span>
+            <span class="account-meta">{{ account.currency }} &middot; {{ account.start_balance | number:'1.2-2' }}</span>
+        </div>
+    }
+</tui-loader>

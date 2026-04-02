@@ -1,0 +1,50 @@
+:host {
+    height: 60vh;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.header {
+    display: flex;
+    gap: .5rem;
+}
+
+.list {
+    width: 100%;
+    flex-grow: 1;
+    overflow: auto;
+}
+
+.account {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .5rem .75rem;
+    border-radius: .3rem;
+    cursor: pointer;
+
+    &.active {
+        background-color: rgba(0, 0, 0, .075);
+    }
+
+    &:hover:not(.active) {
+        background-color: rgba(0, 0, 0, .04);
+    }
+}
+
+.account-name {
+    font-weight: 500;
+}
+
+.account-meta {
+    font: var(--tui-font-text-s);
+    color: var(--tui-text-secondary);
+}
+
+.empty {
+    color: var(--tui-text-secondary);
+    font: var(--tui-font-text-s);
+    padding: 1rem;
+    text-align: center;
+}

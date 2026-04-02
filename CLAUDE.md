@@ -52,13 +52,25 @@ All API responses use this envelope format consistently.
 ### Frontend State Management
 - **AuthService** (`core/auth.service.ts`): Signal-based `accessToken`, `userSignal`, computed `isAuthenticated`
 - **CategoriesState** (`core/categories.state.ts`): Angular `resource()` API for async loading + computed hierarchical structure
+- **AccountsState** (`core/accounts.state.ts`): Same pattern as CategoriesState — flat list of user accounts
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→002→003)
+- Migrations in `backend/src/db/migrations/` — run in order (001→004)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
+- Accounts table added in migration 004 (`name`, `currency`, `start_balance`)
+- Transactions restructured in migration 005: `amount` replaced by `debit`/`credit`; `debit_account_id` and `credit_account_id` added (both nullable); `category_id` and `currency` are now nullable
+
+### Transaction Type Semantics
+Type is derived at runtime — no stored `type` column:
+
+| Type | `debit_account_id` | `credit_account_id` | `currency` | `category_id` |
+|------|-------------------|---------------------|------------|---------------|
+| Expense | filled | null | credit currency | required (leaf) |
+| Income | null | filled | debit currency | required (leaf) |
+| Transfer | filled | filled | null | null |
 
 ### Environment Variables
 Copy `.env.example` → `.env`:

@@ -9,6 +9,7 @@ describe('Transactions API', () => {
   let testUserId: number;
   let incomeCategoryId: number;
   let expenseCategoryId: number;
+  let testAccountId: number;
 
   beforeAll(async () => {
     const email = `tx${Date.now()}@example.com`;
@@ -16,27 +17,35 @@ describe('Transactions API', () => {
       .post('/api/auth/register')
       .send({ email, password: 'password123' });
     token = res.body.data.accessToken;
-    
+
     const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     testUserId = userResult.rows[0].id;
-    
+
     const catResult = await pool.query(`
-      SELECT c.id FROM categories c 
-      LEFT JOIN categories p ON c.parent_id = p.id 
+      SELECT c.id FROM categories c
+      LEFT JOIN categories p ON c.parent_id = p.id
       WHERE c.user_id = $1 AND p.id = 1 LIMIT 1
     `, [testUserId]);
     incomeCategoryId = catResult.rows[0]?.id;
-    
+
     const expCatResult = await pool.query(`
-      SELECT c.id FROM categories c 
-      LEFT JOIN categories p ON c.parent_id = p.id 
+      SELECT c.id FROM categories c
+      LEFT JOIN categories p ON c.parent_id = p.id
       WHERE c.user_id = $1 AND p.id = 2 LIMIT 1
     `, [testUserId]);
     expenseCategoryId = expCatResult.rows[0]?.id;
+
+    const accountResult = await pool.query(
+      `INSERT INTO accounts (user_id, name, currency, start_balance)
+       VALUES ($1, 'Test Account', 'USD', 0) RETURNING id`,
+      [testUserId]
+    );
+    testAccountId = accountResult.rows[0].id;
   });
 
   afterAll(async () => {
     await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+    await pool.query('DELETE FROM accounts WHERE user_id = $1', [testUserId]);
     await pool.query('DELETE FROM categories WHERE user_id = $1', [testUserId]);
     await pool.query('DELETE FROM users WHERE id = $1', [testUserId]);
   });
@@ -44,16 +53,18 @@ describe('Transactions API', () => {
   describe('GET /api/transactions', () => {
     beforeEach(async () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
-      
+
+      // Income: credit_account_id filled, debit_account_id null
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, amount, date, description, currency)
-         VALUES ($1, $2, 1000, '2026-02-01', 'Test income', 'USD')`,
-        [testUserId, incomeCategoryId]
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
+         VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-02-01', 'Test income')`,
+        [testUserId, incomeCategoryId, testAccountId]
       );
+      // Expense: debit_account_id filled, credit_account_id null
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, amount, date, description, currency)
-         VALUES ($1, $2, -50, '2026-02-15', 'Test expense', 'USD')`,
-        [testUserId, expenseCategoryId]
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date, description)
+         VALUES ($1, $2, $3, 50, 50, 'USD', '2026-02-15', 'Test expense')`,
+        [testUserId, expenseCategoryId, testAccountId]
       );
     });
 
@@ -89,20 +100,22 @@ describe('Transactions API', () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
     });
 
-    it('should create a new transaction', async () => {
+    it('should create an income transaction', async () => {
       const res = await request(app)
         .post('/api/transactions')
         .set({ Authorization: `Bearer ${token}` })
         .send({
           categoryId: incomeCategoryId,
-          amount: 500,
+          creditAccountId: testAccountId,
+          debit: 500,
+          credit: 500,
           date: '2026-02-18',
-          description: 'Test transaction',
-          currency: 'USD'
+          description: 'Test income',
+          currency: 'USD',
         });
 
       expect(res.status).toBe(200);
-      expect(Number(res.body.data.amount)).toBe(500);
+      expect(Number(res.body.data.debit)).toBe(500);
       expect(res.body.data.currency).toBe('USD');
     });
 
@@ -112,23 +125,27 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` })
         .send({
           categoryId: incomeCategoryId,
-          amount: 100,
+          creditAccountId: testAccountId,
+          debit: 100,
+          credit: 100,
           date: '2026-02-18',
-          currency: 'USDT'
+          currency: 'USDT',
         });
 
       expect(res.status).toBe(200);
       expect(res.body.data.currency).toBe('USDT');
     });
 
-    it('should require currency', async () => {
+    it('should require currency for income', async () => {
       const res = await request(app)
         .post('/api/transactions')
         .set({ Authorization: `Bearer ${token}` })
         .send({
           categoryId: incomeCategoryId,
-          amount: 500,
-          date: '2026-02-18'
+          creditAccountId: testAccountId,
+          debit: 500,
+          credit: 500,
+          date: '2026-02-18',
         });
 
       expect(res.status).toBe(400);
@@ -140,13 +157,39 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` })
         .send({
           categoryId: 1,
-          amount: 500,
+          creditAccountId: testAccountId,
+          debit: 500,
+          credit: 500,
           date: '2026-02-18',
-          currency: 'USD'
+          currency: 'USD',
         });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('leaf category');
+    });
+
+    it('should create a transfer transaction', async () => {
+      const secondAccountResult = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance)
+         VALUES ($1, 'Second Account', 'EUR', 0) RETURNING id`,
+        [testUserId]
+      );
+      const secondAccountId = secondAccountResult.rows[0].id;
+
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debitAccountId: testAccountId,
+          creditAccountId: secondAccountId,
+          debit: 100,
+          credit: 90,
+          date: '2026-02-18',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.category_id).toBeNull();
+      expect(res.body.data.currency).toBeNull();
     });
   });
 
@@ -155,12 +198,12 @@ describe('Transactions API', () => {
 
     beforeEach(async () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
-      
+
       const result = await pool.query(
-        `INSERT INTO transactions (user_id, category_id, amount, date, description, currency)
-         VALUES ($1, $2, 100, '2026-02-01', 'Original', 'USD')
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
+         VALUES ($1, $2, $3, 100, 100, 'USD', '2026-02-01', 'Original')
          RETURNING id`,
-        [testUserId, incomeCategoryId]
+        [testUserId, incomeCategoryId, testAccountId]
       );
       transactionId = result.rows[0].id;
     });
@@ -170,15 +213,13 @@ describe('Transactions API', () => {
         .put(`/api/transactions/${transactionId}`)
         .set({ Authorization: `Bearer ${token}` })
         .send({
-          categoryId: incomeCategoryId,
-          amount: 200,
-          date: '2026-02-01',
-          description: 'Updated',
-          currency: 'EUR'
+          debit: 200,
+          credit: 200,
+          currency: 'EUR',
         });
 
       expect(res.status).toBe(200);
-      expect(Number(res.body.data.amount)).toBe(200);
+      expect(Number(res.body.data.debit)).toBe(200);
       expect(res.body.data.currency).toBe('EUR');
     });
   });
@@ -188,12 +229,12 @@ describe('Transactions API', () => {
 
     beforeEach(async () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
-      
+
       const result = await pool.query(
-        `INSERT INTO transactions (user_id, category_id, amount, date, currency)
-         VALUES ($1, $2, 100, '2026-02-01', 'USD')
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
+         VALUES ($1, $2, $3, 100, 100, 'USD', '2026-02-01')
          RETURNING id`,
-        [testUserId, incomeCategoryId]
+        [testUserId, incomeCategoryId, testAccountId]
       );
       transactionId = result.rows[0].id;
     });

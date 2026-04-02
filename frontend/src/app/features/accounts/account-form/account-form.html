@@ -1,0 +1,22 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+    <tui-textfield>
+        <label tuiLabel>Name</label>
+        <input tuiTextfield formControlName="name" placeholder="Account name" />
+    </tui-textfield>
+
+    <tui-textfield>
+        <label tuiLabel>Currency</label>
+        <input tuiTextfield formControlName="currency" placeholder="e.g. USD, EUR" />
+    </tui-textfield>
+
+    <tui-textfield>
+        <label tuiLabel>Starting Balance</label>
+        <input tuiTextfield type="number" formControlName="startBalance" placeholder="0" />
+    </tui-textfield>
+
+    <tui-error [error]="error()" />
+
+    <button tuiButton size="m" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Saving...' : (!!accountId() ? 'Save Changes' : 'Create Account') }}
+    </button>
+</form>

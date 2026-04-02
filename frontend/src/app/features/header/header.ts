@@ -20,4 +20,13 @@ export class Header {
       size: 'l',
     })().subscribe();
   }
+
+  async accounts() {
+    const {Accounts} = await import('../accounts/accounts');
+    tuiDialog(Accounts, {
+      injector: this.injector,
+      label: 'Accounts',
+      size: 'm',
+    })().subscribe();
+  }
 }

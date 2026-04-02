@@ -1,10 +1,13 @@
 # Swarmer Finance
 
-A personal finance application for tracking income/expenses.
+A personal finance application for tracking income, expenses, and transfers across multiple accounts.
 
 ## Features
 
-- Transaction management (income & expense tracking)
+- Account management (name, currency, starting balance)
+- Transaction management with double-entry bookkeeping (debit/credit)
+- Three transaction types: **expense**, **income**, **transfer** — derived from account references
+- Cross-currency transfers (debit ≠ credit when currencies differ)
 - Hierarchical categories with parent/child support
 - JWT authentication (access + refresh tokens)
 - Filtering transactions by date range, category, and type
@@ -113,11 +116,27 @@ All endpoints except `/api/auth/*` require a `Bearer` JWT token.
 | POST | `/api/categories` | Create a category |
 | PUT | `/api/categories/:id` | Update a category |
 | DELETE | `/api/categories/:id` | Delete a category |
+| GET | `/api/accounts` | List accounts |
+| POST | `/api/accounts` | Create an account |
+| PUT | `/api/accounts/:id` | Update an account |
+| DELETE | `/api/accounts/:id` | Delete an account |
 | GET | `/api/transactions` | List transactions (supports `?from=&to=&category=&type=&page=&limit=`) |
 | POST | `/api/transactions` | Create a transaction |
 | PUT | `/api/transactions/:id` | Update a transaction |
 | DELETE | `/api/transactions/:id` | Delete a transaction |
 | GET | `/api/health` | Health check |
+
+### Transaction Types
+
+Transactions use double-entry bookkeeping. The type is derived from which account references are populated:
+
+| Type | `debit_account_id` | `credit_account_id` | `currency` | `category_id` |
+|------|-------------------|---------------------|------------|---------------|
+| Expense | filled | null | credit currency | required (leaf) |
+| Income | null | filled | debit currency | required (leaf) |
+| Transfer | filled | filled | null | null |
+
+When both accounts share the same currency `debit == credit`; otherwise they differ by the exchange rate.
 
 ## Project Structure
 
@@ -125,18 +144,18 @@ All endpoints except `/api/auth/*` require a `Bearer` JWT token.
 swarmer-finance/
 ├── backend/
 │   └── src/
-│       ├── routes/        # Express route handlers
+│       ├── routes/        # Express route handlers (auth, categories, accounts, transactions)
 │       ├── services/      # Business logic
 │       ├── db/
-│       │   ├── migrations/ # Numbered SQL migration files
+│       │   ├── migrations/ # Numbered SQL migration files (001–005)
 │       │   └── queries/    # Raw SQL query functions
 │       ├── middleware/    # auth, error handler, validation
 │       └── types/         # Shared TypeScript interfaces
 ├── frontend/
 │   └── src/app/
-│       ├── core/          # Auth service, interceptor, guards
-│       ├── shared/        # Reusable components and utilities
-│       └── features/      # Feature components (auth, categories, dashboard)
+│       ├── core/          # Auth service, interceptor, guards, state (categories, accounts)
+│       ├── models/        # TypeScript interfaces (Category, Account, Transaction)
+│       └── features/      # Feature components (auth, header, categories, accounts, dashboard)
 ├── docker-compose.yml
 ├── Dockerfile
 └── render.yaml            # Render.com deployment config
