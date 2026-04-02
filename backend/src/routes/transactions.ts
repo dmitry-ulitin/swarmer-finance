@@ -11,6 +11,7 @@ router.use(authMiddleware);
 const createTransactionSchema = z.object({
   categoryId: z.number().int().positive(),
   amount: z.number().positive(),
+  currency: z.string().min(1),
   date: z.string(),
   description: z.string().optional(),
 });
@@ -46,11 +47,12 @@ router.get('/', validate(filtersSchema), async (req: AuthRequest, res, next) => 
 
 router.post('/', validate(createTransactionSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { categoryId, amount, date, description } = req.body;
+    const { categoryId, amount, currency, date, description } = req.body;
     const transaction = await transactionService.createTransaction(
       req.userId!,
       categoryId,
       amount,
+      currency,
       date,
       description
     );
@@ -67,12 +69,13 @@ router.post('/', validate(createTransactionSchema), async (req: AuthRequest, res
 router.put('/:id', validate(updateTransactionSchema), async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { categoryId, amount, date, description } = req.body;
+    const { categoryId, amount, currency, date, description } = req.body;
     const transaction = await transactionService.updateTransaction(
       id,
       req.userId!,
       categoryId,
       amount,
+      currency,
       date,
       description
     );

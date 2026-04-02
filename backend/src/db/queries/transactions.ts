@@ -73,13 +73,14 @@ export const createTransaction = async (
   userId: number,
   categoryId: number,
   amount: number,
+  currency: string,
   date: string,
   description?: string
 ): Promise<Transaction> => {
   const result = await query<Transaction>(
-    `INSERT INTO transactions (user_id, category_id, amount, date, description)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [userId, categoryId, amount, date, description || '']
+    `INSERT INTO transactions (user_id, category_id, amount, date, currency, description)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [userId, categoryId, amount, date, currency, description || '']
   );
   return result[0];
 };
@@ -89,14 +90,15 @@ export const updateTransaction = async (
   userId: number,
   categoryId: number,
   amount: number,
+  currency: string | undefined,
   date: string,
   description?: string
 ): Promise<Transaction | null> => {
   const result = await query<Transaction>(
-    `UPDATE transactions 
-     SET category_id = $1, amount = $2, date = $3, description = $4
-     WHERE id = $5 AND user_id = $6 RETURNING *`,
-    [categoryId, amount, date, description || '', id, userId]
+    `UPDATE transactions
+     SET category_id = $1, amount = $2, date = $3, description = $4, currency = COALESCE($5, currency)
+     WHERE id = $6 AND user_id = $7 RETURNING *`,
+    [categoryId, amount, date, description || '', currency ?? null, id, userId]
   );
   return result[0] || null;
 };

@@ -12,6 +12,7 @@ export const createTransaction = async (
   userId: number,
   categoryId: number,
   amount: number,
+  currency: string,
   date: string,
   description?: string
 ) => {
@@ -19,13 +20,13 @@ export const createTransaction = async (
   if (!hasAccess) {
     throw { statusCode: 403, message: 'Cannot use this category' };
   }
-  
+
   const isLeaf = !(await categoryQueries.hasChildren(categoryId));
   if (!isLeaf) {
     throw { statusCode: 400, message: 'Must select a leaf category' };
   }
-  
-  return transactionQueries.createTransaction(userId, categoryId, amount, date, description);
+
+  return transactionQueries.createTransaction(userId, categoryId, amount, currency, date, description);
 };
 
 export const updateTransaction = async (
@@ -33,6 +34,7 @@ export const updateTransaction = async (
   userId: number,
   categoryId: number,
   amount: number,
+  currency: string | undefined,
   date: string,
   description?: string
 ) => {
@@ -40,18 +42,18 @@ export const updateTransaction = async (
   if (!existing) {
     throw { statusCode: 404, message: 'Transaction not found' };
   }
-  
+
   const hasAccess = await categoryQueries.canUserAccessCategory(categoryId, userId);
   if (!hasAccess) {
     throw { statusCode: 403, message: 'Cannot use this category' };
   }
-  
+
   const isLeaf = !(await categoryQueries.hasChildren(categoryId));
   if (!isLeaf) {
     throw { statusCode: 400, message: 'Must select a leaf category' };
   }
-  
-  return transactionQueries.updateTransaction(id, userId, categoryId, amount, date, description);
+
+  return transactionQueries.updateTransaction(id, userId, categoryId, amount, currency, date, description);
 };
 
 export const deleteTransaction = async (id: number, userId: number): Promise<void> => {

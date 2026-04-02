@@ -21,6 +21,7 @@ export interface Transaction {
   user_id: number;
   category_id: number;
   amount: number;
+  currency: string;
   date: Date;
   description: string;
   created_at: Date;
