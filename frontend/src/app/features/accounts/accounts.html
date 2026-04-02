@@ -16,7 +16,7 @@
         <div class="account" [class.active]="account.id === selectedAccount()?.id"
              (click)="setAsSelected(account)">
             <span class="account-name">{{ account.name }}</span>
-            <span class="account-meta">{{ account.currency }} &middot; {{ account.start_balance | number:'1.2-2' }}</span>
+            <span class="account-meta">{{ account.currency }} &middot; {{ account.start_balance / 100 | number:'1.2-2' }}</span>
         </div>
     }
 </tui-loader>

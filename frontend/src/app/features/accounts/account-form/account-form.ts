@@ -22,7 +22,7 @@ export class AccountForm {
   readonly form = new FormGroup({
     name: new FormControl<string>(this.context.data?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
     currency: new FormControl<string>(this.context.data?.currency ?? '', { nonNullable: true, validators: [Validators.required] }),
-    startBalance: new FormControl<number>(this.context.data?.start_balance ?? 0, { nonNullable: true, validators: [Validators.required] }),
+    startBalance: new FormControl<number>((this.context.data?.start_balance ?? 0) / 100, { nonNullable: true, validators: [Validators.required] }),
   });
 
   readonly loading = signal(false);
@@ -37,7 +37,8 @@ export class AccountForm {
       this.error.set(null);
 
       const id = this.context.data?.id;
-      const { name, currency, startBalance } = this.form.getRawValue();
+      const { name, currency } = this.form.getRawValue();
+      const startBalance = Math.round(this.form.getRawValue().startBalance * 100);
       const obs = id != null
         ? this.accountsState.update(id, { name, currency, startBalance })
         : this.accountsState.create({ name, currency, startBalance });

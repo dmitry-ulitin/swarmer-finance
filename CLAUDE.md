@@ -60,8 +60,8 @@ All API responses use this envelope format consistently.
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
-- Accounts table added in migration 004 (`name`, `currency`, `start_balance`)
-- Transactions restructured in migration 005: `amount` replaced by `debit`/`credit`; `debit_account_id` and `credit_account_id` added (both nullable); `category_id` and `currency` are now nullable
+- Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
+- Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` and `currency` are nullable
 
 ### Transaction Type Semantics
 Type is derived at runtime — no stored `type` column:

@@ -138,6 +138,8 @@ Transactions use double-entry bookkeeping. The type is derived from which accoun
 
 When both accounts share the same currency `debit == credit`; otherwise they differ by the exchange rate.
 
+All monetary values (`debit`, `credit`, `start_balance`) are stored as **integer cents** (e.g. `1000` = $10.00).
+
 ## Project Structure
 
 ```
