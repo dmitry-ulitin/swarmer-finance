@@ -1,23 +1,23 @@
-    <div class="auth-container">
-      <div class="auth-card card">
-        <h1>Login</h1>
-        <form [formGroup]="form" (submit)="onSubmit($event)" tuiTextfieldSize="m">
-          <tui-textfield>
-            <label tuiLabel>Email</label>
-            <input tuiInput type="email" formControlName="email" class="form-input" placeholder="Enter your email">
-          </tui-textfield>
-          <tui-textfield>
-            <label tuiLabel>Password</label>
-            <input tuiInput type="password" formControlName="password" class="form-input" placeholder="Enter your password">
-            <tui-icon tuiPassword />
-          </tui-textfield>
-          <tui-error [error]="error()" />
-          <button tuiButton size="l" type="submit" [disabled]="loading()" size="m">
-            {{ loading() ? 'Loading...' : 'Login' }}
-          </button>
-        </form>
-        <p class="auth-link">
-          Don't have an account? <a tuiLink routerLink="/register">Register</a>
-        </p>
-      </div>
-    </div>
+<div class="auth-container">
+  <div class="auth-card card">
+    <h1>Login</h1>
+    <form [formGroup]="form" (submit)="onSubmit($event)" tuiTextfieldSize="m">
+      <tui-textfield>
+        <label tuiLabel>Email</label>
+        <input tuiInput type="email" formControlName="email" class="form-input" placeholder="Enter your email">
+      </tui-textfield>
+      <tui-textfield>
+        <label tuiLabel>Password</label>
+        <input tuiInput type="password" formControlName="password" class="form-input" placeholder="Enter your password">
+        <tui-icon tuiPassword />
+      </tui-textfield>
+      <tui-error [error]="error()" />
+      <button tuiButton size="m" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Loading...' : 'Login' }}
+      </button>
+    </form>
+    <p class="auth-link">
+      Don't have an account? <a tuiLink routerLink="/register">Register</a>
+    </p>
+  </div>
+</div>

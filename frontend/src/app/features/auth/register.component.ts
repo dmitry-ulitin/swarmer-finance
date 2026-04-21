@@ -5,6 +5,7 @@ import { TuiButton, TuiError, TuiIcon, TuiInput, TuiLink } from '@taiga-ui/core'
 import { TuiPassword } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { AuthService } from '../../core/auth.service';
+import { firstValueFrom } from 'rxjs/internal/firstValueFrom';
 
 @Component({
   selector: 'app-register',
@@ -25,24 +26,22 @@ export class RegisterComponent {
   loading = signal(false);
   error = signal<TuiValidationError | null>(null);
 
-  onSubmit(event: Event) {
+  async onSubmit(event: Event) {
     event.preventDefault();
     if (this.form.invalid) return;
 
     this.loading.set(true);
     this.error.set(null);
 
-    this.authService.register(
-      this.form.value.email!,
-      this.form.value.password!
-    ).subscribe({
-      next: () => {
-        this.router.navigate(['/dashboard']);
-      },
-      error: (err) => {
-        this.loading.set(false);
-        this.error.set(new TuiValidationError(err.error?.error || 'Registration failed'));
-      }
-    });
+    try {
+      await firstValueFrom(this.authService.register(
+        this.form.value.email!,
+        this.form.value.password!
+      ));
+      this.router.navigate(['/dashboard']);
+    } catch (err) {
+      this.loading.set(false);
+      this.error.set(new TuiValidationError((err as any).error?.error || 'Registration failed'));
+    }
   }
 }
