@@ -31,7 +31,7 @@ docker-compose up --build   # Start backend + frontend + PostgreSQL
 
 ### Monorepo Structure
 - `backend/` — Node.js + Express + PostgreSQL (raw SQL, no ORM)
-- `frontend/` — Angular 21 standalone components + Taiga UI v4
+- `frontend/` — Angular 21 standalone components + Taiga UI v5
 - `docker-compose.yml` / `Dockerfile` — multi-stage production build; `start.sh` generates Nginx config dynamically at container startup for Render.com compatibility
 
 ### Backend Request Flow
