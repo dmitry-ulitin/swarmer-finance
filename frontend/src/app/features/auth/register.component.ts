@@ -25,7 +25,8 @@ export class RegisterComponent {
   loading = signal(false);
   error = signal<TuiValidationError | null>(null);
 
-  onSubmit() {
+  onSubmit(event: Event) {
+    event.preventDefault();
     if (this.form.invalid) return;
 
     this.loading.set(true);

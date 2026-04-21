@@ -1,7 +1,7 @@
 <div class="auth-container">
   <div class="auth-card card">
     <h1>Register</h1>
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" tuiTextfieldSize="m">
+    <form [formGroup]="form" (submit)="onSubmit($event)" tuiTextfieldSize="m">
       <tui-textfield>
         <label tuiLabel>Email</label>
         <input tuiInput type="email" formControlName="email" placeholder="Enter your email">
