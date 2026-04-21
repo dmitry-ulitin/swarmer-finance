@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiError, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiInput } from '@taiga-ui/core';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -10,7 +10,7 @@ import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiTextfield, TuiButton, TuiError],
+  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

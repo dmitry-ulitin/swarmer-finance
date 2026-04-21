@@ -4,11 +4,11 @@
     <form [formGroup]="form" (ngSubmit)="onSubmit()" tuiTextfieldSize="m">
       <tui-textfield>
         <label tuiLabel>Email</label>
-        <input tuiTextfield type="email" formControlName="email" placeholder="Enter your email">
+        <input tuiInput type="email" formControlName="email" placeholder="Enter your email">
       </tui-textfield>
       <tui-textfield>
         <label tuiLabel>Password</label>
-        <input tuiTextfield type="password" formControlName="password" placeholder="Enter your password (min 6 characters)">
+        <input tuiInput type="password" formControlName="password" placeholder="Enter your password (min 6 characters)">
         <tui-icon tuiPassword />
       </tui-textfield>
       <tui-error [error]="error()" />

@@ -3,7 +3,7 @@
         [identityMatcher]="identityMatcher">
         <label tuiLabel>Parent Category</label>
         <input tuiSelect formControlName="parent" />
-        <tui-data-list *tuiTextfieldDropdown>
+        <tui-data-list *tuiDropdown>
             @for (item of parentOptions(); track item.id) {
             <tui-tree [childrenHandler]="treeHandler()" [content]="treeNodeContent" [map]="treeMap"
                 [tuiTreeController]="false" [value]="item" />
@@ -13,7 +13,7 @@
 
     <tui-textfield>
         <label tuiLabel>Name</label>
-        <input tuiTextfield formControlName="name" placeholder="Category name" />
+        <input tuiInput formControlName="name" placeholder="Category name" />
     </tui-textfield>
 
     <div class="row">

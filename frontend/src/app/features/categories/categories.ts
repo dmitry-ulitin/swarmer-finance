@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal 
 import { CategoriesState } from '../../core/categories.state';
 import { TUI_CONFIRM, TuiConfirmData, TuiTree } from '@taiga-ui/kit';
 import { Category, findAncestors, findCategoryById, flattenCategories } from '../../models/category';
-import { EMPTY_ARRAY, TuiHandler } from '@taiga-ui/cdk';
+import { TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
@@ -20,7 +20,7 @@ export class Categories {
   private readonly dialogs = inject(TuiDialogService);
   private readonly injector = inject(INJECTOR);
 
-  protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children || EMPTY_ARRAY;
+  protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children ?? [];
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
     const newCategories = this.categoriesState.categories();

@@ -8,7 +8,7 @@
     <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
         [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
 </div>
-<tui-loader [showLoader]="accountsState.loading()" class="list">
+<tui-loader [loading]="accountsState.loading()" class="list">
     @if (accountsState.accounts().length === 0 && !accountsState.loading()) {
         <p class="empty">No accounts yet. Create one to get started.</p>
     }

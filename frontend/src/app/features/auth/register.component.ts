@@ -1,17 +1,17 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { TuiButton, TuiError, TuiIcon, TuiLink, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiIcon, TuiInput, TuiLink } from '@taiga-ui/core';
 import { TuiPassword } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-register',
-  standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TuiButton, TuiError, TuiIcon, TuiLink, TuiTextfield, TuiPassword],
+  imports: [ReactiveFormsModule, RouterLink, TuiButton, TuiError, TuiIcon, TuiLink, TuiInput, TuiPassword],
   templateUrl: './register.component.html',
-  styleUrl: './register.component.scss'
+  styleUrl: './register.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RegisterComponent {
   private authService = inject(AuthService);

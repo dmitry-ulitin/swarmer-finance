@@ -8,7 +8,7 @@
     <button tuiButton appearance="outline" size="s" [disabled]="!isDeletable()"
         [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
 </div>
-<tui-loader [showLoader]="categoriesState.loading()" class="tree">
+<tui-loader [loading]="categoriesState.loading()" class="tree">
     @for (item of categories(); track item.id) {
     <tui-tree [childrenHandler]="handler" [content]="content" [map]="map" [tuiTreeController]="false" [value]="item" (toggled)="onToggled($event)" />
     }

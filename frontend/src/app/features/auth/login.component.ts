@@ -1,17 +1,17 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { TuiButton, TuiError, TuiIcon, TuiLink, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiIcon, TuiInput, TuiLink } from '@taiga-ui/core';
 import { AuthService } from '../../core/auth.service';
 import { TuiPassword } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 
 @Component({
   selector: 'app-login',
-  standalone: true,
-  imports: [ReactiveFormsModule, TuiLink, RouterLink, TuiButton, TuiTextfield, TuiPassword, TuiIcon, TuiError],
+  imports: [ReactiveFormsModule, TuiLink, RouterLink, TuiButton, TuiInput, TuiPassword, TuiIcon, TuiError],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
+  styleUrl: './login.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent {
   private authService = inject(AuthService);

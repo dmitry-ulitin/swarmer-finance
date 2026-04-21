@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiError, TuiIcon, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiIcon, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiInputColor, TuiSelect, TuiTree } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
-import { EMPTY_ARRAY, type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
+import { type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { CategoriesState } from '../../../core/categories.state';
@@ -15,7 +15,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-category-form',
-  imports: [ReactiveFormsModule, TuiTextfield, TuiInputColor, TuiButton, TuiError, TuiDataList, TuiSelect, TuiChevron, TuiTree, TuiIcon],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputColor, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiTree, TuiIcon],
   templateUrl: './category-form.html',
   styleUrl: './category-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,7 +29,7 @@ export class CategoryForm {
   readonly treeHandler = computed(() => {
     const currentId = this.context.data?.id;
     return (item: Category): readonly Category[] =>
-      (item.children || EMPTY_ARRAY).filter((c: Category) => c.id !== currentId);
+      (item.children || []).filter((c: Category) => c.id !== currentId);
   });
 
   readonly treeMap = new Map<Category, boolean>();
