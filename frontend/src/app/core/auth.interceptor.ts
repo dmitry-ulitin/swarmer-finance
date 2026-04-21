@@ -12,7 +12,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const token = authService.getToken();
   return next(token ? withToken(req, token) : req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status !== 401 || req.url.includes('/api/auth/refresh')) {
+      if (error.status !== 401 || req.url.includes('/api/auth/refresh') || req.url.includes('/api/auth/login')) {
         return throwError(() => error);
       }
       return authService.refreshToken().pipe(
