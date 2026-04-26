@@ -10,6 +10,7 @@ CREATE TABLE transactions (
   currency TEXT,
   date DATE NOT NULL,
   description TEXT DEFAULT '',
+  payee TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

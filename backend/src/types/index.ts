@@ -36,6 +36,7 @@ export interface Transaction {
   currency: string | null;
   date: Date;
   description: string;
+  payee: string | null;
   created_at: Date;
 }
 

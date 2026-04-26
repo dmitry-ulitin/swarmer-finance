@@ -19,6 +19,7 @@ export interface CreateTransactionData {
   currency?: string;
   date: string;
   description?: string;
+  payee?: string;
 }
 
 export interface UpdateTransactionData {
@@ -30,6 +31,7 @@ export interface UpdateTransactionData {
   currency?: string;
   date?: string;
   description?: string;
+  payee?: string;
 }
 
 export const getTransactionsByUserId = async (
@@ -110,8 +112,8 @@ export const createTransaction = async (
 ): Promise<Transaction> => {
   const result = await query<Transaction>(
     `INSERT INTO transactions
-       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, date, description)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, date, description, payee)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
     [
       userId,
       data.categoryId ?? null,
@@ -122,6 +124,7 @@ export const createTransaction = async (
       data.currency ?? null,
       data.date,
       data.description || '',
+      data.payee ?? null,
     ]
   );
   return result[0];
@@ -141,8 +144,9 @@ export const updateTransaction = async (
          credit = COALESCE($5, credit),
          currency = COALESCE($6, currency),
          date = COALESCE($7, date),
-         description = COALESCE($8, description)
-     WHERE id = $9 AND user_id = $10 RETURNING *`,
+         description = COALESCE($8, description),
+         payee = COALESCE($9, payee)
+     WHERE id = $10 AND user_id = $11 RETURNING *`,
     [
       data.categoryId ?? null,
       data.debitAccountId ?? null,
@@ -152,6 +156,7 @@ export const updateTransaction = async (
       data.currency ?? null,
       data.date ?? null,
       data.description ?? null,
+      data.payee ?? null,
       id,
       userId,
     ]

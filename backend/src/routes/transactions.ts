@@ -17,6 +17,7 @@ const createTransactionSchema = z.object({
   currency: z.string().min(1).optional(),
   date: z.string(),
   description: z.string().optional(),
+  payee: z.string().optional(),
 });
 
 const updateTransactionSchema = createTransactionSchema.partial();
