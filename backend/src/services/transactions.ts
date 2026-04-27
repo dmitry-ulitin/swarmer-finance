@@ -9,8 +9,10 @@ type CreateInput = {
   debit: number;
   credit: number;
   currency?: string;
+  scale?: number;
   date: string;
   description?: string;
+  payee?: string;
 };
 
 type UpdateInput = Partial<CreateInput>;
@@ -49,6 +51,9 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.currency != null) {
       throw { statusCode: 400, message: 'Transfers must not have a currency' };
     }
+    if (input.scale != null) {
+      throw { statusCode: 400, message: 'Transfers must not have a scale' };
+    }
     await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
   } else if (hasDebit) {
@@ -59,6 +64,9 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Expenses must have a currency (credit side)' };
     }
+    if (input.scale == null) {
+      throw { statusCode: 400, message: 'Expenses must have a scale (credit side)' };
+    }
     await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
     await validateCategory(input.categoryId, userId);
   } else {
@@ -68,6 +76,9 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     }
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Income transactions must have a currency (debit side)' };
+    }
+    if (input.scale == null) {
+      throw { statusCode: 400, message: 'Income transactions must have a scale (debit side)' };
     }
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
     await validateCategory(input.categoryId, userId);
@@ -100,8 +111,10 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     debit: input.debit ?? existing.debit,
     credit: input.credit ?? existing.credit,
     currency: input.currency !== undefined ? input.currency : (existing.currency ?? undefined),
+    scale: input.scale !== undefined ? input.scale : (existing.scale ?? 2),
     date: input.date ?? existing.date.toString(),
     description: input.description ?? existing.description,
+    payee: input.payee !== undefined ? input.payee : (existing.payee ?? undefined),
   };
 
   await validateTransactionInput(merged, userId);

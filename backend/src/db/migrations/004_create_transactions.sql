@@ -8,6 +8,7 @@ CREATE TABLE transactions (
   debit NUMERIC(24, 0) NOT NULL,
   credit NUMERIC(24, 0) NOT NULL,
   currency TEXT,
+  scale INTEGER NOT NULL DEFAULT 2,
   date DATE NOT NULL,
   description TEXT DEFAULT '',
   payee TEXT,

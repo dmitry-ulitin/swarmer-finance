@@ -109,6 +109,7 @@ describe('Transactions API', () => {
           creditAccountId: testAccountId,
           debit: 500,
           credit: 500,
+          scale: 2,
           date: '2026-02-18',
           description: 'Test income',
           currency: 'USD',
@@ -128,6 +129,7 @@ describe('Transactions API', () => {
           creditAccountId: testAccountId,
           debit: 100,
           credit: 100,
+          scale: 2,
           date: '2026-02-18',
           currency: 'USDT',
         });
@@ -160,6 +162,7 @@ describe('Transactions API', () => {
           creditAccountId: testAccountId,
           debit: 500,
           credit: 500,
+          scale: 2,
           date: '2026-02-18',
           currency: 'USD',
         });

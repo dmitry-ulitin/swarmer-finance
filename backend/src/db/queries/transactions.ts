@@ -17,6 +17,7 @@ export interface CreateTransactionData {
   debit: number;
   credit: number;
   currency?: string;
+  scale?: number;
   date: string;
   description?: string;
   payee?: string;
@@ -112,8 +113,8 @@ export const createTransaction = async (
 ): Promise<Transaction> => {
   const result = await query<Transaction>(
     `INSERT INTO transactions
-       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, date, description, payee)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, scale, date, description, payee)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
       userId,
       data.categoryId ?? null,
@@ -122,6 +123,7 @@ export const createTransaction = async (
       data.debit,
       data.credit,
       data.currency ?? null,
+      data.scale ?? 2,
       data.date,
       data.description || '',
       data.payee ?? null,

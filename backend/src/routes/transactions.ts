@@ -15,6 +15,7 @@ const createTransactionSchema = z.object({
   debit: z.number().positive(),
   credit: z.number().positive(),
   currency: z.string().min(1).optional(),
+  scale: z.number().int().positive().optional(),
   date: z.string(),
   description: z.string().optional(),
   payee: z.string().optional(),
