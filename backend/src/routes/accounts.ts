@@ -12,6 +12,7 @@ const createAccountSchema = z.object({
   name: z.string().min(1),
   currency: z.string().min(1),
   startBalance: z.number().default(0),
+  scale: z.number().optional().default(2),
 });
 
 const updateAccountSchema = createAccountSchema.partial();
@@ -27,8 +28,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { name, currency, startBalance } = req.body;
-    const account = await accountService.createAccount(req.userId!, name, currency, startBalance);
+    const { name, currency, startBalance, scale } = req.body;
+    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, scale);
     res.json({ data: account, error: null });
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'statusCode' in error) {

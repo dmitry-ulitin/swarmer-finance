@@ -22,6 +22,7 @@ export interface Account {
   name: string;
   currency: string;
   start_balance: number;
+  scale: number;
   created_at: Date;
 }
 

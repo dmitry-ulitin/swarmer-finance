@@ -8,15 +8,16 @@ export const createAccount = async (
   userId: number,
   name: string,
   currency: string,
-  startBalance: number
+  startBalance: number,
+  scale = 2
 ) => {
-  return accountQueries.createAccount(userId, name, currency, startBalance);
+  return accountQueries.createAccount(userId, name, currency, startBalance, scale);
 };
 
 export const updateAccount = async (
   id: number,
   userId: number,
-  data: { name?: string; currency?: string; startBalance?: number }
+  data: { name?: string; currency?: string; startBalance?: number; scale?: number }
 ) => {
   const existing = await accountQueries.getAccountById(id, userId);
   if (!existing) {

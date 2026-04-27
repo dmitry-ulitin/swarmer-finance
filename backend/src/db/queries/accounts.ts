@@ -19,12 +19,13 @@ export const createAccount = async (
   userId: number,
   name: string,
   currency: string,
-  startBalance: number
+  startBalance: number,
+  scale: number
 ): Promise<Account> => {
   const result = await query<Account>(
-    `INSERT INTO accounts (user_id, name, currency, start_balance)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [userId, name, currency, startBalance]
+    `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [userId, name, currency, startBalance, scale]
   );
   return result[0];
 };
@@ -32,15 +33,16 @@ export const createAccount = async (
 export const updateAccount = async (
   id: number,
   userId: number,
-  data: { name?: string; currency?: string; startBalance?: number }
+  data: { name?: string; currency?: string; startBalance?: number; scale?: number }
 ): Promise<Account | null> => {
   const result = await query<Account>(
     `UPDATE accounts
      SET name = COALESCE($1, name),
          currency = COALESCE($2, currency),
-         start_balance = COALESCE($3, start_balance)
-     WHERE id = $4 AND user_id = $5 RETURNING *`,
-    [data.name ?? null, data.currency ?? null, data.startBalance ?? null, id, userId]
+         start_balance = COALESCE($3, start_balance),
+         scale = COALESCE($4, scale)
+     WHERE id = $5 AND user_id = $6 RETURNING *`,
+    [data.name ?? null, data.currency ?? null, data.startBalance ?? null, data.scale ?? null, id, userId]
   );
   return result[0] || null;
 };

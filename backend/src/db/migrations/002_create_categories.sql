@@ -2,14 +2,14 @@
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
+  name TEXT NOT NULL,
   parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
-  color VARCHAR(7) DEFAULT '#000000',
-  icon VARCHAR(50) DEFAULT 'folder',
+  color TEXT DEFAULT '#000000',
+  icon TEXT DEFAULT 'folder',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_system_root CHECK (
     (user_id IS NULL AND parent_id IS NULL) OR 
-    (user_id IS NOT NULL)
+    (user_id IS NOT NULL AND parent_id IS NOT NULL)
   )
 );
 
