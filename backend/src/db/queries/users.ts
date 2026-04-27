@@ -6,13 +6,13 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
 };
 
 export const getUserById = async (id: number): Promise<User | null> => {
-  return queryOne<User>('SELECT id, email, created_at FROM users WHERE id = $1', [id]);
+  return queryOne<User>('SELECT id, email, name, currency, created_at FROM users WHERE id = $1', [id]);
 };
 
-export const createUser = async (email: string, passwordHash: string): Promise<User> => {
+export const createUser = async (email: string, passwordHash: string, name: string, currency: string): Promise<User> => {
   const result = await query<User>(
-    'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING *',
-    [email, passwordHash]
+    'INSERT INTO users (email, password_hash, name, currency) VALUES ($1, $2, $3, $4) RETURNING *',
+    [email, passwordHash, name, currency]
   );
   return result[0];
 };

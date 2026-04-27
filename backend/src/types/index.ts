@@ -2,6 +2,8 @@ export interface User {
   id: number;
   email: string;
   password_hash: string;
+  name: string;
+  currency: string;
   created_at: Date;
 }
 
@@ -49,7 +51,7 @@ export interface ApiResponse<T> {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user?: { id: number; email: string };
+  user?: { id: number; email: string; name: string; currency: string };
 }
 
 export interface JwtPayload {
