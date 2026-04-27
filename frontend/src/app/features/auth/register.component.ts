@@ -20,7 +20,9 @@ export class RegisterComponent {
 
   form = new FormGroup({
     email: new FormControl('', [Validators.required, Validators.email]),
-    password: new FormControl('', [Validators.required, Validators.minLength(6)])
+    password: new FormControl('', [Validators.required, Validators.minLength(6)]),
+    name: new FormControl(''),
+    currency: new FormControl('')
   });
 
   loading = signal(false);
@@ -36,7 +38,9 @@ export class RegisterComponent {
     try {
       await firstValueFrom(this.authService.register(
         this.form.value.email!,
-        this.form.value.password!
+        this.form.value.password!,
+        this.form.value.name!,
+        this.form.value.currency!
       ));
       this.router.navigate(['/dashboard']);
     } catch (err) {

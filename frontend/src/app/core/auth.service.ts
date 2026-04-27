@@ -7,6 +7,8 @@ import { map, tap } from 'rxjs/operators';
 export interface User {
   id: number;
   email: string;
+  name: string;
+  currency: string;
 }
 
 export interface AuthResponse {
@@ -43,8 +45,8 @@ export class AuthService {
     }
   }
 
-  register(email: string, password: string) {
-    return this.http.post<ApiResponse<AuthResponse>>('/api/auth/register', { email, password })
+  register(email: string, password: string, name: string, currency: string) {
+    return this.http.post<ApiResponse<AuthResponse>>('/api/auth/register', { email, password, name, currency })
       .pipe(tap(response => this.handleAuth(response.data)));
   }
 

@@ -7,7 +7,7 @@
 <button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="categories()" [iconStart]="'@tui.folder'">Categories</button>
 }
 @if(authService.isAuthenticated()) {
-<span>{{ authService.user()?.email }}</span>
+<span>{{ authService.user()?.name }}</span>
 }
 @if(authService.isAuthenticated()) {
 <button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="authService.logout()" [iconStart]="'@tui.user'">Logout</button>

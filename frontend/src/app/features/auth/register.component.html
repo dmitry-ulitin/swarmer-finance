@@ -7,6 +7,14 @@
         <input tuiInput type="email" formControlName="email" placeholder="Enter your email">
       </tui-textfield>
       <tui-textfield>
+        <label tuiLabel>Name</label>
+        <input tuiInput type="text" formControlName="name" placeholder="{{ (form.get('email')?.value || '').split('@')[0] || 'Optional' }}" />
+      </tui-textfield>
+      <tui-textfield>
+        <label tuiLabel>Currency</label>
+        <input tuiInput type="text" formControlName="currency" placeholder="EUR">
+      </tui-textfield>
+      <tui-textfield>
         <label tuiLabel>Password</label>
         <input tuiInput type="password" formControlName="password" placeholder="Enter your password (min 6 characters)">
         <tui-icon tuiPassword />
