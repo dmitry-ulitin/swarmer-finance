@@ -4,15 +4,18 @@
         <input tuiInput formControlName="name" placeholder="Account name" />
     </tui-textfield>
 
-    <tui-textfield>
-        <label tuiLabel>Currency</label>
-        <input tuiInput formControlName="currency" placeholder="e.g. USD, EUR" />
-    </tui-textfield>
+    <div class="row">
+        <tui-textfield>
+            <label tuiLabel>Starting Balance</label>
+            <input tuiInput type="number" formControlName="startBalance" placeholder="0" />
+        </tui-textfield>
 
-    <tui-textfield>
-        <label tuiLabel>Starting Balance</label>
-        <input tuiInput type="number" formControlName="startBalance" placeholder="0" />
-    </tui-textfield>
+        <tui-textfield tuiChevron class="currency">
+            <label tuiLabel>Currency</label>
+            <input tuiComboBox formControlName="currency" placeholder="e.g. USD, EUR" [strict]="false" />
+            <tui-data-list-wrapper *tuiDropdown [items]="currencies() | tuiFilterByInput" />
+        </tui-textfield>
+    </div>
 
     <tui-error [error]="error()" />
 

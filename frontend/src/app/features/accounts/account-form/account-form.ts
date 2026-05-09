@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiError, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
+import { TuiChevron, TuiComboBox, TuiDataListWrapper } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -10,7 +11,7 @@ import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError],
+  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,6 +26,7 @@ export class AccountForm {
     startBalance: new FormControl<number>((this.context.data?.start_balance ?? 0) / 100, { nonNullable: true, validators: [Validators.required] }),
   });
 
+  readonly currencies = this.accountsState.currencies;
   readonly loading = signal(false);
   readonly accountId = signal(this.context.data?.id ?? null);
   readonly error = signal<TuiValidationError | null>(null);

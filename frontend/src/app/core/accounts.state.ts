@@ -19,6 +19,12 @@ export class AccountsState {
   });
 
   readonly accounts = computed(() => this.resource.value() ?? []);
+  readonly currencies = computed(() => {
+    const defaultCurrency = this.auth.user()?.currency;
+    const fromAccounts = [...new Set(this.accounts().map(a => a.currency))].sort();
+    if (!defaultCurrency) return fromAccounts;
+    return [defaultCurrency, ...fromAccounts.filter(c => c !== defaultCurrency)];
+  });
   readonly loading = this.resource.isLoading;
 
   reload() {
