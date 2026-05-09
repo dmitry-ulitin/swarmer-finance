@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import * as transactionService from '../services/transactions';
+import { TransactionFilters } from '../db/queries/transactions';
 
 const router = Router();
 
@@ -23,23 +24,39 @@ const createTransactionSchema = z.object({
 
 const updateTransactionSchema = createTransactionSchema.partial();
 
+const arrayOfIds = z.preprocess(
+  (val) => (Array.isArray(val) ? val : val !== undefined ? [val] : undefined),
+  z.array(z.coerce.number().int().positive()).optional()
+);
+
 const filtersSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
-  category: z.coerce.number().int().positive().optional(),
+  category: arrayOfIds,
+  account: arrayOfIds,
+  details: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']).optional(),
-  page: z.coerce.number().int().positive().optional(),
+  offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
-router.get('/', validate(filtersSchema), async (req: AuthRequest, res, next) => {
+const toIntArray = (val: unknown): number[] | undefined => {
+  if (!val) return undefined;
+  const arr = Array.isArray(val) ? val : [val];
+  const nums = (arr as string[]).map(v => parseInt(v, 10)).filter(n => !isNaN(n));
+  return nums.length ? nums : undefined;
+};
+
+router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, next) => {
   try {
-    const filters = {
+    const filters: TransactionFilters = {
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
-      category: req.query.category ? parseInt(req.query.category as string, 10) : undefined,
+      category: toIntArray(req.query.category),
+      account: toIntArray(req.query.account),
+      details: req.query.details as string | undefined,
       type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
-      page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+      offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     };
     const result = await transactionService.getTransactions(req.userId!, filters);

@@ -10,6 +10,7 @@ describe('Transactions API', () => {
   let incomeCategoryId: number;
   let expenseCategoryId: number;
   let testAccountId: number;
+  let secondAccountId: number;
 
   beforeAll(async () => {
     const email = `tx${Date.now()}@example.com`;
@@ -41,6 +42,13 @@ describe('Transactions API', () => {
       [testUserId]
     );
     testAccountId = accountResult.rows[0].id;
+
+    const secondAccountResult = await pool.query(
+      `INSERT INTO accounts (user_id, name, currency, start_balance)
+       VALUES ($1, 'Second Account', 'EUR', 0) RETURNING id`,
+      [testUserId]
+    );
+    secondAccountId = secondAccountResult.rows[0].id;
   });
 
   afterAll(async () => {
@@ -54,17 +62,17 @@ describe('Transactions API', () => {
     beforeEach(async () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
 
-      // Income: credit_account_id filled, debit_account_id null
+      // Income on testAccount: credit_account_id filled, debit_account_id null
       await pool.query(
         `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
          VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-02-01', 'Test income')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
-      // Expense: debit_account_id filled, credit_account_id null
+      // Expense on secondAccount: debit_account_id filled, credit_account_id null
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date, description)
-         VALUES ($1, $2, $3, 50, 50, 'USD', '2026-02-15', 'Test expense')`,
-        [testUserId, expenseCategoryId, testAccountId]
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date, description, payee)
+         VALUES ($1, $2, $3, 50, 50, 'USD', '2026-02-15', 'Groceries run', 'Supermarket')`,
+        [testUserId, expenseCategoryId, secondAccountId]
       );
     });
 
@@ -85,6 +93,80 @@ describe('Transactions API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.transactions.length).toBe(1);
+    });
+
+    it('should filter by single account', async () => {
+      const res = await request(app)
+        .get(`/api/transactions?account=${testAccountId}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.transactions[0].credit_account_id).toBe(testAccountId);
+    });
+
+    it('should filter by multiple accounts (OR logic)', async () => {
+      const res = await request(app)
+        .get(`/api/transactions?account=${testAccountId}&account=${secondAccountId}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(2);
+    });
+
+    it('should filter by multiple categories (OR logic)', async () => {
+      const res = await request(app)
+        .get(`/api/transactions?category=${incomeCategoryId}&category=${expenseCategoryId}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(2);
+    });
+
+    it('should filter by single category', async () => {
+      const res = await request(app)
+        .get(`/api/transactions?category=${expenseCategoryId}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.transactions.length).toBe(1);
+    });
+
+    it('should filter by details matching description', async () => {
+      const res = await request(app)
+        .get('/api/transactions?details=Groceries')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.transactions[0].description).toBe('Groceries run');
+    });
+
+    it('should filter by details matching payee', async () => {
+      const res = await request(app)
+        .get('/api/transactions?details=supermarket')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.transactions.length).toBe(1);
+    });
+
+    it('should support offset-based pagination', async () => {
+      const res = await request(app)
+        .get('/api/transactions?offset=1&limit=1')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.total).toBe(2);
+    });
+
+    it('should reject invalid offset', async () => {
+      const res = await request(app)
+        .get('/api/transactions?offset=-1')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(400);
     });
 
     it('should require authentication', async () => {

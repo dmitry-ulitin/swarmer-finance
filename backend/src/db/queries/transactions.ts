@@ -4,9 +4,11 @@ import { Transaction } from '../../types';
 export interface TransactionFilters {
   from?: string;
   to?: string;
-  category?: number;
+  category?: number[];
+  account?: number[];
+  details?: string;
   type?: 'income' | 'expense' | 'transfer';
-  page?: number;
+  offset?: number;
   limit?: number;
 }
 
@@ -53,9 +55,21 @@ export const getTransactionsByUserId = async (
     params.push(filters.to);
   }
 
-  if (filters.category) {
-    conditions.push(`t.category_id = $${paramIndex++}`);
+  if (filters.category?.length) {
+    conditions.push(`t.category_id = ANY($${paramIndex++}::int[])`);
     params.push(filters.category);
+  }
+
+  if (filters.account?.length) {
+    const idx = paramIndex++;
+    conditions.push(`(t.debit_account_id = ANY($${idx}::int[]) OR t.credit_account_id = ANY($${idx}::int[]))`);
+    params.push(filters.account);
+  }
+
+  if (filters.details) {
+    const idx = paramIndex++;
+    conditions.push(`(t.description ILIKE $${idx} OR t.payee ILIKE $${idx})`);
+    params.push(`%${filters.details}%`);
   }
 
   if (filters.type === 'expense') {
@@ -67,9 +81,8 @@ export const getTransactionsByUserId = async (
   }
 
   const whereClause = conditions.join(' AND ');
-  const page = filters.page || 1;
-  const limit = filters.limit || 20;
-  const offset = (page - 1) * limit;
+  const limit = filters.limit ?? 20;
+  const offset = filters.offset ?? 0;
 
   const countResult = await query<{ total: string }>(
     `SELECT COUNT(*) as total FROM transactions t WHERE ${whereClause}`,
