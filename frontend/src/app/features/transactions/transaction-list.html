@@ -1,0 +1,31 @@
+<div class="toolbar">
+    <button tuiButton appearance="outline" size="s" (click)="state.reload()" [iconStart]="'@tui.refresh-cw'">Refresh</button>
+</div>
+
+@for (t of state.transactions(); track t.id) {
+    <div class="row" [class]="kind(t)">
+        <span class="date">{{ t.date | date:'dd MMM' }}</span>
+        <span class="info">
+            <span class="description">{{ t.description || t.payee || '—' }}</span>
+            <span class="meta">
+                {{ accountName(t) }}
+                @if (t.category_name) { · {{ t.category_name }} }
+            </span>
+        </span>
+        <span class="amount">{{ amount(t) }}</span>
+    </div>
+}
+
+@if (state.transactions().length === 0 && !state.loading()) {
+    <p class="empty">No transactions yet.</p>
+}
+
+<div #sentinel class="sentinel"></div>
+
+@if (state.loading()) {
+    <tui-loader class="loader" />
+}
+
+@if (state.hasMore() && !state.loading()) {
+    <button tuiButton appearance="flat" size="s" class="load-more" (click)="state.loadMore()">Load more</button>
+}
