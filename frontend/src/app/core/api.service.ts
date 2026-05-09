@@ -1,7 +1,8 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category } from '../models/category';
 import { Account } from '../models/account';
+import { Transaction, TransactionFilters } from '../models/transaction';
 import { Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -47,6 +48,20 @@ export class ApiService {
 
   deleteAccount(id: number): Observable<ApiResponse<{ success: boolean }>> {
     return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/accounts/${id}`);
+  }
+
+  // Transactions
+  getTransactions(filters: TransactionFilters & { offset?: number; limit?: number } = {}): Observable<ApiResponse<{ transactions: Transaction[]; total: number }>> {
+    let params = new HttpParams();
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    if (filters.type) params = params.set('type', filters.type);
+    if (filters.details) params = params.set('details', filters.details);
+    if (filters.offset != null) params = params.set('offset', filters.offset);
+    if (filters.limit != null) params = params.set('limit', filters.limit);
+    filters.category?.forEach(id => { params = params.append('category', id); });
+    filters.account?.forEach(id => { params = params.append('account', id); });
+    return this.http.get<ApiResponse<{ transactions: Transaction[]; total: number }>>('/api/transactions', { params });
   }
 
 }

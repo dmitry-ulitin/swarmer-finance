@@ -14,10 +14,27 @@ export interface Transaction {
     debit: number;
     credit: number;
     currency: string | null;
+    scale: number | null;
     date: string;
     description: string;
     payee: string | null;
     created_at: string;
+    // enriched by backend JOINs
+    category_name: string | null;
+    category_color: string | null;
+    debit_account_name: string | null;
+    debit_account_currency: string | null;
+    credit_account_name: string | null;
+    credit_account_currency: string | null;
+}
+
+export interface TransactionFilters {
+    from?: string;
+    to?: string;
+    category?: number[];
+    account?: number[];
+    details?: string;
+    type?: 'income' | 'expense' | 'transfer';
 }
 
 export type TransactionKind = 'expense' | 'income' | 'transfer';
