@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Transaction, TransactionFilters } from '../models/transaction';
-import { ApiService } from './api.service';
+import { ApiService, CreateTransactionRequest } from './api.service';
 
 const PAGE_SIZE = 20;
 
@@ -33,6 +33,10 @@ export class TransactionsState {
   loadMore(): void {
     if (this._loading() || !this.hasMore()) return;
     this.fetch(this._offset());
+  }
+
+  create(data: CreateTransactionRequest) {
+    return this.api.createTransaction(data).pipe(tap(() => this.reload()));
   }
 
   reload(): void {

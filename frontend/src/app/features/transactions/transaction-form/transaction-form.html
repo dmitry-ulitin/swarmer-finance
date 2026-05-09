@@ -1,0 +1,85 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+  <div class="type-toggle">
+    <button tuiButton type="button" size="s"
+      [appearance]="type() === 'expense' ? 'primary' : 'outline'"
+      (click)="setType('expense')">Expense</button>
+    <button tuiButton type="button" size="s"
+      [appearance]="type() === 'income' ? 'primary' : 'outline'"
+      (click)="setType('income')">Income</button>
+    <button tuiButton type="button" size="s"
+      [appearance]="type() === 'transfer' ? 'primary' : 'outline'"
+      (click)="setType('transfer')">Transfer</button>
+  </div>
+
+  <tui-textfield>
+    <label tuiLabel>Date</label>
+    <input tuiInput type="date" formControlName="date" />
+  </tui-textfield>
+
+  @if (type() === 'expense' || type() === 'transfer') {
+  <tui-textfield tuiChevron [stringify]="stringifyAccount" [identityMatcher]="identityMatcherAccount">
+    <label tuiLabel>{{ type() === 'transfer' ? 'From account' : 'Account' }}</label>
+    <input tuiSelect formControlName="debitAccountId" />
+    <tui-data-list *tuiDropdown>
+      @for (account of accounts(); track account.id) {
+      <button tuiOption type="button" [value]="account">{{ account.name }} ({{ account.currency }})</button>
+      }
+    </tui-data-list>
+  </tui-textfield>
+  }
+
+  @if (type() === 'income' || type() === 'transfer') {
+  <tui-textfield tuiChevron [stringify]="stringifyAccount" [identityMatcher]="identityMatcherAccount">
+    <label tuiLabel>{{ type() === 'transfer' ? 'To account' : 'Account' }}</label>
+    <input tuiSelect formControlName="creditAccountId" />
+    <tui-data-list *tuiDropdown>
+      @for (account of accounts(); track account.id) {
+      <button tuiOption type="button" [value]="account">{{ account.name }} ({{ account.currency }})</button>
+      }
+    </tui-data-list>
+  </tui-textfield>
+  }
+
+  @if (type() !== 'transfer') {
+  <tui-textfield tuiChevron [stringify]="stringifyCategory" [identityMatcher]="identityMatcherCategory">
+    <label tuiLabel>Category</label>
+    <input tuiSelect formControlName="categoryId" />
+    <tui-data-list *tuiDropdown>
+      @for (cat of categories(); track cat.id) {
+      <button tuiOption type="button" [value]="cat">{{ cat.fullName }}</button>
+      }
+    </tui-data-list>
+  </tui-textfield>
+  }
+
+  <tui-textfield>
+    <label tuiLabel>{{ type() === 'transfer' ? 'From amount' : 'Amount' }}</label>
+    <input tuiInput type="number" formControlName="amount" placeholder="0.00" min="0" step="0.01" />
+  </tui-textfield>
+
+  @if (type() === 'transfer') {
+  <tui-textfield>
+    <label tuiLabel>To amount (leave empty if same)</label>
+    <input tuiInput type="number" formControlName="creditAmount" placeholder="0.00" min="0" step="0.01" />
+  </tui-textfield>
+  }
+
+  <tui-textfield>
+    <label tuiLabel>Description</label>
+    <input tuiInput formControlName="description" placeholder="Optional" />
+  </tui-textfield>
+
+  <tui-textfield>
+    <label tuiLabel>Payee</label>
+    <input tuiInput formControlName="payee" placeholder="Optional" />
+  </tui-textfield>
+
+  <tui-error [error]="error()" />
+
+  <div class="actions">
+    <button tuiButton size="m" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+    <button tuiButton size="m" type="submit" [disabled]="loading()">
+      {{ loading() ? 'Saving...' : 'Add Transaction' }}
+    </button>
+  </div>
+</form>

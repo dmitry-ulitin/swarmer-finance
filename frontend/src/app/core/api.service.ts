@@ -10,6 +10,19 @@ export interface ApiResponse<T> {
   error: string | null;
 }
 
+export interface CreateTransactionRequest {
+  categoryId?: number;
+  debitAccountId?: number;
+  creditAccountId?: number;
+  debit: number;
+  credit: number;
+  currency?: string;
+  scale?: number;
+  date: string;
+  description?: string;
+  payee?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -51,6 +64,10 @@ export class ApiService {
   }
 
   // Transactions
+  createTransaction(data: CreateTransactionRequest): Observable<ApiResponse<Transaction>> {
+    return this.http.post<ApiResponse<Transaction>>('/api/transactions', data);
+  }
+
   getTransactions(filters: TransactionFilters & { offset?: number; limit?: number } = {}): Observable<ApiResponse<{ transactions: Transaction[]; total: number }>> {
     let params = new HttpParams();
     if (filters.from) params = params.set('from', filters.from);
