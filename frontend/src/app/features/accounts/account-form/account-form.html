@@ -1,7 +1,7 @@
 <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
     <tui-textfield>
         <label tuiLabel>Name</label>
-        <input tuiInput formControlName="name" placeholder="Account name" />
+        <input tuiInput tuiAutoFocus formControlName="name" placeholder="Account name" />
     </tui-textfield>
 
     <div class="row">

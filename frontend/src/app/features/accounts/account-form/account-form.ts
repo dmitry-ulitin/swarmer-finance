@@ -8,10 +8,11 @@ import type { TuiDialogContext } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
 import type { Account } from '../../../models/account';
 import { firstValueFrom } from 'rxjs';
+import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe],
+  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

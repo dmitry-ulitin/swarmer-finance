@@ -3,7 +3,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiIcon, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiInputColor, TuiSelect, TuiTree } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
-import { type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
+import { TuiAutoFocus, type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { CategoriesState } from '../../../core/categories.state';
@@ -15,7 +15,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-category-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputColor, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiTree, TuiIcon],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputColor, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiTree, TuiIcon, TuiAutoFocus],
   templateUrl: './category-form.html',
   styleUrl: './category-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
