@@ -49,9 +49,12 @@
 
     <tui-error [error]="error()" />
 
-    <button tuiButton size="m" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Saving...' : (!!categoryId() ? 'Save Changes' : 'Create Category') }}
-    </button>
+    <div class="actions">
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+        <button tuiButton size="s" type="submit" [disabled]="loading()">
+            {{ loading() ? 'Saving...' : (!!categoryId() ? 'Save Changes' : 'Create Category') }}
+        </button>
+    </div>
 </form>
 
 <ng-template #treeNodeContent let-item>

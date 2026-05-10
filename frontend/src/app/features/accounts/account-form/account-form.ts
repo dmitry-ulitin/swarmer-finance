@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
-import { TuiChevron, TuiComboBox, TuiDataListWrapper } from '@taiga-ui/kit';
+import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -12,7 +12,7 @@ import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +31,10 @@ export class AccountForm {
   readonly loading = signal(false);
   readonly accountId = signal(this.context.data?.id ?? null);
   readonly error = signal<TuiValidationError | null>(null);
+
+  cancel(): void {
+    this.context.completeWith(null);
+  }
 
   async onSubmit() {
     if (this.form.invalid) return;

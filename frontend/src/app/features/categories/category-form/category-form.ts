@@ -82,6 +82,10 @@ export class CategoryForm {
     this.form.controls.icon.setValue(parent.icon);
   }
 
+  cancel(): void {
+    this.context.completeWith(null);
+  }
+
   async onSubmit() {
     if (this.form.invalid) return;
 

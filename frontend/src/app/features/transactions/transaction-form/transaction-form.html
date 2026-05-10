@@ -88,8 +88,8 @@
   <tui-error [error]="error()" />
 
   <div class="actions">
-    <button tuiButton size="m" type="button" appearance="outline" (click)="cancel()">Cancel</button>
-    <button tuiButton size="m" type="submit" [disabled]="loading()">
+    <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+    <button tuiButton size="s" type="submit" [disabled]="loading()">
       {{ loading() ? 'Saving...' : 'Add Transaction' }}
     </button>
   </div>

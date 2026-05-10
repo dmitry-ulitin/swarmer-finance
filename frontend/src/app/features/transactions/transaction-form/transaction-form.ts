@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
-import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiSelect } from '@taiga-ui/kit';
+import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import type { TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
@@ -18,7 +18,7 @@ import type { Transaction, TransactionKind } from '../../../models/transaction';
 
 @Component({
   selector: 'app-transaction-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

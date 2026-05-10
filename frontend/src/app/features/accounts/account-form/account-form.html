@@ -7,7 +7,7 @@
     <div class="row">
         <tui-textfield>
             <label tuiLabel>Starting Balance</label>
-            <input tuiInput type="number" formControlName="startBalance" placeholder="0" />
+            <input tuiInputNumber formControlName="startBalance" [min]="0" [quantum]="0.01" placeholder="0.00" />
         </tui-textfield>
 
         <tui-textfield tuiChevron class="currency" [tuiTextfieldCleaner]="false">
@@ -19,7 +19,10 @@
 
     <tui-error [error]="error()" />
 
-    <button tuiButton size="m" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Saving...' : (!!accountId() ? 'Save Changes' : 'Create Account') }}
-    </button>
+    <div class="actions">
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+        <button tuiButton size="s" type="submit" [disabled]="loading()">
+            {{ loading() ? 'Saving...' : (!!accountId() ? 'Save Changes' : 'Create Account') }}
+        </button>
+    </div>
 </form>
