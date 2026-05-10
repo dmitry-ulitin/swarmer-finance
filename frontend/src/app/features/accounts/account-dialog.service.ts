@@ -1,6 +1,6 @@
 import { inject, Injectable, INJECTOR } from '@angular/core';
 import { TUI_CONFIRM, TuiConfirmData } from '@taiga-ui/kit';
-import { TuiDialogService } from '@taiga-ui/core';
+import { tuiDialog, TuiDialogService } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import type { Account } from '../../models/account';
@@ -11,6 +11,14 @@ export class AccountDialogService {
   private readonly dialogs = inject(TuiDialogService);
   private readonly auth = inject(AuthService);
   private readonly injector = inject(INJECTOR);
+
+  async openManager(): Promise<void> {
+    const { Accounts } = await import('./accounts');
+    await firstValueFrom(
+      tuiDialog(Accounts, { injector: this.injector, label: 'Accounts', size: 'm' })(),
+      { defaultValue: null }
+    );
+  }
 
   async openCreate(): Promise<Account | null> {
     const { AccountForm } = await import('./account-form/account-form');

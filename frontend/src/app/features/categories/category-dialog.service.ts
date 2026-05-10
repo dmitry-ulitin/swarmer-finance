@@ -1,6 +1,6 @@
 import { inject, Injectable, INJECTOR } from '@angular/core';
 import { TUI_CONFIRM, TuiConfirmData } from '@taiga-ui/kit';
-import { TuiDialogService } from '@taiga-ui/core';
+import { tuiDialog, TuiDialogService } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import type { Category } from '../../models/category';
@@ -9,6 +9,14 @@ import type { Category } from '../../models/category';
 export class CategoryDialogService {
   private readonly dialogs = inject(TuiDialogService);
   private readonly injector = inject(INJECTOR);
+
+  async openManager(): Promise<void> {
+    const { Categories } = await import('./categories');
+    await firstValueFrom(
+      tuiDialog(Categories, { injector: this.injector, label: 'Categories', size: 'l' })(),
+      { defaultValue: null }
+    );
+  }
 
   async openCreate(parent: Category | null): Promise<Category | null> {
     const { CategoryForm } = await import('./category-form/category-form');
