@@ -14,3 +14,16 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+.row {
+  display: flex;
+  gap: 1rem;
+
+  tui-textfield {
+    flex: 1;
+
+    &.currency {
+      flex: 0 0 8rem;
+    }
+  }
+}

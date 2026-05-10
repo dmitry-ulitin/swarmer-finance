@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, INJECTOR } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import { TuiButton, tuiDialog } from '@taiga-ui/core';
+import { TransactionDialogService } from '../transactions/transaction-dialog.service';
 
 @Component({
   selector: 'app-header',
@@ -12,6 +13,7 @@ import { TuiButton, tuiDialog } from '@taiga-ui/core';
 export class Header {
   authService = inject(AuthService);
   private readonly injector = inject(INJECTOR);
+  private readonly transactionDialogs = inject(TransactionDialogService);
 
   async categories() {
     const {Categories} = await import('../categories/categories');
@@ -22,13 +24,8 @@ export class Header {
     })().subscribe();
   }
 
-  async addTransaction() {
-    const { TransactionForm } = await import('../transactions/transaction-form/transaction-form');
-    tuiDialog(TransactionForm, {
-      injector: this.injector,
-      label: 'Add Transaction',
-      size: 'm',
-    })().subscribe();
+  addTransaction(): void {
+    this.transactionDialogs.openCreate();
   }
 
   async accounts() {

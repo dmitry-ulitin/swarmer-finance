@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { AccountsState } from '../../core/accounts.state';
 import { Account } from '../../models/account';
-import { TUI_CONFIRM, TuiConfirmData } from '@taiga-ui/kit';
-import { TuiButton, TuiDialogService, TuiLoader } from '@taiga-ui/core';
-import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
+import { TuiButton, TuiLoader } from '@taiga-ui/core';
+import { AccountDialogService } from './account-dialog.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -16,8 +15,7 @@ import { firstValueFrom } from 'rxjs';
 })
 export class Accounts {
   readonly accountsState = inject(AccountsState);
-  private readonly dialogs = inject(TuiDialogService);
-  private readonly injector = inject(INJECTOR);
+  private readonly accountDialogs = inject(AccountDialogService);
 
   readonly selectedId = signal<number | null>(null);
   readonly selectedAccount = computed(() => {
@@ -31,11 +29,7 @@ export class Accounts {
   }
 
   async openCreateDialog(): Promise<void> {
-    const { AccountForm } = await import('./account-form/account-form');
-    const account = await firstValueFrom(this.dialogs.open<Account | null>(
-      new PolymorpheusComponent(AccountForm, this.injector),
-      { data: null, label: 'Add Account', size: 's' }
-    ), { defaultValue: null });
+    const account = await this.accountDialogs.openCreate();
     if (account !== null) {
       this.selectedId.set(account.id);
     }
@@ -44,25 +38,13 @@ export class Accounts {
   async openEditDialog(): Promise<void> {
     const account = this.selectedAccount();
     if (!account) return;
-    const { AccountForm } = await import('./account-form/account-form');
-    await firstValueFrom(this.dialogs.open<Account | null>(
-      new PolymorpheusComponent(AccountForm, this.injector),
-      { data: account, label: 'Edit Account', size: 's' }
-    ), { defaultValue: null });
+    await this.accountDialogs.openEdit(account);
   }
 
   async openDeleteDialog(): Promise<void> {
     const account = this.selectedAccount();
     if (!account) return;
-    const data: TuiConfirmData = {
-      content: `Delete "${account.name}"?`,
-      yes: 'Delete',
-      no: 'Cancel',
-    };
-    const confirmed = await firstValueFrom(
-      this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Delete Account', size: 's', data }),
-      { defaultValue: false }
-    );
+    const confirmed = await this.accountDialogs.openDelete(account);
     if (confirmed) {
       await firstValueFrom(this.accountsState.delete(account.id));
       this.selectedId.set(null);

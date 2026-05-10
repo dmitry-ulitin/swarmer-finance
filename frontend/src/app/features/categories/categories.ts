@@ -1,12 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, INJECTOR, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
-import { TUI_CONFIRM, TuiConfirmData, TuiTree } from '@taiga-ui/kit';
+import { TuiTree } from '@taiga-ui/kit';
 import { Category, findAncestors, findCategoryById, flattenCategories } from '../../models/category';
 import { TuiHandler } from '@taiga-ui/cdk';
-import { TuiButton, TuiDialogService, TuiIcon, TuiLoader } from '@taiga-ui/core';
-import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
+import { TuiButton, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { TransactionType } from '../../models/transaction';
+import { CategoryDialogService } from './category-dialog.service';
 
 @Component({
   selector: 'app-categories',
@@ -17,8 +17,7 @@ import { TransactionType } from '../../models/transaction';
 })
 export class Categories {
   readonly categoriesState = inject(CategoriesState);
-  private readonly dialogs = inject(TuiDialogService);
-  private readonly injector = inject(INJECTOR);
+  private readonly categoryDialogs = inject(CategoryDialogService);
 
   protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children ?? [];
   protected readonly map = new Map<Category, boolean>();
@@ -68,15 +67,7 @@ export class Categories {
 
   async openCreateDialog(): Promise<void> {
     const parent = this.selectedCategory() || findCategoryById(TransactionType.Expense, this.categories());
-    const { CategoryForm } = await import('./category-form/category-form');
-    const category = await firstValueFrom(this.dialogs.open<Category | null>(
-      new PolymorpheusComponent(CategoryForm, this.injector),
-      {
-        data: { ...parent, id: null, name: '', parent_id: parent?.id, children: [] },
-        label: 'Add Category',
-        size: 's',
-      }
-    ), { defaultValue: null });
+    const category = await this.categoryDialogs.openCreate(parent ?? null);
     if (category !== null) {
       this.selectedId.set(category.id);
     }
@@ -85,15 +76,7 @@ export class Categories {
   async openDeleteDialog(): Promise<void> {
     const category = this.selectedCategory();
     if (!category || !this.isDeletable()) return;
-    const data: TuiConfirmData = {
-      content: `Delete "${category?.name}"?`,
-      yes: 'Delete',
-      no: 'Cancel',
-    };
-    const confirmed = await firstValueFrom(
-      this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Delete Category', size: 's', data }),
-      { defaultValue: false }
-    );
+    const confirmed = await this.categoryDialogs.openDelete(category);
     if (confirmed) {
       await firstValueFrom(this.categoriesState.delete(category.id));
       this.selectedId.set(null);
@@ -103,14 +86,6 @@ export class Categories {
   async openEditDialog(): Promise<void> {
     const category = this.selectedCategory();
     if (!category || !this.isEditable()) return;
-    const { CategoryForm } = await import('./category-form/category-form');
-    await firstValueFrom(this.dialogs.open<Category | null>(
-      new PolymorpheusComponent(CategoryForm, this.injector),
-      {
-        data: category,
-        label: 'Edit Category',
-        size: 's',
-      }
-    ), { defaultValue: null });
+    await this.categoryDialogs.openEdit(category);
   }
 }

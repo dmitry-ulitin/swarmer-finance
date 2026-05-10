@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiInput } from '@taiga-ui/core';
-import { TuiChevron, TuiSelect } from '@taiga-ui/kit';
+import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
+import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiSelect } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import type { TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { AccountsState } from '../../../core/accounts.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { TransactionsState } from '../../../core/transactions.state';
@@ -17,7 +18,7 @@ import type { Transaction, TransactionKind } from '../../../models/transaction';
 
 @Component({
   selector: 'app-transaction-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron],
+  imports: [ReactiveFormsModule, TuiInput, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiFilterByInputPipe],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,6 +34,7 @@ export class TransactionForm {
   readonly error = signal<TuiValidationError | null>(null);
 
   readonly accounts = this.accountsState.accounts;
+  readonly currencies = this.accountsState.currencies;
 
   readonly categories = computed(() => {
     const rootId = this.type() === 'income' ? 1 : 2;
@@ -45,11 +47,30 @@ export class TransactionForm {
     debitAccountId: new FormControl<Account | null>(null),
     creditAccountId: new FormControl<Account | null>(null),
     categoryId: new FormControl<Category | null>(null),
+    currency: new FormControl<string>(this.accountsState.currencies()[0] ?? '', { nonNullable: true }),
     amount: new FormControl<number | null>(null),
     creditAmount: new FormControl<number | null>(null),
     description: new FormControl<string>('', { nonNullable: true }),
     payee: new FormControl<string>('', { nonNullable: true }),
   });
+
+  private readonly debitAccount = toSignal(this.form.controls.debitAccountId.valueChanges);
+  private readonly creditAccount = toSignal(this.form.controls.creditAccountId.valueChanges);
+
+  constructor() {
+    effect(() => {
+      const account = this.debitAccount();
+      if (account && this.type() === 'expense') {
+        this.form.controls.currency.setValue(account.currency, { emitEvent: false });
+      }
+    });
+    effect(() => {
+      const account = this.creditAccount();
+      if (account && this.type() === 'income') {
+        this.form.controls.currency.setValue(account.currency, { emitEvent: false });
+      }
+    });
+  }
 
   readonly stringifyAccount: TuiStringHandler<Account | null> = (a) => a?.name ?? '';
   readonly stringifyCategory: TuiStringHandler<Category | null> = (c) => c?.fullName ?? '';
@@ -61,6 +82,7 @@ export class TransactionForm {
     this.form.controls.debitAccountId.reset(null);
     this.form.controls.creditAccountId.reset(null);
     this.form.controls.categoryId.reset(null);
+    this.form.controls.currency.setValue(this.accountsState.currencies()[0] ?? '');
     this.error.set(null);
   }
 
@@ -69,7 +91,7 @@ export class TransactionForm {
   }
 
   async onSubmit(): Promise<void> {
-    const { date, debitAccountId, creditAccountId, categoryId, amount, creditAmount, description, payee } = this.form.getRawValue();
+    const { date, debitAccountId, creditAccountId, categoryId, currency, amount, creditAmount, description, payee } = this.form.getRawValue();
     const type = this.type();
 
     if (!date) { this.error.set(new TuiValidationError('Date is required')); return; }
@@ -93,13 +115,13 @@ export class TransactionForm {
         ...(type === 'expense' && {
           debitAccountId: debitAccountId!.id,
           categoryId: categoryId!.id,
-          currency: debitAccountId!.currency,
+          currency: currency || debitAccountId!.currency,
           scale: 2,
         }),
         ...(type === 'income' && {
           creditAccountId: creditAccountId!.id,
           categoryId: categoryId!.id,
-          currency: creditAccountId!.currency,
+          currency: currency || creditAccountId!.currency,
           scale: 2,
         }),
         ...(type === 'transfer' && {

@@ -10,7 +10,7 @@
             <input tuiInput type="number" formControlName="startBalance" placeholder="0" />
         </tui-textfield>
 
-        <tui-textfield tuiChevron class="currency">
+        <tui-textfield tuiChevron class="currency" [tuiTextfieldCleaner]="false">
             <label tuiLabel>Currency</label>
             <input tuiComboBox formControlName="currency" placeholder="e.g. USD, EUR" [strict]="false" />
             <tui-data-list-wrapper *tuiDropdown [items]="currencies() | tuiFilterByInput" />
