@@ -44,6 +44,35 @@ export interface Transaction {
   created_at: Date;
 }
 
+export interface TransactionCategory {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface TransactionAccount {
+  id: number;
+  name: string;
+  currency: string;
+  scale: number;
+}
+
+export interface TransactionDTO {
+  id: number;
+  user_id: number;
+  category: TransactionCategory | null;
+  debit_account: TransactionAccount | null;
+  credit_account: TransactionAccount | null;
+  debit: number;
+  credit: number;
+  currency: string | null;
+  scale: number | null;
+  date: Date;
+  description: string;
+  payee: string | null;
+  created_at: Date;
+}
+
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;

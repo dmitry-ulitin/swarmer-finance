@@ -102,7 +102,7 @@ describe('Transactions API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(1);
-      expect(res.body.data[0].credit_account_id).toBe(testAccountId);
+      expect(res.body.data[0].credit_account.id).toBe(testAccountId);
     });
 
     it('should filter by multiple accounts (OR logic)', async () => {
@@ -272,7 +272,7 @@ describe('Transactions API', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.category_id).toBeNull();
+      expect(res.body.data.category).toBeNull();
       expect(res.body.data.currency).toBeNull();
     });
   });

@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../index';
-import { Transaction } from '../../types';
+import { Transaction, TransactionDTO } from '../../types';
 
 export interface TransactionFilters {
   from?: string;
@@ -37,10 +37,67 @@ export interface UpdateTransactionData {
   payee?: string;
 }
 
+interface TransactionRow extends Transaction {
+  category_name: string | null;
+  category_color: string | null;
+  debit_account_name: string | null;
+  debit_account_currency: string | null;
+  debit_account_scale: number | null;
+  credit_account_name: string | null;
+  credit_account_currency: string | null;
+  credit_account_scale: number | null;
+}
+
+function toDTO(row: TransactionRow): TransactionDTO {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    category: row.category_id != null
+      ? { id: row.category_id, name: row.category_name!, color: row.category_color! }
+      : null,
+    debit_account: row.debit_account_id != null
+      ? { id: row.debit_account_id, name: row.debit_account_name!, currency: row.debit_account_currency!, scale: row.debit_account_scale! }
+      : null,
+    credit_account: row.credit_account_id != null
+      ? { id: row.credit_account_id, name: row.credit_account_name!, currency: row.credit_account_currency!, scale: row.credit_account_scale! }
+      : null,
+    debit: row.debit,
+    credit: row.credit,
+    currency: row.currency,
+    scale: row.scale,
+    date: row.date,
+    description: row.description,
+    payee: row.payee,
+    created_at: row.created_at,
+  };
+}
+
+const WITH_DETAILS_SQL = `
+  SELECT t.*,
+         c.name as category_name, c.color as category_color,
+         da.name as debit_account_name, da.currency as debit_account_currency, da.scale as debit_account_scale,
+         ca.name as credit_account_name, ca.currency as credit_account_currency, ca.scale as credit_account_scale
+  FROM transactions t
+  LEFT JOIN categories c ON t.category_id = c.id
+  LEFT JOIN accounts da ON t.debit_account_id = da.id
+  LEFT JOIN accounts ca ON t.credit_account_id = ca.id
+`;
+
+export const getTransactionDTOById = async (
+  id: number,
+  userId: number
+): Promise<TransactionDTO | null> => {
+  const row = await queryOne<TransactionRow>(
+    `${WITH_DETAILS_SQL} WHERE t.id = $1 AND t.user_id = $2`,
+    [id, userId]
+  );
+  return row ? toDTO(row) : null;
+};
+
 export const getTransactionsByUserId = async (
   userId: number,
   filters: TransactionFilters
-): Promise<Transaction[]> => {
+): Promise<TransactionDTO[]> => {
   const conditions: string[] = ['t.user_id = $1'];
   const params: unknown[] = [userId];
   let paramIndex = 2;
@@ -84,22 +141,15 @@ export const getTransactionsByUserId = async (
   const limit = filters.limit ?? 20;
   const offset = filters.offset ?? 0;
 
-  const transactions = await query<Transaction>(
-    `SELECT t.*,
-            c.name as category_name, c.color as category_color,
-            da.name as debit_account_name, da.currency as debit_account_currency,
-            ca.name as credit_account_name, ca.currency as credit_account_currency
-     FROM transactions t
-     LEFT JOIN categories c ON t.category_id = c.id
-     LEFT JOIN accounts da ON t.debit_account_id = da.id
-     LEFT JOIN accounts ca ON t.credit_account_id = ca.id
+  const rows = await query<TransactionRow>(
+    `${WITH_DETAILS_SQL}
      WHERE ${whereClause}
      ORDER BY t.date DESC, t.created_at DESC
      LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
     [...params, limit, offset]
   );
 
-  return transactions;
+  return rows.map(toDTO);
 };
 
 export const getTransactionById = async (
@@ -115,11 +165,11 @@ export const getTransactionById = async (
 export const createTransaction = async (
   userId: number,
   data: CreateTransactionData
-): Promise<Transaction> => {
-  const result = await query<Transaction>(
+): Promise<TransactionDTO> => {
+  const result = await query<{ id: number }>(
     `INSERT INTO transactions
        (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, scale, date, description, payee)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
     [
       userId,
       data.categoryId ?? null,
@@ -134,15 +184,15 @@ export const createTransaction = async (
       data.payee ?? null,
     ]
   );
-  return result[0];
+  return (await getTransactionDTOById(result[0].id, userId))!;
 };
 
 export const updateTransaction = async (
   id: number,
   userId: number,
   data: UpdateTransactionData
-): Promise<Transaction | null> => {
-  const result = await query<Transaction>(
+): Promise<TransactionDTO | null> => {
+  const count = await execute(
     `UPDATE transactions
      SET category_id = COALESCE($1, category_id),
          debit_account_id = COALESCE($2, debit_account_id),
@@ -153,7 +203,7 @@ export const updateTransaction = async (
          date = COALESCE($7, date),
          description = COALESCE($8, description),
          payee = COALESCE($9, payee)
-     WHERE id = $10 AND user_id = $11 RETURNING *`,
+     WHERE id = $10 AND user_id = $11`,
     [
       data.categoryId ?? null,
       data.debitAccountId ?? null,
@@ -168,7 +218,8 @@ export const updateTransaction = async (
       userId,
     ]
   );
-  return result[0] || null;
+  if (count === 0) return null;
+  return getTransactionDTOById(id, userId);
 };
 
 export const deleteTransaction = async (

@@ -5,7 +5,7 @@
             <span class="description">{{ t.description || t.payee || '—' }}</span>
             <span class="meta">
                 {{ accountName(t) }}
-                @if (t.category_name) { · {{ t.category_name }} }
+                @if (t.category) { · {{ t.category.name }} }
             </span>
         </span>
         <span class="amount">{{ amount(t) }}</span>
