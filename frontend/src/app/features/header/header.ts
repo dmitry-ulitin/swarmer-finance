@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import { TuiButton } from '@taiga-ui/core';
-import { TransactionDialogService } from '../transactions/transaction-dialog.service';
 import { CategoryDialogService } from '../categories/category-dialog.service';
 import { AccountDialogService } from '../accounts/account-dialog.service';
+import { TransactionsState } from '../../core/transactions.state';
 
 @Component({
   selector: 'app-header',
@@ -14,7 +14,7 @@ import { AccountDialogService } from '../accounts/account-dialog.service';
 })
 export class Header {
   authService = inject(AuthService);
-  private readonly transactionDialogs = inject(TransactionDialogService);
+  private readonly transactionsState = inject(TransactionsState);
   private readonly categoryDialogs = inject(CategoryDialogService);
   private readonly accountDialogs = inject(AccountDialogService);
 
@@ -22,8 +22,8 @@ export class Header {
     this.categoryDialogs.openManager();
   }
 
-  addTransaction(): void {
-    this.transactionDialogs.openCreate();
+  reload(): void {
+    this.transactionsState.reload();
   }
 
   accounts(): void {

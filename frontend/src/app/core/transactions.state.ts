@@ -12,22 +12,18 @@ export class TransactionsState {
   private readonly auth = inject(AuthService);
 
   private readonly _transactions = signal<Transaction[]>([]);
-  private readonly _total = signal(0);
   private readonly _offset = signal(0);
   private readonly _loading = signal(false);
+  private readonly _hasMore = signal(true);
   private readonly _filters = signal<TransactionFilters>({});
 
   readonly transactions = this._transactions.asReadonly();
-  readonly total = this._total.asReadonly();
   readonly loading = this._loading.asReadonly();
-  readonly hasMore = computed(() => this._transactions().length < this._total());
+  readonly hasMore = this._hasMore.asReadonly();
 
   setFilters(filters: TransactionFilters): void {
     this._filters.set(filters);
-    this._transactions.set([]);
-    this._total.set(0);
-    this._offset.set(0);
-    this.fetch(0);
+    this.reload();
   }
 
   loadMore(): void {
@@ -41,7 +37,7 @@ export class TransactionsState {
 
   reload(): void {
     this._transactions.set([]);
-    this._total.set(0);
+    this._hasMore.set(true);
     this._offset.set(0);
     this.fetch(0);
   }
@@ -54,9 +50,10 @@ export class TransactionsState {
         this.api.getTransactions({ ...this._filters(), offset, limit: PAGE_SIZE })
       );
       if (r.data) {
-        this._transactions.update(existing => [...existing, ...r.data!.transactions]);
-        this._total.set(r.data.total);
-        this._offset.set(offset + r.data.transactions.length);
+        const transactions = r.data || [];
+        this._transactions.update(existing => [...existing, ...transactions]);
+        this._hasMore.set(transactions.length === PAGE_SIZE);
+        this._offset.set(offset + transactions.length);
       }
     } finally {
       this._loading.set(false);

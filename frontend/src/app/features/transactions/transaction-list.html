@@ -1,7 +1,3 @@
-<div class="toolbar">
-    <button tuiButton appearance="outline" size="s" (click)="state.reload()" [iconStart]="'@tui.refresh-cw'">Refresh</button>
-</div>
-
 @for (t of state.transactions(); track t.id) {
     <div class="row" [class]="kind(t)">
         <span class="date">{{ t.date | date:'dd MMM' }}</span>

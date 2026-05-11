@@ -68,7 +68,7 @@ export class ApiService {
     return this.http.post<ApiResponse<Transaction>>('/api/transactions', data);
   }
 
-  getTransactions(filters: TransactionFilters & { offset?: number; limit?: number } = {}): Observable<ApiResponse<{ transactions: Transaction[]; total: number }>> {
+  getTransactions(filters: TransactionFilters & { offset?: number; limit?: number } = {}): Observable<ApiResponse<Transaction[]>> {
     let params = new HttpParams();
     if (filters.from) params = params.set('from', filters.from);
     if (filters.to) params = params.set('to', filters.to);
@@ -78,7 +78,7 @@ export class ApiService {
     if (filters.limit != null) params = params.set('limit', filters.limit);
     filters.category?.forEach(id => { params = params.append('category', id); });
     filters.account?.forEach(id => { params = params.append('account', id); });
-    return this.http.get<ApiResponse<{ transactions: Transaction[]; total: number }>>('/api/transactions', { params });
+    return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
   }
 
 }

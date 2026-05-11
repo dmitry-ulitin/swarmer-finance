@@ -82,8 +82,8 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions).toBeInstanceOf(Array);
-      expect(res.body.data.total).toBe(2);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBe(2);
     });
 
     it('should filter transactions by date range', async () => {
@@ -92,7 +92,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.length).toBe(1);
     });
 
     it('should filter by single account', async () => {
@@ -101,8 +101,8 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
-      expect(res.body.data.transactions[0].credit_account_id).toBe(testAccountId);
+      expect(res.body.data.length).toBe(1);
+      expect(res.body.data[0].credit_account_id).toBe(testAccountId);
     });
 
     it('should filter by multiple accounts (OR logic)', async () => {
@@ -111,7 +111,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.total).toBe(2);
+      expect(res.body.data.length).toBe(2);
     });
 
     it('should filter by multiple categories (OR logic)', async () => {
@@ -120,7 +120,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.total).toBe(2);
+      expect(res.body.data.length).toBe(2);
     });
 
     it('should filter by single category', async () => {
@@ -129,7 +129,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.length).toBe(1);
     });
 
     it('should filter by details matching description', async () => {
@@ -138,8 +138,8 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
-      expect(res.body.data.transactions[0].description).toBe('Groceries run');
+      expect(res.body.data.length).toBe(1);
+      expect(res.body.data[0].description).toBe('Groceries run');
     });
 
     it('should filter by details matching payee', async () => {
@@ -148,7 +148,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
+      expect(res.body.data.length).toBe(1);
     });
 
     it('should support offset-based pagination', async () => {
@@ -157,8 +157,7 @@ describe('Transactions API', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.transactions.length).toBe(1);
-      expect(res.body.data.total).toBe(2);
+      expect(res.body.data.length).toBe(1);
     });
 
     it('should reject invalid offset', async () => {

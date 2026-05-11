@@ -40,7 +40,7 @@ export interface UpdateTransactionData {
 export const getTransactionsByUserId = async (
   userId: number,
   filters: TransactionFilters
-): Promise<{ transactions: Transaction[]; total: number }> => {
+): Promise<Transaction[]> => {
   const conditions: string[] = ['t.user_id = $1'];
   const params: unknown[] = [userId];
   let paramIndex = 2;
@@ -84,11 +84,6 @@ export const getTransactionsByUserId = async (
   const limit = filters.limit ?? 20;
   const offset = filters.offset ?? 0;
 
-  const countResult = await query<{ total: string }>(
-    `SELECT COUNT(*) as total FROM transactions t WHERE ${whereClause}`,
-    params
-  );
-
   const transactions = await query<Transaction>(
     `SELECT t.*,
             c.name as category_name, c.color as category_color,
@@ -104,10 +99,7 @@ export const getTransactionsByUserId = async (
     [...params, limit, offset]
   );
 
-  return {
-    transactions,
-    total: parseInt(countResult[0]?.total || '0', 10),
-  };
+  return transactions;
 };
 
 export const getTransactionById = async (
