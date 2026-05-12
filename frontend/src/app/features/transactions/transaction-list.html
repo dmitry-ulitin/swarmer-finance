@@ -1,18 +1,18 @@
-@for (t of state.transactions(); track t.id) {
-    <div class="row" [class]="kind(t)">
+@for (t of state.viewTransactions(); track t.id) {
+    <div class="row" [class]="'type'+t.type">
         <span class="date">{{ t.date | date:'dd MMM' }}</span>
         <span class="info">
             <span class="description">{{ t.description || t.payee || '—' }}</span>
             <span class="meta">
-                {{ accountName(t) }}
+                {{ t.accountName }}
                 @if (t.category) { · {{ t.category.name }} }
             </span>
         </span>
-        <span class="amount">{{ amount(t) }}</span>
+        <span class="amount">{{ t.formattedAmount }}</span>
     </div>
 }
 
-@if (state.transactions().length === 0 && !state.loading()) {
+@if (state.viewTransactions().length === 0 && !state.loading()) {
     <p class="empty">No transactions yet.</p>
 }
 

@@ -1,10 +1,3 @@
-export enum TransactionType {
-    Transfer = 0,
-    Income,
-    Expense,
-    Correction
-}
-
 export interface TransactionCategory {
     id: number;
     name: string;
@@ -43,10 +36,20 @@ export interface TransactionFilters {
     type?: 'income' | 'expense' | 'transfer';
 }
 
-export type TransactionKind = 'expense' | 'income' | 'transfer';
+export enum TransactionType {
+    Transfer = 0,
+    Income,
+    Expense
+}
 
-export function getTransactionKind(t: Transaction): TransactionKind {
-    if (t.debit_account != null && t.credit_account != null) return 'transfer';
-    if (t.debit_account != null) return 'expense';
-    return 'income';
+export interface TransactionView extends Transaction {
+    accountName: string;
+    formattedAmount: string;
+    type: TransactionType;
+}
+
+export function getTransactionType(t: Transaction): TransactionType {
+    if (t.debit_account != null && t.credit_account != null) return TransactionType.Transfer;
+    if (t.debit_account != null) return TransactionType.Expense;
+    return TransactionType.Income;
 }

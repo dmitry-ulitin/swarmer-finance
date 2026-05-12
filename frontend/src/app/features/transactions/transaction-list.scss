@@ -50,11 +50,11 @@
     font-weight: 500;
     font-variant-numeric: tabular-nums;
 
-    .expense & {
+    .type2 & {
         color: var(--tui-status-negative);
     }
 
-    .income & {
+    .type1 & {
         color: var(--tui-status-positive);
     }
 }
