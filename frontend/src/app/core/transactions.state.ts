@@ -74,18 +74,31 @@ export class TransactionsState {
       const currency = showCredit
         ? (t.credit_account?.currency ?? t.currency ?? '')
         : (t.debit_account?.currency ?? t.currency ?? '');
-      return `${val.toLocaleString()} ${currency}`;
+      return this.formatAmount(val, currency, scale);
     }
 
     if (type === TransactionType.Income) {
       const scale = t.credit_account?.scale ?? t.scale ?? 2;
       const currency = t.credit_account?.currency ?? t.currency ?? '';
-      return `+${(t.credit / Math.pow(10, scale)).toLocaleString()} ${currency}`;
+      return `+${this.formatAmount(t.credit / Math.pow(10, scale), currency, scale)}`;
     }
 
     const scale = t.debit_account?.scale ?? t.scale ?? 2;
     const currency = t.debit_account?.currency ?? t.currency ?? '';
-    return `−${(t.debit / Math.pow(10, scale)).toLocaleString()} ${currency}`;
+    return `−${this.formatAmount(t.debit / Math.pow(10, scale), currency, scale)}`;
+  }
+
+  private formatAmount(value: number, currency: string, scale: number): string {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: scale,
+        maximumFractionDigits: scale,
+      }).format(value);
+    } catch {
+      return value.toLocaleString(undefined, { minimumFractionDigits: scale, maximumFractionDigits: scale });
+    }
   }
 
   private async fetch(offset: number): Promise<void> {
