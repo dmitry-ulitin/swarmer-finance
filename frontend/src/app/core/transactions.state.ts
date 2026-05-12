@@ -59,8 +59,6 @@ export class TransactionsState {
   }
 
   private getFormattedAmount(t: Transaction, accountFilter?: number[]): string {
-    const scale = t.scale ?? 2;
-    const divisor = Math.pow(10, scale);
     const type = getTransactionType(t);
 
     if (type === TransactionType.Transfer) {
@@ -69,14 +67,25 @@ export class TransactionsState {
         && t.credit_account != null
         && filterIds.includes(t.credit_account.id)
         && !(t.debit_account != null && filterIds.includes(t.debit_account.id));
-      const val = showCredit ? t.credit / divisor : t.debit / divisor;
-      const currency = showCredit ? (t.credit_account?.currency ?? '') : (t.debit_account?.currency ?? '');
+      const scale = showCredit
+        ? (t.credit_account?.scale ?? t.scale ?? 2)
+        : (t.debit_account?.scale ?? t.scale ?? 2);
+      const val = (showCredit ? t.credit : t.debit) / Math.pow(10, scale);
+      const currency = showCredit
+        ? (t.credit_account?.currency ?? t.currency ?? '')
+        : (t.debit_account?.currency ?? t.currency ?? '');
       return `${val.toLocaleString()} ${currency}`;
     }
 
-    const raw = type === TransactionType.Income ? t.debit : t.credit;
-    const sign = type === TransactionType.Income ? '+' : '−';
-    return `${sign}${(raw / divisor).toLocaleString()} ${t.currency ?? ''}`;
+    if (type === TransactionType.Income) {
+      const scale = t.credit_account?.scale ?? t.scale ?? 2;
+      const currency = t.credit_account?.currency ?? t.currency ?? '';
+      return `+${(t.credit / Math.pow(10, scale)).toLocaleString()} ${currency}`;
+    }
+
+    const scale = t.debit_account?.scale ?? t.scale ?? 2;
+    const currency = t.debit_account?.currency ?? t.currency ?? '';
+    return `−${(t.debit / Math.pow(10, scale)).toLocaleString()} ${currency}`;
   }
 
   private async fetch(offset: number): Promise<void> {
