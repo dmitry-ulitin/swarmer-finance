@@ -25,6 +25,7 @@ export interface Account {
   currency: string;
   start_balance: number;
   scale: number;
+  balance: number;
   created_at: Date;
 }
 
@@ -55,6 +56,7 @@ export interface TransactionAccount {
   name: string;
   currency: string;
   scale: number;
+  balance?: number;
 }
 
 export interface TransactionDTO {

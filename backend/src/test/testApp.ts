@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from '../routes/auth';
 import categoryRoutes from '../routes/categories';
 import transactionRoutes from '../routes/transactions';
+import accountRoutes from '../routes/accounts';
 import { errorHandler } from '../middleware/error';
 
 export function createTestApp() {
@@ -12,6 +13,7 @@ export function createTestApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/categories', categoryRoutes);
   app.use('/api/transactions', transactionRoutes);
+  app.use('/api/accounts', accountRoutes);
   app.use(errorHandler);
   return app;
 }

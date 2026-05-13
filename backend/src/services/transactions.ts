@@ -89,8 +89,39 @@ export const getTransactions = async (
   userId: number,
   filters: transactionQueries.TransactionFilters
 ) => {
-  return transactionQueries.getTransactionsByUserId(userId, filters);
+  const transactions = await transactionQueries.getTransactionsByUserId(userId, filters);
+  const sequential = !filters.details && !filters.category?.length && !filters.type;
+  if (sequential && transactions.length > 0) {
+    return attachRunningBalances(userId, transactions);
+  }
+  return transactions;
 };
+
+async function attachRunningBalances(
+  userId: number,
+  transactions: import('../types').TransactionDTO[]
+) {
+  const accountIds = [...new Set(
+    transactions.flatMap(t => [t.debit_account?.id, t.credit_account?.id].filter((id): id is number => id != null))
+  )];
+
+  const first = transactions[0];
+  const d = new Date(first.date);
+  const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const balanceRows = await transactionQueries.getBalancesAt(userId, accountIds, dateStr);
+  const balanceMap = new Map(balanceRows.map(r => [r.id, r.balance]));
+
+  return transactions.map(t => {
+    const dto = {
+      ...t,
+      debit_account: t.debit_account ? { ...t.debit_account, balance: balanceMap.get(t.debit_account.id) } : null,
+      credit_account: t.credit_account ? { ...t.credit_account, balance: balanceMap.get(t.credit_account.id) } : null,
+    };
+    if (t.debit_account) balanceMap.set(t.debit_account.id, (balanceMap.get(t.debit_account.id) ?? 0) + Number(t.debit));
+    if (t.credit_account) balanceMap.set(t.credit_account.id, (balanceMap.get(t.credit_account.id) ?? 0) - Number(t.credit));
+    return dto;
+  });
+}
 
 export const createTransaction = async (userId: number, input: CreateInput) => {
   await validateTransactionInput(input, userId);
@@ -127,4 +158,11 @@ export const deleteTransaction = async (id: number, userId: number): Promise<voi
     throw { statusCode: 404, message: 'Transaction not found' };
   }
   await transactionQueries.deleteTransaction(id, userId);
+};
+
+export const getAccountBalances = async (
+  userId: number,
+  accountIds: number[]
+): Promise<transactionQueries.AccountBalance[]> => {
+  return transactionQueries.getAccountBalances(userId, accountIds);
 };

@@ -232,3 +232,63 @@ export const deleteTransaction = async (
   );
   return count > 0;
 };
+
+export interface AccountBalanceAt {
+  id: number;
+  balance: number;
+}
+
+export const getBalancesAt = async (
+  userId: number,
+  accountIds: number[],
+  date: string
+): Promise<AccountBalanceAt[]> => {
+  const rows = await query<{ id: number; balance: string }>(
+    `SELECT a.id,
+            (a.start_balance
+             + COALESCE(SUM(t.credit) FILTER (WHERE t.credit_account_id = a.id), 0)
+             - COALESCE(SUM(t.debit)  FILTER (WHERE t.debit_account_id  = a.id), 0)
+            )::numeric AS balance
+     FROM accounts a
+     LEFT JOIN transactions t
+            ON (t.credit_account_id = a.id OR t.debit_account_id = a.id)
+           AND t.user_id = $1
+           AND t.date <= $2::date
+     WHERE a.id = ANY($3::int[])
+       AND a.user_id = $1
+     GROUP BY a.id, a.start_balance`,
+    [userId, date, accountIds]
+  );
+  return rows.map(r => ({ id: r.id, balance: Number(r.balance) }));
+};
+
+export interface AccountBalance {
+  debit_account_id: number | null;
+  credit_account_id: number | null;
+  debit: number;
+  credit: number;
+  last_date: Date;
+}
+
+export const getAccountBalances = async (
+  userId: number,
+  accountIds: number[]
+): Promise<AccountBalance[]> => {
+  const rows = await query<Omit<AccountBalance, 'debit' | 'credit'> & { debit: string; credit: string }>(
+    `SELECT
+       debit_account_id,
+       credit_account_id,
+       SUM(debit) AS debit,
+       SUM(credit) AS credit,
+       MAX(date) AS last_date
+     FROM transactions
+     WHERE user_id = $1
+       AND (array_length($2::int[], 1) IS NULL
+            OR debit_account_id = ANY($2::int[])
+            OR credit_account_id = ANY($2::int[]))
+     GROUP BY debit_account_id, credit_account_id
+     ORDER BY last_date DESC`,
+    [userId, accountIds]
+  );
+  return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
+};
