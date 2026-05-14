@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { Transaction, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
+import { Transaction, TransactionAccount, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
 import { ApiService, CreateTransactionRequest } from './api.service';
 
 const PAGE_SIZE = 20;
@@ -26,6 +26,7 @@ export class TransactionsState {
       ...t,
       accountName: this.getAccountName(t),
       formattedAmount: this.getFormattedAmount(t, accountFilter),
+      formattedBalance: this.getFormattedBalance(t, accountFilter),
       type: getTransactionType(t),
     }));
   });
@@ -86,6 +87,28 @@ export class TransactionsState {
     const scale = t.debit_account?.scale ?? t.scale ?? 2;
     const currency = t.debit_account?.currency ?? t.currency ?? '';
     return `−${this.formatAmount(t.debit / Math.pow(10, scale), currency, scale)}`;
+  }
+
+  private getFormattedBalance(t: Transaction, accountFilter?: number[]): string {
+    const type = getTransactionType(t);
+    let account: TransactionAccount | null = null;
+
+    if (type === TransactionType.Transfer) {
+      const filterIds = accountFilter ?? [];
+      const showCredit = filterIds.length > 0
+        && t.credit_account != null
+        && filterIds.includes(t.credit_account.id)
+        && !(t.debit_account != null && filterIds.includes(t.debit_account.id));
+      account = showCredit ? t.credit_account : t.debit_account;
+    } else if (type === TransactionType.Income) {
+      account = t.credit_account;
+    } else {
+      account = t.debit_account;
+    }
+
+    if (account?.balance == null) return '';
+    const scale = account.scale;
+    return this.formatAmount(account.balance / Math.pow(10, scale), account.currency, scale);
   }
 
   private formatAmount(value: number, currency: string, scale: number): string {

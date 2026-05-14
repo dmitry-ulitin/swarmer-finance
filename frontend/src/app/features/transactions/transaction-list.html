@@ -8,7 +8,12 @@
                 @if (t.category) { · {{ t.category.name }} }
             </span>
         </span>
-        <span class="amount">{{ t.formattedAmount }}</span>
+        <div class="amounts">
+            <span class="amount">{{ t.formattedAmount }}</span>
+            @if (t.formattedBalance) {
+                <span class="balance">{{ t.formattedBalance }}</span>
+            }
+        </div>
     </div>
 }
 
