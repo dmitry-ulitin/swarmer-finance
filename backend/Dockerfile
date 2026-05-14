@@ -1,3 +1,15 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+RUN cp -r src/db/migrations dist/db/migrations
+
 FROM node:20-alpine
 
 WORKDIR /app
@@ -5,9 +17,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY dist ./dist
-COPY src/db/migrations ./src/db/migrations
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]

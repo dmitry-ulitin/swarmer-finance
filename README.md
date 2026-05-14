@@ -10,7 +10,7 @@ A personal finance application for tracking income, expenses, and transfers acro
 - Cross-currency transfers (debit ≠ credit when currencies differ)
 - Hierarchical categories with parent/child support
 - JWT authentication (access + refresh tokens)
-- Filtering transactions by date range, category, and type
+- Filtering transactions by date range, accounts, categories and type
 
 ## Tech Stack
 

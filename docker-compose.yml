@@ -1,24 +1,6 @@
 # Docker Compose для локальной разработки
+name: finance-app
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=postgresql://finance_user:123456@postgres:5432/finance_db
-      - JWT_SECRET=dev_secret_min_32_chars_long_abcdef
-      - JWT_REFRESH_SECRET=dev_refresh_secret_min_32_chars_long
-      - CORS_ORIGIN=*
-
-  frontend:
-    build: .
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-    environment:
-      - API_URL=http://backend:3000
-
   postgres:
     image: postgres:15-alpine
     environment:
@@ -29,6 +11,31 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_user -d finance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://finance_user:123456@postgres:5432/finance_db
+      - JWT_SECRET=dev_secret_min_32_chars_long_abcdef
+      - JWT_REFRESH_SECRET=dev_refresh_secret_min_32_chars_long
+      - CORS_ORIGIN=*
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
