@@ -4,9 +4,59 @@ import { AuthService } from './auth.service';
 import { Account } from '../models/account';
 import { ApiService } from './api.service';
 
-export interface AccountGroup {
+export interface AccountNode {
   name: string;
+  fullPath: string;
   accounts: (Account & { displayName: string })[];
+  children: AccountNode[];
+}
+
+function getOrCreateNode(nodes: AccountNode[], segment: string, fullPath: string): AccountNode {
+  let node = nodes.find(n => n.name === segment);
+  if (!node) {
+    node = { name: segment, fullPath, accounts: [], children: [] };
+    nodes.push(node);
+  }
+  return node;
+}
+
+export function buildAccountTree(accounts: Account[]): AccountNode[] {
+  const roots: AccountNode[] = [];
+  for (const account of accounts) {
+    const segments = account.name.split('/');
+    const displayName = segments[segments.length - 1];
+    const groupSegments = segments.slice(0, -1);
+    if (groupSegments.length === 0) {
+      let ungrouped = roots.find(n => n.name === '');
+      if (!ungrouped) {
+        ungrouped = { name: '', fullPath: '', accounts: [], children: [] };
+        roots.push(ungrouped);
+      }
+      ungrouped.accounts.push({ ...account, displayName });
+    } else {
+      let current = roots;
+      let path = '';
+      for (const segment of groupSegments) {
+        path = path ? `${path}/${segment}` : segment;
+        const node = getOrCreateNode(current, segment, path);
+        current = node.children;
+      }
+      const parent = findNode(roots, groupSegments);
+      if (parent) parent.accounts.push({ ...account, displayName });
+    }
+  }
+  return roots;
+}
+
+function findNode(nodes: AccountNode[], segments: string[]): AccountNode | null {
+  let current = nodes;
+  let found: AccountNode | null = null;
+  for (const segment of segments) {
+    found = current.find(n => n.name === segment) ?? null;
+    if (!found) return null;
+    current = found.children;
+  }
+  return found;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -24,18 +74,7 @@ export class AccountsState {
   });
 
   readonly accounts = computed(() => this.resource.value() ?? []);
-  readonly groupedAccounts = computed<AccountGroup[]>(() => {
-    const groups = new Map<string, (Account & { displayName: string })[]>();
-    for (const account of this.accounts()) {
-      const slash = account.name.indexOf('/');
-      const groupName = slash === -1 ? '' : account.name.slice(0, slash);
-      const displayName = slash === -1 ? account.name : account.name.slice(slash + 1);
-      const entry = groups.get(groupName) ?? [];
-      entry.push({ ...account, displayName });
-      groups.set(groupName, entry);
-    }
-    return Array.from(groups.entries()).map(([name, accounts]) => ({ name, accounts }));
-  });
+  readonly groupedAccounts = computed<AccountNode[]>(() => buildAccountTree(this.accounts()));
   readonly currencies = computed(() => {
     const defaultCurrency = this.auth.user()?.currency;
     const fromAccounts = [...new Set(this.accounts().map(a => a.currency))].sort();

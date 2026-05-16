@@ -10,8 +10,7 @@
   flex-direction: column;
 }
 
-.row,
-.group-header {
+.row {
   display: flex;
   align-items: center;
   width: 100%;
@@ -32,37 +31,8 @@
 .all-row {
   font-weight: 500;
   margin-bottom: 0.25rem;
-}
-
-.group-header {
-  justify-content: space-between;
-  font-weight: 500;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--tui-text-secondary);
-  padding-top: 0.5rem;
-
-  .chevron {
-    font-style: normal;
-    transition: transform 0.15s ease;
-    transform: rotate(90deg);
-
-    &.collapsed {
-      transform: rotate(0deg);
-    }
-  }
-}
-
-.account-row {
-  font-size: 0.9rem;
-
-  &.indented {
-    padding-left: 1.25rem;
-  }
 
   &.active {
     background: var(--tui-background-base-alt);
-    font-weight: 500;
   }
 }

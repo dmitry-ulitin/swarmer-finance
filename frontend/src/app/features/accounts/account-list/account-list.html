@@ -1,38 +1,14 @@
 <nav class="account-list" aria-label="Filter by account">
   <button
     class="row all-row"
-    [class.active]="isAllSelected()"
-    (click)="selectAll()"
+    [class.active]="store.isAllSelected()"
     type="button"
+    (click)="store.selectAll()"
   >
     All accounts
   </button>
 
-  @for (group of state.groupedAccounts(); track group.name) {
-    @if (group.name) {
-      <button
-        class="group-header"
-        type="button"
-        [attr.aria-expanded]="!isCollapsed(group.name)"
-        (click)="toggleGroup(group.name)"
-      >
-        <span class="group-name">{{ group.name }}</span>
-        <span class="chevron" [class.collapsed]="isCollapsed(group.name)" aria-hidden="true">›</span>
-      </button>
-    }
-
-    @if (!isCollapsed(group.name)) {
-      @for (account of group.accounts; track account.id) {
-        <button
-          class="row account-row"
-          [class.active]="isSelected(account.id)"
-          [class.indented]="!!group.name"
-          type="button"
-          (click)="toggleAccount(account.id)"
-        >
-          {{ account.displayName }}
-        </button>
-      }
-    }
+  @for (node of state.groupedAccounts(); track node.fullPath) {
+    <app-account-tree-node [node]="node" />
   }
 </nav>
