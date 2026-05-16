@@ -1,0 +1,30 @@
+@if (node().name) {
+  <button
+    class="group-header"
+    type="button"
+    [style.padding-left]="indent"
+    [attr.aria-expanded]="!store.isCollapsed(node().fullPath)"
+    (click)="store.toggleCollapsed(node().fullPath)"
+  >
+    <span class="group-name">{{ node().name }}</span>
+    <span class="chevron" [class.collapsed]="store.isCollapsed(node().fullPath)" aria-hidden="true">›</span>
+  </button>
+}
+
+@if (!store.isCollapsed(node().fullPath)) {
+  @for (account of node().accounts; track account.id) {
+    <button
+      class="account-row"
+      type="button"
+      [style.padding-left]="'calc(' + indent + ' + ' + (node().name ? '1.25rem' : '0.75rem') + ')'"
+      [class.active]="store.selectedIds().has(account.id)"
+      (click)="$event.ctrlKey || $event.metaKey ? store.toggleAccount(account.id) : store.selectAccount(account.id)"
+    >
+      {{ account.displayName }}
+    </button>
+  }
+
+  @for (child of node().children; track child.fullPath) {
+    <app-account-tree-node [node]="child" [depth]="node().name ? depth() + 1 : depth()" />
+  }
+}
