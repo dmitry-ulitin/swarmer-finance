@@ -3,7 +3,7 @@ import { Injectable, computed, signal } from '@angular/core';
 @Injectable()
 export class AccountListStore {
   private readonly _selectedIds = signal<ReadonlySet<number>>(new Set());
-  private readonly _collapsedPaths = signal<ReadonlySet<string>>(new Set());
+  private readonly _expandedPaths = signal<ReadonlySet<string>>(new Set());
 
   readonly selectedIds = this._selectedIds.asReadonly();
   readonly selectedIdsArray = computed(() => [...this._selectedIds()]);
@@ -27,17 +27,17 @@ export class AccountListStore {
     this._selectedIds.set(next);
   }
 
-  toggleCollapsed(path: string): void {
-    const next = new Set(this._collapsedPaths());
+  toggleExpanded(path: string): void {
+    const next = new Set(this._expandedPaths());
     if (next.has(path)) {
       next.delete(path);
     } else {
       next.add(path);
     }
-    this._collapsedPaths.set(next);
+    this._expandedPaths.set(next);
   }
 
-  isCollapsed(path: string): boolean {
-    return this._collapsedPaths().has(path);
+  isExpanded(path: string): boolean {
+    return this._expandedPaths().has(path);
   }
 }

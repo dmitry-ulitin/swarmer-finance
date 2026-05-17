@@ -3,15 +3,15 @@
     class="group-header"
     type="button"
     [style.padding-left]="indent"
-    [attr.aria-expanded]="!store.isCollapsed(node().fullPath)"
-    (click)="store.toggleCollapsed(node().fullPath)"
+    [attr.aria-expanded]="store.isExpanded(node().fullPath)"
+    (click)="store.toggleExpanded(node().fullPath)"
   >
     <span class="group-name">{{ node().name }}</span>
-    <span class="chevron" [class.collapsed]="store.isCollapsed(node().fullPath)" aria-hidden="true">›</span>
+    <span class="chevron" [class.collapsed]="!store.isExpanded(node().fullPath)" aria-hidden="true">›</span>
   </button>
 }
 
-@if (!store.isCollapsed(node().fullPath)) {
+@if (!node().name || store.isExpanded(node().fullPath)) {
   @for (account of node().accounts; track account.id) {
     <button
       class="account-row"
