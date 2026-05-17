@@ -20,6 +20,7 @@ export class TransactionsState {
   readonly transactions = this._transactions.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
+  readonly selectedAccountIds = computed(() => this._filters().account ?? []);
   readonly viewTransactions = computed<TransactionView[]>(() => {
     const accountFilter = this._filters().account;
     return this._transactions().map(t => ({
@@ -33,6 +34,23 @@ export class TransactionsState {
 
   setFilters(filters: TransactionFilters): void {
     this._filters.set(filters);
+    this.reload();
+  }
+
+  selectAllAccounts(): void {
+    this._filters.update(f => ({ ...f, account: undefined }));
+    this.reload();
+  }
+
+  selectAccount(id: number): void {
+    this._filters.update(f => ({ ...f, account: [id] }));
+    this.reload();
+  }
+
+  toggleAccount(id: number): void {
+    const current = this._filters().account ?? [];
+    const next = current.includes(id) ? current.filter(a => a !== id) : [...current, id];
+    this._filters.update(f => ({ ...f, account: next.length ? next : undefined }));
     this.reload();
   }
 

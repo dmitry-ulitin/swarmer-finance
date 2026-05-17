@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { AccountNode } from '../../../../core/accounts.state';
 import { AccountListStore } from '../account-list.store';
+import { TransactionsState } from '../../../../core/transactions.state';
 
 @Component({
   selector: 'app-account-tree-node',
@@ -14,6 +15,7 @@ export class AccountTreeNode {
   readonly depth = input<number>(0);
 
   protected readonly store = inject(AccountListStore);
+  protected readonly transactions = inject(TransactionsState);
 
   protected get indent(): string {
     return `${this.depth() * 1}rem`;

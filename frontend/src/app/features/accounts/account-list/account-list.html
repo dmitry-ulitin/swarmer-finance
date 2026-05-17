@@ -1,9 +1,9 @@
 <nav class="account-list" aria-label="Filter by account">
   <button
     class="row all-row"
-    [class.active]="store.isAllSelected()"
+    [class.active]="transactions.selectedAccountIds().length === 0"
     type="button"
-    (click)="store.selectAll()"
+    (click)="transactions.selectAllAccounts()"
   >
     All accounts
   </button>

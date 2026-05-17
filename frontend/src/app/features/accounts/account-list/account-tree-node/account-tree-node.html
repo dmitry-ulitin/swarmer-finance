@@ -17,8 +17,8 @@
       class="account-row"
       type="button"
       [style.padding-left]="'calc(' + indent + ' + ' + (node().name ? '1.25rem' : '0.75rem') + ')'"
-      [class.active]="store.selectedIds().has(account.id)"
-      (click)="$event.ctrlKey || $event.metaKey ? store.toggleAccount(account.id) : store.selectAccount(account.id)"
+      [class.active]="transactions.selectedAccountIds().includes(account.id)"
+      (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
     >
       {{ account.displayName }}
     </button>
