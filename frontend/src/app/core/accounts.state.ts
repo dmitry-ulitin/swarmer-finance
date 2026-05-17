@@ -59,6 +59,14 @@ function findNode(nodes: AccountNode[], segments: string[]): AccountNode | null 
   return found;
 }
 
+export function collectAccountIds(node: AccountNode): number[] {
+  const ids = node.accounts.map(a => a.id);
+  for (const child of node.children) {
+    ids.push(...collectAccountIds(child));
+  }
+  return ids;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountsState {
   private readonly api = inject(ApiService);

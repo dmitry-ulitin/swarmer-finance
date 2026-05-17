@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
-import { AccountNode } from '../../../../core/accounts.state';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { AccountNode, collectAccountIds } from '../../../../core/accounts.state';
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
 
@@ -16,6 +16,8 @@ export class AccountTreeNode {
 
   protected readonly store = inject(AccountListStore);
   protected readonly transactions = inject(TransactionsState);
+
+  protected readonly nodeAccountIds = computed(() => collectAccountIds(this.node()));
 
   protected get indent(): string {
     return `${this.depth() * 1}rem`;

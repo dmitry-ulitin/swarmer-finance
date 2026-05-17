@@ -6,6 +6,12 @@ import { ApiService, CreateTransactionRequest } from './api.service';
 
 const PAGE_SIZE = 20;
 
+function sameAccountFilter(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const setA = new Set(a);
+  return b.every(id => setA.has(id));
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransactionsState {
   private readonly api = inject(ApiService);
@@ -38,20 +44,35 @@ export class TransactionsState {
   }
 
   selectAllAccounts(): void {
+    if (!this._filters().account) return;
     this._filters.update(f => ({ ...f, account: undefined }));
     this.reload();
   }
 
   selectAccount(id: number): void {
-    this._filters.update(f => ({ ...f, account: [id] }));
-    this.reload();
+    this.selectAccounts([id]);
   }
 
   toggleAccount(id: number): void {
     const current = this._filters().account ?? [];
     const next = current.includes(id) ? current.filter(a => a !== id) : [...current, id];
-    this._filters.update(f => ({ ...f, account: next.length ? next : undefined }));
+    this.selectAccounts(next);
+  }
+
+  selectAccounts(ids: number[]): void {
+    const current = this._filters().account ?? [];
+    if (sameAccountFilter(current, ids)) return;
+    this._filters.update(f => ({ ...f, account: ids.length ? ids : undefined }));
     this.reload();
+  }
+
+  toggleAccounts(ids: number[]): void {
+    const current = this._filters().account ?? [];
+    const allSelected = ids.every(id => current.includes(id));
+    const next = allSelected
+      ? current.filter(id => !ids.includes(id))
+      : [...new Set([...current, ...ids])];
+    this.selectAccounts(next);
   }
 
   loadMore(): void {
