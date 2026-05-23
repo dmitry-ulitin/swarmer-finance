@@ -4,65 +4,74 @@ import { AuthService } from './auth.service';
 import { Account } from '../models/account';
 import { ApiService } from './api.service';
 
+export type AccountItem =
+  | { kind: 'account'; account: Account & { displayName: string } }
+  | { kind: 'group'; node: AccountNode };
+
 export interface AccountNode {
   name: string;
   fullPath: string;
-  accounts: (Account & { displayName: string })[];
-  children: AccountNode[];
-}
-
-function getOrCreateNode(nodes: AccountNode[], segment: string, fullPath: string): AccountNode {
-  let node = nodes.find(n => n.name === segment);
-  if (!node) {
-    node = { name: segment, fullPath, accounts: [], children: [] };
-    nodes.push(node);
-  }
-  return node;
+  children: AccountItem[];
 }
 
 export function buildAccountTree(accounts: Account[]): AccountNode[] {
+  const nodeMap = new Map<string, AccountNode>();
   const roots: AccountNode[] = [];
+
+  function getOrCreate(segments: string[]): AccountNode {
+    const path = segments.join('/');
+    if (nodeMap.has(path)) return nodeMap.get(path)!;
+    const node: AccountNode = { name: segments[segments.length - 1], fullPath: path, children: [] };
+    nodeMap.set(path, node);
+    if (segments.length === 1) {
+      roots.push(node);
+    } else {
+      const parent = getOrCreate(segments.slice(0, -1));
+      parent.children.push({ kind: 'group', node });
+    }
+    return node;
+  }
+
   for (const account of accounts) {
     const segments = account.name.split('/');
     const displayName = segments[segments.length - 1];
     const groupSegments = segments.slice(0, -1);
+
     if (groupSegments.length === 0) {
-      let ungrouped = roots.find(n => n.name === '');
+      let ungrouped = nodeMap.get('');
       if (!ungrouped) {
-        ungrouped = { name: '', fullPath: '', accounts: [], children: [] };
+        ungrouped = { name: '', fullPath: '', children: [] };
+        nodeMap.set('', ungrouped);
         roots.push(ungrouped);
       }
-      ungrouped.accounts.push({ ...account, displayName });
+      ungrouped.children.push({ kind: 'account', account: { ...account, displayName } });
     } else {
-      let current = roots;
-      let path = '';
-      for (const segment of groupSegments) {
-        path = path ? `${path}/${segment}` : segment;
-        const node = getOrCreateNode(current, segment, path);
-        current = node.children;
-      }
-      const parent = findNode(roots, groupSegments);
-      if (parent) parent.accounts.push({ ...account, displayName });
+      const parent = getOrCreate(groupSegments);
+      parent.children.push({ kind: 'account', account: { ...account, displayName } });
     }
   }
+
+  function sortNode(node: AccountNode): void {
+    node.children.sort((a, b) => {
+      const nameA = a.kind === 'account' ? a.account.displayName : a.node.name;
+      const nameB = b.kind === 'account' ? b.account.displayName : b.node.name;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+    for (const item of node.children) {
+      if (item.kind === 'group') sortNode(item.node);
+    }
+  }
+  for (const root of roots) sortNode(root);
+  roots.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
   return roots;
 }
 
-function findNode(nodes: AccountNode[], segments: string[]): AccountNode | null {
-  let current = nodes;
-  let found: AccountNode | null = null;
-  for (const segment of segments) {
-    found = current.find(n => n.name === segment) ?? null;
-    if (!found) return null;
-    current = found.children;
-  }
-  return found;
-}
-
 export function collectAccountIds(node: AccountNode): number[] {
-  const ids = node.accounts.map(a => a.id);
-  for (const child of node.children) {
-    ids.push(...collectAccountIds(child));
+  const ids: number[] = [];
+  for (const item of node.children) {
+    if (item.kind === 'account') ids.push(item.account.id);
+    else ids.push(...collectAccountIds(item.node));
   }
   return ids;
 }
