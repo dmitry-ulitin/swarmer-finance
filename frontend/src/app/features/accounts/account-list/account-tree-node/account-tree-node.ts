@@ -20,6 +20,6 @@ export class AccountTreeNode {
   protected readonly nodeAccountIds = computed(() => collectAccountIds(this.node()));
 
   protected get indent(): string {
-    return `${this.depth() * 1}rem`;
+    return `calc(0.75rem + ${this.depth()}rem)`;
   }
 }

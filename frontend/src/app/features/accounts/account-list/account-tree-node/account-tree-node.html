@@ -3,7 +3,8 @@
     <button
       class="group-name"
       type="button"
-      (click)="transactions.toggleAccounts(nodeAccountIds())"
+      [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
+      (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
     >{{ node().name }}</button>
     <button
       class="chevron"
@@ -16,19 +17,19 @@
 }
 
 @if (!node().name || store.isExpanded(node().fullPath)) {
-  @for (account of node().accounts; track account.id) {
-    <button
-      class="account-row"
-      type="button"
-      [style.padding-left]="'calc(' + indent + ' + ' + (node().name ? '1.25rem' : '0.75rem') + ')'"
-      [class.active]="transactions.selectedAccountIds().includes(account.id)"
-      (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
-    >
-      {{ account.displayName }}
-    </button>
-  }
-
-  @for (child of node().children; track child.fullPath) {
-    <app-account-tree-node [node]="child" [depth]="node().name ? depth() + 1 : depth()" />
+  @for (item of node().children; track item.kind === 'account' ? item.account.id : item.node.fullPath) {
+    @if (item.kind === 'account') {
+      <button
+        class="account-row"
+        type="button"
+        [style.padding-left]="node().name ? 'calc(' + indent + ' + 1rem)' : indent"
+        [class.active]="transactions.selectedAccountIds().includes(item.account.id)"
+        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(item.account.id) : transactions.selectAccount(item.account.id)"
+      >
+        {{ item.account.displayName }}
+      </button>
+    } @else {
+      <app-account-tree-node [node]="item.node" [depth]="node().name ? depth() + 1 : depth()" />
+    }
   }
 }
