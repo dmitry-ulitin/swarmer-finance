@@ -3,6 +3,7 @@ import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Transaction, TransactionAccount, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
 import { ApiService, CreateTransactionRequest } from './api.service';
+import { AccountsState } from './accounts.state';
 
 const PAGE_SIZE = 20;
 
@@ -16,6 +17,7 @@ function sameAccountFilter(a: number[], b: number[]): boolean {
 export class TransactionsState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  protected readonly accounts = inject(AccountsState);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _offset = signal(0);
@@ -61,8 +63,9 @@ export class TransactionsState {
 
   selectAccounts(ids: number[]): void {
     const current = this._filters().account ?? [];
-    if (sameAccountFilter(current, ids)) return;
-    this._filters.update(f => ({ ...f, account: ids.length ? ids : undefined }));
+    const next = this.accounts.accounts().every(a => ids.includes(a.id)) ? [] : ids;
+    if (sameAccountFilter(current, next)) return;
+    this._filters.update(f => ({ ...f, account: next.length ? next : undefined }));
     this.reload();
   }
 
