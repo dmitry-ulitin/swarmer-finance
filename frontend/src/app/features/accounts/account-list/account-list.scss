@@ -29,10 +29,11 @@
 }
 
 .all-row {
-  font-weight: 500;
   margin-bottom: 0.25rem;
 
   &.active {
     background: var(--tui-background-base-alt);
+    color: var(--tui-text-primary);
+    font-weight: 500;
   }
 }

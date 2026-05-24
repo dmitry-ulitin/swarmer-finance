@@ -9,7 +9,7 @@
   text-align: left;
   font: inherit;
   border-radius: var(--tui-radius-m);
-  color: var(--tui-text-primary);
+  color: var(--tui-text-secondary);
   font-size: 0.9rem;
 
   &:hover {
@@ -17,7 +17,7 @@
   }
 
   &.active {
-    background: var(--tui-background-base-alt);
+    color: var(--tui-text-primary);
     font-weight: 500;
   }
 }
@@ -36,7 +36,6 @@
   cursor: pointer;
   text-align: left;
   font: inherit;
-  font-weight: 500;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -45,6 +44,11 @@
 
   &:hover {
     color: var(--tui-text-primary);
+  }
+
+  &.active {
+    color: var(--tui-text-primary);
+    font-weight: 500;
   }
 }
 
