@@ -81,4 +81,12 @@ export class ApiService {
     return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
   }
 
+  updateTransaction(id: number, data: Partial<CreateTransactionRequest>): Observable<ApiResponse<Transaction>> {
+    return this.http.put<ApiResponse<Transaction>>(`/api/transactions/${id}`, data);
+  }
+
+  deleteTransaction(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`/api/transactions/${id}`);
+  }
+
 }

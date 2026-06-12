@@ -4,7 +4,12 @@ import { ZodSchema, ZodError } from 'zod';
 export const validate = (schema: ZodSchema, source: 'body' | 'query' = 'body') => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse(source === 'query' ? req.query : req.body);
+      const parsed = schema.parse(source === 'query' ? req.query : req.body);
+      if (source === 'query') {
+        req.query = parsed;
+      } else {
+        req.body = parsed;
+      }
       next();
     } catch (error) {
       if (error instanceof ZodError) {

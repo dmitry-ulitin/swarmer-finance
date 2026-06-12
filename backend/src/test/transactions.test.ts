@@ -234,24 +234,6 @@ describe('Transactions API', () => {
       expect(res.status).toBe(400);
     });
 
-    it('should validate leaf category', async () => {
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: 1,
-          creditAccountId: testAccountId,
-          debit: 500,
-          credit: 500,
-          scale: 2,
-          date: '2026-02-18',
-          currency: 'USD',
-        });
-
-      expect(res.status).toBe(400);
-      expect(res.body.error).toContain('leaf category');
-    });
-
     it('should create a transfer transaction', async () => {
       const secondAccountResult = await pool.query(
         `INSERT INTO accounts (user_id, name, currency, start_balance)

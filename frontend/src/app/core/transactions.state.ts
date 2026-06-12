@@ -24,11 +24,13 @@ export class TransactionsState {
   private readonly _loading = signal(false);
   private readonly _hasMore = signal(true);
   private readonly _filters = signal<TransactionFilters>({});
+  private readonly _selectedTransaction = signal<Transaction | null>(null);
 
   readonly transactions = this._transactions.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
   readonly selectedAccountIds = computed(() => this._filters().account ?? []);
+  readonly selectedTransaction = this._selectedTransaction.asReadonly();
   readonly viewTransactions = computed<TransactionView[]>(() => {
     const accountFilter = this._filters().account;
     return this._transactions().map(t => ({
@@ -87,7 +89,21 @@ export class TransactionsState {
     return this.api.createTransaction(data).pipe(tap(() => this.reload()));
   }
 
+  update(id: number, data: Partial<CreateTransactionRequest>) {
+    return this.api.updateTransaction(id, data).pipe(tap(() => this.reload()));
+  }
+
+  delete(id: number) {
+    return this.api.deleteTransaction(id).pipe(tap(() => this.reload()));
+  }
+
+  selectTransaction(transaction: Transaction | null): void {
+    const current = this._selectedTransaction();
+    this._selectedTransaction.set(current?.id === transaction?.id ? null : transaction);
+  }
+
   reload(): void {
+    this._selectedTransaction.set(null);
     this._transactions.set([]);
     this._hasMore.set(true);
     this._offset.set(0);
@@ -174,7 +190,7 @@ export class TransactionsState {
         this.api.getTransactions({ ...this._filters(), offset, limit: PAGE_SIZE })
       );
       if (r.data) {
-        const transactions = r.data || [];
+        const transactions = r.data;
         this._transactions.update(existing => [...existing, ...transactions]);
         this._hasMore.set(transactions.length === PAGE_SIZE);
         this._offset.set(offset + transactions.length);

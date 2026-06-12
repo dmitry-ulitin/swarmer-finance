@@ -13,6 +13,12 @@
     &:hover {
         background: var(--tui-background-base-alt);
     }
+
+    &.selected {
+        background-color: rgba(0, 0, 0, .075);
+        border-left: 3px solid var(--tui-text-action);
+        padding-left: calc(0.75rem - 3px);
+    }
 }
 
 .date {

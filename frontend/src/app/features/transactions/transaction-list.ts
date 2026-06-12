@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRe
 import { DatePipe } from '@angular/common';
 import { TransactionsState } from '../../core/transactions.state';
 import { TuiButton, TuiLoader } from '@taiga-ui/core';
+import type { TransactionView } from '../../models/transaction';
 
 @Component({
   selector: 'app-transaction-list',
@@ -14,6 +15,10 @@ export class TransactionList {
   readonly state = inject(TransactionsState);
   private readonly destroyRef = inject(DestroyRef);
   private readonly sentinel = viewChild.required<ElementRef<HTMLElement>>('sentinel');
+
+  selectTransaction(t: TransactionView): void {
+    this.state.selectTransaction(t);
+  }
 
   constructor() {
     afterNextRender(() => {

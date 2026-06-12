@@ -1,5 +1,12 @@
 @for (t of state.viewTransactions(); track t.id) {
-    <div class="row" [class]="'type'+t.type">
+    <div
+        [class]="'row type' + t.type + (state.selectedTransaction()?.id === t.id ? ' selected' : '')"
+        role="button"
+        tabindex="0"
+        (click)="selectTransaction(t)"
+        (keydown.enter)="selectTransaction(t); $event.preventDefault()"
+        (keydown.space)="selectTransaction(t); $event.preventDefault()"
+    >
         <span class="date">{{ t.date | date:'dd MMM' }}</span>
         <span class="info">
             <span class="description">{{ t.description || t.payee || '—' }}</span>

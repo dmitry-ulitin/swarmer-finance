@@ -1,0 +1,42 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.type-selector {
+    width: 100%;
+
+    button {
+        flex: 1;
+    }
+}
+
+.currency-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.currency-field {
+    flex: 1;
+}
+
+.row {
+    display: flex;
+    gap: 1rem;
+
+    tui-textfield {
+        flex: 1;
+
+        &.currency-field {
+            flex: 0 0 8rem;
+        }
+    }
+}
+
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}

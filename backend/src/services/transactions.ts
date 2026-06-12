@@ -29,10 +29,6 @@ async function validateCategory(categoryId: number, userId: number): Promise<voi
   if (!hasAccess) {
     throw { statusCode: 403, message: 'Cannot use this category' };
   }
-  const isLeaf = !(await categoryQueries.hasChildren(categoryId));
-  if (!isLeaf) {
-    throw { statusCode: 400, message: 'Must select a leaf category' };
-  }
 }
 
 async function validateTransactionInput(input: CreateInput, userId: number): Promise<void> {

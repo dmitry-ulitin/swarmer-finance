@@ -1,0 +1,103 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+
+    <!-- Type selector -->
+    <tui-segmented [activeItemIndex]="activeTypeIndex()" (activeItemIndexChange)="activeTypeIndex.set($event)"
+        class="type-selector">
+        <button type="button">Expense</button>
+        <button type="button">Income</button>
+        <button type="button" [disabled]="accountsState.accounts().length < 2">Transfer</button>
+    </tui-segmented>
+
+    <!-- Date -->
+    <tui-textfield>
+        <label tuiLabel>Date</label>
+        <input tuiInputDate formControlName="date" />
+        <tui-calendar *tuiDropdown />
+    </tui-textfield>
+
+    <!-- From / To accounts -->
+    @if (isExpense() || isTransfer()) {
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
+        [identityMatcher]="accountMatcher">
+        <label tuiLabel>{{ isTransfer() ? 'From Account' : 'Account' }}</label>
+        <input tuiSelect formControlName="fromAccount" placeholder="Select account" />
+        <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
+    </tui-textfield>
+    }
+    @if (isIncome() || isTransfer()) {
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
+        [identityMatcher]="accountMatcher">
+        <label tuiLabel>{{ isTransfer() ? 'To Account' : 'Account' }}</label>
+        <input tuiSelect formControlName="toAccount" placeholder="Select account" />
+        <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
+    </tui-textfield>
+    }
+    <!-- Amount(s) -->
+    @if (isIncome() || !isSameCurrency() || isTransfer()) {
+    <div class="row">
+        <tui-textfield>
+            <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Debit Amount' }}</label>
+            <input tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
+                placeholder="0.00" />
+        </tui-textfield>
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
+            <input tuiComboBox formControlName="debitCurrency" placeholder="e.g. USD" [strict]="false" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.currencies() | tuiFilterByInput" />
+        </tui-textfield>
+    </div>
+    }
+    @if (isExpense() || !isSameCurrency()) {
+    <div class="row">
+        <tui-textfield>
+            <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Credit Amount' }}</label>
+            <input tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
+                placeholder="0.00" />
+        </tui-textfield>
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
+            <input tuiComboBox formControlName="creditCurrency" placeholder="e.g. EUR" [strict]="false" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.currencies() | tuiFilterByInput" />
+        </tui-textfield>
+    </div>
+    }
+    <!-- Category (Expense / Income only) -->
+    @if (!isTransfer()) {
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="true" [stringify]="stringifyCategory"
+        [identityMatcher]="categoryMatcher">
+        <label tuiLabel>Category</label>
+        <input tuiSelect formControlName="category" />
+        <tui-data-list *tuiDropdown>
+            @for (item of visibleCategories(); track item.id) {
+            <tui-tree [childrenHandler]="treeHandler()" [content]="treeNodeContent" [map]="treeMap"
+                [tuiTreeController]="false" [value]="item" />
+            }
+        </tui-data-list>
+    </tui-textfield>
+    <ng-template #treeNodeContent let-item>
+        <button new tuiOption type="button" [value]="item" class="tree-option">
+            <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />
+            {{ item.name }}
+        </button>
+    </ng-template>
+    }
+
+    <!-- Optional fields -->
+    <tui-textfield>
+        <label tuiLabel>Payee</label>
+        <input tuiInput formControlName="payee" placeholder="Optional" />
+    </tui-textfield>
+    <tui-textfield>
+        <label tuiLabel>Description</label>
+        <textarea tuiTextarea formControlName="description" placeholder="Optional"></textarea>
+    </tui-textfield>
+
+    <tui-error [error]="error()" />
+
+    <div class="actions">
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+        <button tuiButton size="s" type="submit">Save</button>
+    </div>
+</form>
+
+<ng-template #accountTemplate let-item>
+    <button tuiOption type="button" [value]="item">{{ item.name }}</button>
+</ng-template>
