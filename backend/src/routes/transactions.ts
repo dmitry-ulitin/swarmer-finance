@@ -81,7 +81,7 @@ router.post('/', validate(createTransactionSchema), async (req: AuthRequest, res
 
 router.put('/:id', validate(updateTransactionSchema), async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const transaction = await transactionService.updateTransaction(id, req.userId!, req.body);
     res.json({ data: transaction, error: null });
   } catch (error: unknown) {
@@ -95,7 +95,7 @@ router.put('/:id', validate(updateTransactionSchema), async (req: AuthRequest, r
 
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     await transactionService.deleteTransaction(id, req.userId!);
     res.json({ data: { success: true }, error: null });
   } catch (error: unknown) {

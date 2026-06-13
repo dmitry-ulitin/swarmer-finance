@@ -46,7 +46,7 @@ router.post('/', validate(createCategorySchema), async (req: AuthRequest, res, n
 
 router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const { name, color, icon } = req.body;
     const category = await categoryService.updateCategory(id, req.userId!, name, color, icon);
     res.json({ data: category, error: null });
@@ -61,7 +61,7 @@ router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res,
 
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     await categoryService.deleteCategory(id, req.userId!);
     res.json({ data: { success: true }, error: null });
   } catch (error: unknown) {

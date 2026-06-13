@@ -42,7 +42,7 @@ router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, ne
 
 router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const account = await accountService.updateAccount(id, req.userId!, req.body);
     res.json({ data: account, error: null });
   } catch (error: unknown) {
@@ -56,7 +56,7 @@ router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, 
 
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     await accountService.deleteAccount(id, req.userId!);
     res.json({ data: { success: true }, error: null });
   } catch (error: unknown) {
