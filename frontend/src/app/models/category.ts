@@ -28,7 +28,8 @@ export const withComputedFields = (categories: Category[], ancestorPath = '', ro
     };
   });
 
-export const findCategoryById = (id: number, categories: Category[]): Category | null => {
+export const findCategoryById = (id: number | undefined, categories: Category[]): Category | null => {
+  if (id === undefined) return null;
   for (const category of categories) {
     if (category.id === id) {
       return category;

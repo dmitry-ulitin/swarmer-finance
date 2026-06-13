@@ -32,6 +32,7 @@ export interface UpdateTransactionData {
   debit?: number;
   credit?: number;
   currency?: string;
+  scale?: number;
   date?: string;
   description?: string;
   payee?: string;
@@ -194,16 +195,17 @@ export const updateTransaction = async (
 ): Promise<TransactionDTO | null> => {
   const count = await execute(
     `UPDATE transactions
-     SET category_id = COALESCE($1, category_id),
-         debit_account_id = COALESCE($2, debit_account_id),
-         credit_account_id = COALESCE($3, credit_account_id),
-         debit = COALESCE($4, debit),
-         credit = COALESCE($5, credit),
-         currency = COALESCE($6, currency),
-         date = COALESCE($7, date),
-         description = COALESCE($8, description),
-         payee = COALESCE($9, payee)
-     WHERE id = $10 AND user_id = $11`,
+     SET category_id = $1,
+         debit_account_id = $2,
+         credit_account_id = $3,
+         debit = $4,
+         credit = $5,
+         currency = $6,
+         scale = $7,
+         date = $8,
+         description = $9,
+         payee = $10
+     WHERE id = $11 AND user_id = $12`,
     [
       data.categoryId ?? null,
       data.debitAccountId ?? null,
@@ -211,6 +213,7 @@ export const updateTransaction = async (
       data.debit ?? null,
       data.credit ?? null,
       data.currency ?? null,
+      data.scale ?? null,
       data.date ?? null,
       data.description ?? null,
       data.payee ?? null,

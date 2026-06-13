@@ -11,16 +11,16 @@ export interface ApiResponse<T> {
 }
 
 export interface CreateTransactionRequest {
-  categoryId?: number;
-  debitAccountId?: number;
-  creditAccountId?: number;
+  categoryId?: number | null;
+  debitAccountId?: number | null;
+  creditAccountId?: number | null;
   debit: number;
   credit: number;
-  currency?: string;
-  scale?: number;
+  currency?: string | null;
+  scale?: number | null;
   date: string;
-  description?: string;
-  payee?: string;
+  description?: string | null;
+  payee?: string | null;
 }
 
 @Injectable({

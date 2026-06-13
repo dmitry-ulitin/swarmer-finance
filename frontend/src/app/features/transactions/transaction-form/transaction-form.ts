@@ -62,7 +62,7 @@ export class TransactionForm {
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
-    category: new FormControl<Category | null>(this.context.data.category?.id ? findCategoryById(this.context.data.category.id, this.categoriesState.categories()) : null),
+    category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? null),
     debitCurrency: new FormControl<string>(this.context.data.debit_account?.currency ?? this.context.data.currency ?? '', { nonNullable: true }),
     debitScale: new FormControl<number>(this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2, { nonNullable: true }),
     creditCurrency: new FormControl<string>({ value: this.context.data.credit_account?.currency ?? this.context.data.currency ?? '', disabled: true }, { nonNullable: true }),
@@ -225,26 +225,28 @@ export class TransactionForm {
     if (isExpense) {
       request = {
         debitAccountId: fromAccount!.id,
+        creditAccountId: null,
         debit: debitCents,
         credit: creditCents,
-        currency: this.creditCurrencyValue() || undefined,
+        currency: this.creditCurrencyValue() || null,
         scale: cScale,
-        categoryId: category?.id,
+        categoryId: category?.id ?? null,
         date: date.toJSON(),
-        description: description || undefined,
-        payee: payee || undefined,
+        description: description || null,
+        payee: payee || null,
       };
     } else if (isIncome) {
       request = {
+        debitAccountId: null,
         creditAccountId: toAccount!.id,
         debit: debitCents,
         credit: creditCents,
-        currency: this.debitCurrencyValue() || undefined,
+        currency: this.debitCurrencyValue() || null,
         scale: dScale,
-        categoryId: category?.id,
+        categoryId: category?.id ?? null,
         date: date.toJSON(),
-        description: description || undefined,
-        payee: payee || undefined,
+        description: description || null,
+        payee: payee || null,
       };
     } else {
       request = {
@@ -252,11 +254,12 @@ export class TransactionForm {
         creditAccountId: toAccount!.id,
         debit: debitCents,
         credit: creditCents,
-        currency: undefined,
-        scale: undefined,
+        currency: null,
+        scale: null,
+        categoryId: null,
         date: date.toJSON(),
-        description: description || undefined,
-        payee: payee || undefined,
+        description: description || null,
+        payee: payee || null,
       };
     }
 

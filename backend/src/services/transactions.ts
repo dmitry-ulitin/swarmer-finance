@@ -15,7 +15,18 @@ type CreateInput = {
   payee?: string;
 };
 
-type UpdateInput = Partial<CreateInput>;
+type UpdateInput = {
+  categoryId?: number | null;
+  debitAccountId?: number | null;
+  creditAccountId?: number | null;
+  debit?: number;
+  credit?: number;
+  currency?: string | null;
+  scale?: number | null;
+  date?: string;
+  description?: string | null;
+  payee?: string | null;
+};
 
 async function validateAccountOwnership(accountId: number, userId: number, label: string): Promise<void> {
   const account = await accountQueries.getAccountById(accountId, userId);
@@ -54,30 +65,16 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
   } else if (hasDebit) {
     // Expense
-    if (input.categoryId == null) {
-      throw { statusCode: 400, message: 'Expenses must have a category' };
-    }
-    if (input.currency == null) {
-      throw { statusCode: 400, message: 'Expenses must have a currency (credit side)' };
-    }
-    if (input.scale == null) {
-      throw { statusCode: 400, message: 'Expenses must have a scale (credit side)' };
-    }
     await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
-    await validateCategory(input.categoryId, userId);
+    if (input.categoryId != null) {
+      await validateCategory(input.categoryId, userId);
+    }
   } else {
     // Income
-    if (input.categoryId == null) {
-      throw { statusCode: 400, message: 'Income transactions must have a category' };
-    }
-    if (input.currency == null) {
-      throw { statusCode: 400, message: 'Income transactions must have a currency (debit side)' };
-    }
-    if (input.scale == null) {
-      throw { statusCode: 400, message: 'Income transactions must have a scale (debit side)' };
-    }
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
-    await validateCategory(input.categoryId, userId);
+    if (input.categoryId != null) {
+      await validateCategory(input.categoryId, userId);
+    }
   }
 }
 
@@ -130,22 +127,23 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     throw { statusCode: 404, message: 'Transaction not found' };
   }
 
-  // Merge input with existing values to re-validate the full resulting state
+  // Merge input with existing values to re-validate the full resulting state.
+  // null in input means "clear this field"; undefined means "keep existing".
   const merged: CreateInput = {
-    categoryId: input.categoryId !== undefined ? input.categoryId : (existing.category_id ?? undefined),
-    debitAccountId: input.debitAccountId !== undefined ? input.debitAccountId : (existing.debit_account_id ?? undefined),
-    creditAccountId: input.creditAccountId !== undefined ? input.creditAccountId : (existing.credit_account_id ?? undefined),
+    categoryId: input.categoryId !== undefined ? (input.categoryId ?? undefined) : (existing.category_id ?? undefined),
+    debitAccountId: input.debitAccountId !== undefined ? (input.debitAccountId ?? undefined) : (existing.debit_account_id ?? undefined),
+    creditAccountId: input.creditAccountId !== undefined ? (input.creditAccountId ?? undefined) : (existing.credit_account_id ?? undefined),
     debit: input.debit ?? existing.debit,
     credit: input.credit ?? existing.credit,
-    currency: input.currency !== undefined ? input.currency : (existing.currency ?? undefined),
-    scale: input.scale !== undefined ? input.scale : (existing.scale ?? 2),
+    currency: input.currency !== undefined ? (input.currency ?? undefined) : (existing.currency ?? undefined),
+    scale: input.scale !== undefined ? (input.scale ?? undefined) : (existing.scale ?? 2),
     date: input.date ?? existing.date.toString(),
-    description: input.description ?? existing.description,
-    payee: input.payee !== undefined ? input.payee : (existing.payee ?? undefined),
+    description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
+    payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };
 
   await validateTransactionInput(merged, userId);
-  return transactionQueries.updateTransaction(id, userId, input);
+  return transactionQueries.updateTransaction(id, userId, merged);
 };
 
 export const deleteTransaction = async (id: number, userId: number): Promise<void> => {

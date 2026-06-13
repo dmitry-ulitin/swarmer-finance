@@ -58,6 +58,7 @@ export class TransactionDialogService {
       );
       if (!result) return null;
       const response = await firstValueFrom(this.transactionsState.update(transaction.id, result.request));
+      this.notifications.open('Transaction updated successfully', { label: 'success' });
       return response.data;
     } catch (e) {
       this.notifications.open('Failed to update transaction', { label: 'error' });

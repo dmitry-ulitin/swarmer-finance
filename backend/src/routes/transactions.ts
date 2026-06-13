@@ -10,16 +10,16 @@ const router = Router();
 router.use(authMiddleware);
 
 const createTransactionSchema = z.object({
-  categoryId: z.number().int().positive().optional(),
-  debitAccountId: z.number().int().positive().optional(),
-  creditAccountId: z.number().int().positive().optional(),
+  categoryId: z.number().int().positive().nullish(),
+  debitAccountId: z.number().int().positive().nullish(),
+  creditAccountId: z.number().int().positive().nullish(),
   debit: z.number().positive(),
   credit: z.number().positive(),
-  currency: z.string().min(1).optional(),
-  scale: z.number().int().positive().optional(),
+  currency: z.string().min(1).nullish(),
+  scale: z.number().int().positive().nullish(),
   date: z.string(),
-  description: z.string().optional(),
-  payee: z.string().optional(),
+  description: z.string().nullish(),
+  payee: z.string().nullish(),
 });
 
 const updateTransactionSchema = createTransactionSchema.partial();
