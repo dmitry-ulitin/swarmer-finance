@@ -219,6 +219,21 @@ describe('Transactions API', () => {
       expect(res.body.data.currency).toBe('USDT');
     });
 
+    it('should require currency for expense', async () => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: expenseCategoryId,
+          debitAccountId: testAccountId,
+          debit: 500,
+          credit: 500,
+          date: '2026-02-18',
+        });
+
+      expect(res.status).toBe(400);
+    });
+
     it('should require currency for income', async () => {
       const res = await request(app)
         .post('/api/transactions')

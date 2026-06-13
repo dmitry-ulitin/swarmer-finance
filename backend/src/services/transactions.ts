@@ -65,12 +65,18 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
   } else if (hasDebit) {
     // Expense
+    if (input.currency == null) {
+      throw { statusCode: 400, message: 'Expense transactions must have a currency' };
+    }
     await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
     }
   } else {
     // Income
+    if (input.currency == null) {
+      throw { statusCode: 400, message: 'Income transactions must have a currency' };
+    }
     await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
@@ -137,7 +143,7 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     credit: input.credit ?? existing.credit,
     currency: input.currency !== undefined ? (input.currency ?? undefined) : (existing.currency ?? undefined),
     scale: input.scale !== undefined ? (input.scale ?? undefined) : (existing.scale ?? 2),
-    date: input.date ?? existing.date.toString(),
+    date: input.date ?? new Date(existing.date).toISOString().slice(0, 10),
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };
