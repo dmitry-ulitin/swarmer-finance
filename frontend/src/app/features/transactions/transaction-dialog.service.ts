@@ -20,9 +20,9 @@ export class TransactionDialogService {
   async openCreate(): Promise<Transaction | null> {
     const { TransactionForm } = await import('./transaction-form/transaction-form');
     const lastTransaction = this.transactionsState.transactions()[0];
-    let defaultData: Partial<Transaction> = { debit: 0, credit: 0, date: new Date().toISOString().split('T')[0] };
+    let defaultData: Partial<Transaction> = { date: new Date().toISOString().split('T')[0] };
     if (lastTransaction) {
-      defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: 0, credit: 0 };
+      defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: undefined, credit: undefined };
     } else if (this.accountState.accounts().length < 1) {
       return null;
     } else {

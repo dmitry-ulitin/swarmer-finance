@@ -37,7 +37,7 @@
     <div class="row">
         <tui-textfield>
             <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Debit Amount' }}</label>
-            <input tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
+            <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
                 placeholder="0.00" />
         </tui-textfield>
         <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
@@ -50,7 +50,7 @@
     <div class="row">
         <tui-textfield>
             <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Credit Amount' }}</label>
-            <input tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
+            <input tuiAutoFocus tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
                 placeholder="0.00" />
         </tui-textfield>
         <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
@@ -99,5 +99,5 @@
 </form>
 
 <ng-template #accountTemplate let-item>
-    <button tuiOption type="button" [value]="item">{{ item.name }}</button>
+    {{ item.name }}
 </ng-template>

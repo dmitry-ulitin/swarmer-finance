@@ -4,7 +4,7 @@ import { TuiButton, TuiDataList, TuiError, TuiFilterByInputPipe, TuiIcon, TuiInp
 import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea, TuiTree } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
-import type { TuiStringHandler } from '@taiga-ui/cdk';
+import { TuiAutoFocus, type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -41,6 +41,7 @@ export interface TransactionFormResult {
     TuiChevron,
     TuiButton,
     TuiError,
+    TuiAutoFocus
   ],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
@@ -67,8 +68,8 @@ export class TransactionForm {
     debitScale: new FormControl<number>(this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2, { nonNullable: true }),
     creditCurrency: new FormControl<string>({ value: this.context.data.credit_account?.currency ?? this.context.data.currency ?? '', disabled: true }, { nonNullable: true }),
     creditScale: new FormControl<number>({ value: this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2, disabled: true }, { nonNullable: true }),
-    debitAmount: new FormControl<number>((this.context.data.debit ?? 0) / Math.pow(10, this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2)),
-    creditAmount: new FormControl<number | null>((this.context.data.credit ?? 0) / Math.pow(10, this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2)),
+    debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit / Math.pow(10, this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2) : null),
+    creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit / Math.pow(10, this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2) : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),
     payee: new FormControl<string>(this.context.data.payee ?? '', { nonNullable: true }),
   });
@@ -149,7 +150,7 @@ export class TransactionForm {
           this.form.controls.debitCurrency.disable();
           this.form.controls.creditCurrency.enable();
           this.form.controls.toAccount.setValue(null);
-          this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value ?? 0);
+          this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value);
           if (!fromAccount) {
             this.form.controls.fromAccount.setValue(toAccount);
           }
@@ -160,7 +161,7 @@ export class TransactionForm {
           this.form.controls.debitCurrency.enable();
           this.form.controls.creditCurrency.disable();
           this.form.controls.fromAccount.setValue(null);
-          this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value ?? 0);
+          this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value);
           if (!toAccount) {
             this.form.controls.toAccount.setValue(fromAccount);
           }
