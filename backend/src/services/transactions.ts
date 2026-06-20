@@ -28,6 +28,14 @@ type UpdateInput = {
   payee?: string | null;
 };
 
+function formatDate(date: string | Date): string {
+  if (typeof date === 'string') return date;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 async function validateAccountOwnership(accountId: number, userId: number, label: string): Promise<void> {
   const account = await accountQueries.getAccountById(accountId, userId);
   if (!account) {
@@ -143,7 +151,7 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     credit: input.credit ?? existing.credit,
     currency: input.currency !== undefined ? (input.currency ?? undefined) : (existing.currency ?? undefined),
     scale: input.scale !== undefined ? (input.scale ?? undefined) : (existing.scale ?? 2),
-    date: input.date ?? new Date(existing.date).toISOString().slice(0, 10),
+    date: input.date ?? formatDate(existing.date),
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };

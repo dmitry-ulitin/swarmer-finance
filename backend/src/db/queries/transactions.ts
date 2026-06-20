@@ -213,7 +213,7 @@ export const updateTransaction = async (
       data.debit ?? null,
       data.credit ?? null,
       data.currency ?? null,
-      data.scale ?? null,
+      data.scale ?? 2,
       data.date ?? null,
       data.description ?? null,
       data.payee ?? null,
