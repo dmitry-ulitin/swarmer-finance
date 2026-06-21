@@ -66,11 +66,24 @@ All API responses use this envelope format consistently.
 ### Transaction Type Semantics
 Type is derived at runtime — no stored `type` column:
 
-| Type | `debit_account_id` | `credit_account_id` | `currency` | `category_id` |
+| Type | debit_account_id | credit_account_id | currency | category_id |
 |------|-------------------|---------------------|------------|---------------|
-| Expense | filled | null | credit currency | required (leaf) |
-| Income | null | filled | debit currency | required (leaf) |
+| Expense | filled | null | account currency or FX currency | required (leaf) |
+| Income | null | filled | account currency or FX currency | required (leaf) |
 | Transfer | filled | filled | null | null |
+
+Currency handling for Expense / Income / Transfer follows a single rule:
+
+- **Same-currency** — when the transaction's `currency` matches the account
+  currency on both sides, `debit` must equal `credit` (no value may silently
+  appear or disappear between sides).
+- **Cross-currency (FX)** — when currencies differ across sides, `debit`
+  and `credit` may differ according to the exchange rate. The transaction's
+  `currency` field carries the side of the single-account transaction
+  (Expense / Income); for Transfer the `currency` field is null.
+- Backend enforces this rule in `services/transactions.ts`:
+  `validateTransactionInput` rejects same-currency imbalances with 400,
+  and allows cross-currency differences.
 
 ### Environment Variables
 Copy `.env.example` → `.env`:

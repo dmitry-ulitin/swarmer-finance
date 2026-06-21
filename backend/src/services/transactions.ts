@@ -87,7 +87,17 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Expense transactions must have a currency' };
     }
-    await loadAccount(input.debitAccountId!, userId, 'debit');
+    const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
+    // Same-currency rule: when the transaction currency matches the
+    // account currency, debit must equal credit (otherwise value silently
+    // appears or disappears between sides). Cross-currency expenses are
+    // allowed and may have debit != credit (FX conversion / fee).
+    if (debitAccount.currency === input.currency && input.debit !== input.credit) {
+      throw {
+        statusCode: 400,
+        message: `Same-currency expenses require debit to equal credit (account and transaction are ${debitAccount.currency})`,
+      };
+    }
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
     }
@@ -96,7 +106,14 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Income transactions must have a currency' };
     }
-    await loadAccount(input.creditAccountId!, userId, 'credit');
+    const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
+    // Same rule as expense — see comment above.
+    if (creditAccount.currency === input.currency && input.debit !== input.credit) {
+      throw {
+        statusCode: 400,
+        message: `Same-currency income requires debit to equal credit (account and transaction are ${creditAccount.currency})`,
+      };
+    }
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
     }

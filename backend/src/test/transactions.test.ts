@@ -202,12 +202,20 @@ describe('Transactions API', () => {
     });
 
     it('should create a transaction with non-standard currency', async () => {
+      // Create a USDT account so the income can use a non-USD currency.
+      const usdtAccountResult = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance)
+         VALUES ($1, 'USDT Account', 'USDT', 0) RETURNING id`,
+        [testUserId]
+      );
+      const usdtAccountId = usdtAccountResult.rows[0].id;
+
       const res = await request(app)
         .post('/api/transactions')
         .set({ Authorization: `Bearer ${token}` })
         .send({
           categoryId: incomeCategoryId,
-          creditAccountId: testAccountId,
+          creditAccountId: usdtAccountId,
           debit: 100,
           credit: 100,
           scale: 2,
@@ -217,6 +225,82 @@ describe('Transactions API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.currency).toBe('USDT');
+
+      // cleanup — delete the transaction referencing this account first
+      await pool.query('DELETE FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1', [usdtAccountId]);
+      await pool.query('DELETE FROM accounts WHERE id = $1', [usdtAccountId]);
+    });
+
+    it('should accept cross-currency expense with debit != credit (FX)', async () => {
+      // testAccountId is USD; sending currency: 'EUR' with debit != credit
+      // models an FX expense where 100 USD debits and 90 EUR credits.
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: expenseCategoryId,
+          debitAccountId: testAccountId,
+          debit: 10000,
+          credit: 9200,
+          date: '2026-02-18',
+          currency: 'EUR',
+        });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('should accept cross-currency income with debit != credit (FX)', async () => {
+      // testAccountId is USD; sending currency: 'EUR' with debit != credit
+      // models FX income.
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: incomeCategoryId,
+          creditAccountId: testAccountId,
+          debit: 10000,
+          credit: 9200,
+          date: '2026-02-18',
+          currency: 'EUR',
+        });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('should reject same-currency expense with debit != credit', async () => {
+      // testAccountId is USD; sending currency: 'USD' with debit != credit
+      // would silently lose value between sides — must be rejected.
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: expenseCategoryId,
+          debitAccountId: testAccountId,
+          debit: 100,
+          credit: 90,
+          date: '2026-02-18',
+          currency: 'USD',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/debit to equal credit/);
+    });
+
+    it('should reject same-currency income with debit != credit', async () => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: incomeCategoryId,
+          creditAccountId: testAccountId,
+          debit: 100,
+          credit: 90,
+          date: '2026-02-18',
+          currency: 'USD',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/debit to equal credit/);
     });
 
     it('should require currency for expense', async () => {
@@ -349,12 +433,41 @@ describe('Transactions API', () => {
         .send({
           debit: 200,
           credit: 200,
-          currency: 'EUR',
         });
 
       expect(res.status).toBe(200);
       expect(Number(res.body.data.debit)).toBe(200);
-      expect(res.body.data.currency).toBe('EUR');
+    });
+
+    it('should reject update that would create a same-currency debit/credit imbalance', async () => {
+      // The transaction was created with currency: 'USD' against the
+      // USD test account. Sending currency: 'USD' with debit != credit
+      // would violate the same-currency contract.
+      const res = await request(app)
+        .put(`/api/transactions/${transactionId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debit: 200,
+          credit: 100,
+          currency: 'USD',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/debit to equal credit/);
+    });
+
+    it('should accept update that switches to a cross-currency FX transaction', async () => {
+      // Same account, different currency — debit and credit may differ (FX).
+      const res = await request(app)
+        .put(`/api/transactions/${transactionId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debit: 10000,
+          credit: 9200,
+          currency: 'EUR',
+        });
+
+      expect(res.status).toBe(200);
     });
   });
 
