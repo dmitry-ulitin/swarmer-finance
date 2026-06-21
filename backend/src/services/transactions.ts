@@ -1,6 +1,7 @@
 import * as transactionQueries from '../db/queries/transactions';
 import * as categoryQueries from '../db/queries/categories';
 import * as accountQueries from '../db/queries/accounts';
+import { Account } from '../types';
 
 type CreateInput = {
   categoryId?: number;
@@ -36,11 +37,12 @@ function formatDate(date: string | Date): string {
   return `${y}-${m}-${d}`;
 }
 
-async function validateAccountOwnership(accountId: number, userId: number, label: string): Promise<void> {
+async function loadAccount(accountId: number, userId: number, label: string): Promise<Account> {
   const account = await accountQueries.getAccountById(accountId, userId);
   if (!account) {
     throw { statusCode: 403, message: `Cannot use this ${label} account` };
   }
+  return account;
 }
 
 async function validateCategory(categoryId: number, userId: number): Promise<void> {
@@ -69,14 +71,23 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.scale != null) {
       throw { statusCode: 400, message: 'Transfers must not have a scale' };
     }
-    await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
-    await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
+    const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
+    const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
+    // When both accounts share a currency, debit and credit must be equal —
+    // otherwise value silently disappears or appears between the two sides.
+    // Cross-currency transfers allow debit != credit (FX conversion / fee).
+    if (debitAccount.currency === creditAccount.currency && input.debit !== input.credit) {
+      throw {
+        statusCode: 400,
+        message: `Same-currency transfers require debit to equal credit (both accounts are ${debitAccount.currency})`,
+      };
+    }
   } else if (hasDebit) {
     // Expense
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Expense transactions must have a currency' };
     }
-    await validateAccountOwnership(input.debitAccountId!, userId, 'debit');
+    await loadAccount(input.debitAccountId!, userId, 'debit');
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
     }
@@ -85,7 +96,7 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.currency == null) {
       throw { statusCode: 400, message: 'Income transactions must have a currency' };
     }
-    await validateAccountOwnership(input.creditAccountId!, userId, 'credit');
+    await loadAccount(input.creditAccountId!, userId, 'credit');
     if (input.categoryId != null) {
       await validateCategory(input.categoryId, userId);
     }

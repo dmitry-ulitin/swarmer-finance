@@ -272,6 +272,59 @@ describe('Transactions API', () => {
       expect(res.body.data.category).toBeNull();
       expect(res.body.data.currency).toBeNull();
     });
+
+    it('should reject same-currency transfer with debit != credit', async () => {
+      // Create a second USD account so both sides share a currency.
+      const secondAccountResult = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance)
+         VALUES ($1, 'Same Currency USD', 'USD', 0) RETURNING id`,
+        [testUserId]
+      );
+      const secondUsdAccountId = secondAccountResult.rows[0].id;
+
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debitAccountId: testAccountId,
+          creditAccountId: secondUsdAccountId,
+          debit: 100,
+          credit: 90, // unequal — value would silently disappear
+          date: '2026-02-18',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/debit to equal credit/);
+
+      // cleanup
+      await pool.query('DELETE FROM accounts WHERE id = $1', [secondUsdAccountId]);
+    });
+
+    it('should accept same-currency transfer with debit === credit', async () => {
+      const secondAccountResult = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance)
+         VALUES ($1, 'Same Currency USD 2', 'USD', 0) RETURNING id`,
+        [testUserId]
+      );
+      const secondUsdAccountId = secondAccountResult.rows[0].id;
+
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debitAccountId: testAccountId,
+          creditAccountId: secondUsdAccountId,
+          debit: 100,
+          credit: 100,
+          date: '2026-02-18',
+        });
+
+      expect(res.status).toBe(200);
+
+      // cleanup — delete transactions referencing this account first
+      await pool.query('DELETE FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1', [secondUsdAccountId]);
+      await pool.query('DELETE FROM accounts WHERE id = $1', [secondUsdAccountId]);
+    });
   });
 
   describe('PUT /api/transactions/:id', () => {
