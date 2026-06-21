@@ -69,17 +69,31 @@ export class AuthService {
   }
 
   refreshToken(): Observable<string> {
-    const token = localStorage.getItem('refreshToken');
+    const token = this.getRefreshToken();
     if (!token) {
       this.logout();
       return throwError(() => new Error('No refresh token'));
     }
+    return this.performRefresh(token);
+  }
+
+  /**
+   * Internal: performs the actual /api/auth/refresh HTTP call.
+   * Returns an Observable that emits the new access token on success.
+   * Used by RefreshCoordinator for single-flight gating; do not call
+   * directly from feature code.
+   */
+  performRefresh(refreshToken: string): Observable<string> {
     return this.http
-      .post<ApiResponse<AuthResponse>>('/api/auth/refresh', { refreshToken: token })
+      .post<ApiResponse<AuthResponse>>('/api/auth/refresh', { refreshToken })
       .pipe(
         tap(response => this.handleAuth(response.data)),
         map(response => response.data!.accessToken)
       );
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
   }
 
   private handleAuth(data: AuthResponse | null) {
