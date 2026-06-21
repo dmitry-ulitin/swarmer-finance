@@ -58,7 +58,11 @@ export const login = async (email: string, password: string): Promise<{ user: Us
 
 export const refreshTokens = async (refreshToken: string): Promise<AuthTokens> => {
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as JwtPayload;
+    // Pin the verification algorithm explicitly. See middleware/auth.ts for
+    // the rationale; same threat applies to refresh tokens.
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!, {
+      algorithms: ['HS256'],
+    }) as JwtPayload;
     if (decoded.type !== 'refresh') {
       throw { statusCode: 401, message: 'Invalid token type' };
     }

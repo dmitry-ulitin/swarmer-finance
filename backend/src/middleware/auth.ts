@@ -20,7 +20,14 @@ export const authMiddleware = (
   const token = authHeader.split(' ')[1];
   
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+    // Pin the verification algorithm explicitly. Without this, jsonwebtoken
+    // trusts whatever `alg` the token header advertises, which leaves the door
+    // open to algorithm-confusion attacks (e.g. an attacker signing a token
+    // with HS512, RS256, or "none" against the same key/secret). HS256 is
+    // the algorithm used by services/auth.ts when issuing tokens.
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+      algorithms: ['HS256'],
+    }) as JwtPayload;
     if (decoded.type !== 'access') {
       return res.status(401).json({ data: null, error: 'Invalid token type' });
     }
