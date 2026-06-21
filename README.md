@@ -21,7 +21,7 @@ A personal finance application for tracking income, expenses, and transfers acro
 - Zod request validation
 
 **Frontend**
-- Angular 21 (standalone components, OnPush change detection)
+- Angular 22 (standalone components, OnPush change detection)
 - Taiga UI v5
 - Angular Signals + `resource()` API for state and async data
 

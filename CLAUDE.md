@@ -31,7 +31,7 @@ docker-compose up --build   # Start backend + frontend + PostgreSQL
 
 ### Monorepo Structure
 - `backend/` — Node.js + Express + PostgreSQL (raw SQL, no ORM)
-- `frontend/` — Angular 21 standalone components + Taiga UI v5
+- `frontend/` — Angular 22 standalone components + Taiga UI v5
 - `docker-compose.yml` / `Dockerfile` — multi-stage production build; `start.sh` generates Nginx config dynamically at container startup for Render.com compatibility
 
 ### Backend Request Flow
@@ -83,7 +83,7 @@ Dev proxy: `/api/*` → `http://localhost:3000` configured in `frontend/proxy.co
 
 ## Angular Conventions (frontend/)
 
-This project uses Angular 21 patterns — follow these strictly:
+This project uses Angular 22 patterns — follow these strictly:
 
 - **Standalone components only** — no NgModules
 - **`ChangeDetectionStrategy.OnPush`** required on all components
