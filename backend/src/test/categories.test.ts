@@ -96,10 +96,11 @@ describe('Categories API', () => {
     let categoryId: number;
 
     beforeEach(async () => {
+      const unique = `PUT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const res = await request(app)
         .post('/api/categories')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Test Category', parentId: 1 });
+        .send({ name: unique, parentId: 1 });
       categoryId = res.body.data.id;
     });
 
@@ -124,14 +125,90 @@ describe('Categories API', () => {
     });
   });
 
+  describe('Sibling uniqueness (uq_categories_sibling index)', () => {
+    it('should reject creating a second sibling with the same name', async () => {
+      const first = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Dup-Test', parentId: 1 });
+      expect(first.status).toBe(200);
+
+      const duplicate = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Dup-Test', parentId: 1 });
+      expect(duplicate.status).toBe(409);
+      expect(duplicate.body.error).toMatch(/sibling category named/);
+
+      // cleanup
+      await pool.query('DELETE FROM categories WHERE user_id = $1 AND name = $2', [testUserId, 'Dup-Test']);
+    });
+
+    it('should reject renaming a category into a sibling name', async () => {
+      const a = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Rename-A', parentId: 1 });
+      const b = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Rename-B', parentId: 1 });
+      expect(a.status).toBe(200);
+      expect(b.status).toBe(200);
+
+      const conflict = await request(app)
+        .put(`/api/categories/${b.body.data.id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Rename-A' });
+      expect(conflict.status).toBe(409);
+      expect(conflict.body.error).toMatch(/sibling category named/);
+
+      // cleanup
+      await pool.query(
+        'DELETE FROM categories WHERE user_id = $1 AND name IN ($2, $3)',
+        [testUserId, 'Rename-A', 'Rename-B']
+      );
+    });
+
+    it('should allow the same name under different parents', async () => {
+      // Get a child category under root Income (id=1) so we have a second parent.
+      const parentRes = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'SameName-Parent', parentId: 1 });
+      expect(parentRes.status).toBe(200);
+      const parentId = parentRes.body.data.id;
+
+      const child = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'SameName-Child', parentId });
+      expect(child.status).toBe(200);
+
+      // Different parent (root Income) — same name is allowed.
+      const differentParent = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'SameName-Child', parentId: 1 });
+      expect(differentParent.status).toBe(200);
+
+      // cleanup
+      await pool.query(
+        'DELETE FROM categories WHERE user_id = $1 AND (name = $2 OR name = $3)',
+        [testUserId, 'SameName-Parent', 'SameName-Child']
+      );
+    });
+  });
+
   describe('DELETE /api/categories/:id', () => {
     let categoryId: number;
 
     beforeEach(async () => {
+      const unique = `DEL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const res = await request(app)
         .post('/api/categories')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Test Category', parentId: 1 });
+        .send({ name: unique, parentId: 1 });
       categoryId = res.body.data.id;
     });
 

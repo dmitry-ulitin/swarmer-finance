@@ -1,6 +1,20 @@
 import * as categoryQueries from '../db/queries/categories';
 import { Category } from '../types';
 
+/**
+ * Translate a PostgreSQL unique-constraint violation into a 409 Conflict
+ * response. Returns the original error unchanged if it is not a unique
+ * violation, so callers can rethrow.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === '23505'
+  );
+}
+
 export const getCategoryTree = async (userId: number): Promise<Category[]> => {
   const allCategories = await categoryQueries.getCategoriesByUserId(userId);
   
@@ -41,8 +55,18 @@ export const createCategory = async (
   if (parentCategory.user_id !== null && parentCategory.user_id !== userId) {
     throw { statusCode: 403, message: 'Cannot create category under this parent' };
   }
-  
-  return categoryQueries.createCategory(userId, name, parentId, color, icon);
+
+  try {
+    return await categoryQueries.createCategory(userId, name, parentId, color, icon);
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw {
+        statusCode: 409,
+        message: `A sibling category named "${name}" already exists under this parent`,
+      };
+    }
+    throw err;
+  }
 };
 
 export const updateCategory = async (
@@ -55,12 +79,24 @@ export const updateCategory = async (
   if (id === 1 || id === 2) {
     throw { statusCode: 403, message: 'Cannot edit system categories' };
   }
-  
-  const updated = await categoryQueries.updateCategory(id, userId, name, color, icon);
+
+  let updated: Category | null;
+  try {
+    updated = await categoryQueries.updateCategory(id, userId, name, color, icon);
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw {
+        statusCode: 409,
+        message: `A sibling category named "${name}" already exists under this parent`,
+      };
+    }
+    throw err;
+  }
+
   if (!updated) {
     throw { statusCode: 404, message: 'Category not found or not owned by user' };
   }
-  
+
   return updated;
 };
 
