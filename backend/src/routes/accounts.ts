@@ -8,9 +8,19 @@ const router = Router();
 
 router.use(authMiddleware);
 
+// Currency code: 3 uppercase ASCII letters (ISO 4217, e.g. USD, EUR, GBP)
+// or 4 uppercase ASCII letters (crypto-style tickers like USDT, USDC).
+// Mirrors the DB-level CHECK constraint chk_accounts_currency_format /
+// chk_transactions_currency_format added in migration 006 — defense in
+// depth so a bad value cannot reach the database even if a future
+// migration or direct SQL edit bypasses the API.
+const currencySchema = z
+  .string()
+  .regex(/^[A-Z]{3,4}$/, 'Currency must be 3 or 4 uppercase ASCII letters (e.g. USD, EUR, USDT)');
+
 const createAccountSchema = z.object({
-  name: z.string().min(1),
-  currency: z.string().min(1),
+  name: z.string().min(1).max(255),
+  currency: currencySchema,
   startBalance: z.number().default(0),
   scale: z.number().optional().default(2),
 });

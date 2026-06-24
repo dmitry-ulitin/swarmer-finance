@@ -139,6 +139,59 @@ describe('Accounts API — balance field', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(2000);
     });
+
+    it('accepts 4-letter crypto-style currency codes (USDT, USDC)', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Crypto', currency: 'USDT', startBalance: 0, scale: 2 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.currency).toBe('USDT');
+    });
+  });
+
+  describe('POST /api/accounts — currency format validation', () => {
+    it('rejects lowercase currency code', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'X', currency: 'usd' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Currency must be/);
+    });
+
+    it('rejects 2-letter currency code', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'X', currency: 'US' });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects 5-letter currency code', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'X', currency: 'USDXL' });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects currency with digits', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'X', currency: 'US1' });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects empty currency', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'X', currency: '' });
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('PUT /api/accounts/:id', () => {
