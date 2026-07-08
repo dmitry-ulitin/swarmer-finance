@@ -235,4 +235,134 @@ describe('Accounts API — balance field', () => {
       expect(res.body.data.balance).toBe(4000); // 3000 + 1000
     });
   });
+
+  describe('DELETE /api/accounts/:id', () => {
+    beforeEach(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [testUserId]);
+    });
+
+    it('hard-deletes an account with no transactions', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Empty', currency: 'USD', startBalance: 0, scale: 2 });
+      const id = created.body.data.id;
+
+      const res = await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.kind).toBe('hard-deleted');
+
+      // Verify the row is gone
+      const r = await pool.query('SELECT id FROM accounts WHERE id = $1', [id]);
+      expect(r.rows.length).toBe(0);
+    });
+
+    it('soft-deletes an account with transactions and zero balance', async () => {
+      // Account with start_balance 10000; one expense of 10000 → balance = 0
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'ZeroBalance', currency: 'USD', startBalance: 10000, scale: 2 });
+      const id = created.body.data.id;
+
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
+         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        [testUserId, expenseCategoryId, id]
+      );
+
+      const res = await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.kind).toBe('soft-deleted');
+
+      // Verify the row still exists with deleted=true
+      const r = await pool.query('SELECT id, deleted FROM accounts WHERE id = $1', [id]);
+      expect(r.rows.length).toBe(1);
+      expect(r.rows[0].deleted).toBe(true);
+    });
+
+    it('rejects with 409 when account has transactions and non-zero balance', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Positive', currency: 'USD', startBalance: 5000, scale: 2 });
+      const id = created.body.data.id;
+
+      // Add a transaction that does NOT zero out the balance.
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
+         VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-01-15')`,
+        [testUserId, incomeCategoryId, id]
+      );
+
+      const res = await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/non-zero balance/);
+
+      // Verify the row is still active
+      const r = await pool.query('SELECT deleted FROM accounts WHERE id = $1', [id]);
+      expect(r.rows[0].deleted).toBe(false);
+    });
+
+    it('hides soft-deleted accounts from GET /api/accounts', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'ToArchive', currency: 'USD', startBalance: 10000, scale: 2 });
+      const id = created.body.data.id;
+
+      // Add a transaction that zeroes the balance.
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
+         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        [testUserId, expenseCategoryId, id]
+      );
+
+      await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      const list = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+      expect(list.status).toBe(200);
+      expect(list.body.data.find((a: { id: number }) => a.id === id)).toBeUndefined();
+    });
+
+    it('returns 404 when deleting an already soft-deleted account', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Twice', currency: 'USD', startBalance: 10000, scale: 2 });
+      const id = created.body.data.id;
+
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
+         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        [testUserId, expenseCategoryId, id]
+      );
+
+      // First delete succeeds (balance is 0)
+      const first = await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+      expect(first.status).toBe(200);
+
+      // Second delete returns 404
+      const second = await request(app)
+        .delete(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` });
+      expect(second.status).toBe(404);
+    });
+  });
 });

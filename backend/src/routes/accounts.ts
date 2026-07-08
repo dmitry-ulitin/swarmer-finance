@@ -67,8 +67,8 @@ router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, 
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    await accountService.deleteAccount(id, req.userId!);
-    res.json({ data: { success: true }, error: null });
+    const result = await accountService.deleteAccount(id, req.userId!);
+    res.json({ data: { success: true, kind: result.kind }, error: null });
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'statusCode' in error) {
       const err = error as { statusCode: number; message: string };

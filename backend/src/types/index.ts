@@ -27,6 +27,7 @@ export interface Account {
   scale: number;
   balance: number;
   created_at: Date;
+  deleted?: boolean;
 }
 
 export interface Transaction {
