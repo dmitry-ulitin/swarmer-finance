@@ -19,7 +19,6 @@
         <input tuiInput type="password" formControlName="password" placeholder="Enter your password (min 6 characters)">
         <tui-icon tuiPassword />
       </tui-textfield>
-      <tui-error [error]="error()" />
       <button tuiButton size="m" type="submit" [disabled]="loading()">
         {{ loading() ? 'Loading...' : 'Register' }}
       </button>

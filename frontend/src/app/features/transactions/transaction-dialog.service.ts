@@ -1,5 +1,5 @@
 import { inject, Injectable, INJECTOR } from '@angular/core';
-import { TuiDialogService, TuiNotificationService } from '@taiga-ui/core';
+import { TuiDialogService } from '@taiga-ui/core';
 import { TUI_CONFIRM } from '@taiga-ui/kit';
 import type { TuiConfirmData } from '@taiga-ui/kit';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import type { Transaction } from '../../models/transaction';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
+import { NotificationService } from '../../core/notification.service';
 import type { TransactionFormResult } from './transaction-form/transaction-form';
 
 @Injectable({ providedIn: 'root' })
@@ -15,7 +16,7 @@ export class TransactionDialogService {
   private readonly injector = inject(INJECTOR);
   private readonly transactionsState = inject(TransactionsState);
   private readonly accountState = inject(AccountsState);
-  private readonly notifications = inject(TuiNotificationService);
+  private readonly notifications = inject(NotificationService);
 
   async openCreate(): Promise<Transaction | null> {
     const { TransactionForm } = await import('./transaction-form/transaction-form');
@@ -41,7 +42,7 @@ export class TransactionDialogService {
       const response = await firstValueFrom(this.transactionsState.create(result.request));
       return response.data;
     } catch (e) {
-      this.notifications.open('Failed to create transaction', { label: 'error' });
+      this.notifications.showError(e, 'Failed to create transaction');
       return null;
     }
   }
@@ -58,10 +59,10 @@ export class TransactionDialogService {
       );
       if (!result) return null;
       const response = await firstValueFrom(this.transactionsState.update(transaction.id, result.request));
-      this.notifications.open('Transaction updated successfully', { label: 'success' });
+      this.notifications.showSuccess('Transaction updated successfully');
       return response.data;
     } catch (e) {
-      this.notifications.open('Failed to update transaction', { label: 'error' });
+      this.notifications.showError(e, 'Failed to update transaction');
       return null;
     }
   }
@@ -81,7 +82,7 @@ export class TransactionDialogService {
       await firstValueFrom(this.transactionsState.delete(transaction.id));
       return true;
     } catch (e) {
-      this.notifications.open('Failed to delete transaction', { label: 'error' });
+      this.notifications.showError(e, 'Failed to delete transaction');
       return false;
     }
   }
