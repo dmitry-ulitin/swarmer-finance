@@ -17,47 +17,36 @@
 
     <!-- From / To accounts -->
     @if (isExpense() || isTransfer()) {
-    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
-        [identityMatcher]="accountMatcher">
-        <label tuiLabel>{{ isTransfer() ? 'From Account' : 'Account' }}</label>
-        <input tuiSelect formControlName="fromAccount" placeholder="Select account" />
-        <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
-    </tui-textfield>
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
+            [identityMatcher]="accountMatcher">
+            <label tuiLabel>{{ isTransfer() ? 'From Account' : 'Account' }}</label>
+            <input tuiSelect formControlName="fromAccount" placeholder="Select account" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
+        </tui-textfield>
+        <div class="row">
+            <tui-textfield>
+                <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
+                    placeholder="0.00" />
+            </tui-textfield>
+            <span>{{debitCurrencyValue()}}</span>
+        </div>
     }
     @if (isIncome() || isTransfer()) {
-    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
-        [identityMatcher]="accountMatcher">
-        <label tuiLabel>{{ isTransfer() ? 'To Account' : 'Account' }}</label>
-        <input tuiSelect formControlName="toAccount" placeholder="Select account" />
-        <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
-    </tui-textfield>
-    }
-    <!-- Amount(s) -->
-    @if (isIncome() || !isSameCurrency() || isTransfer()) {
-    <div class="row">
-        <tui-textfield>
-            <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Debit Amount' }}</label>
-            <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
-                placeholder="0.00" />
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
+            [identityMatcher]="accountMatcher">
+            <label tuiLabel>{{ isTransfer() ? 'To Account' : 'Account' }}</label>
+            <input tuiSelect formControlName="toAccount" placeholder="Select account" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
         </tui-textfield>
-        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
-            <input tuiComboBox formControlName="debitCurrency" placeholder="e.g. USD" [strict]="false" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.currencies() | tuiFilterByInput" />
-        </tui-textfield>
-    </div>
-    }
-    @if (isExpense() || !isSameCurrency()) {
-    <div class="row">
-        <tui-textfield>
-            <label tuiLabel>{{ isSameCurrency() ? 'Amount' : 'Credit Amount' }}</label>
-            <input tuiAutoFocus tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
-                placeholder="0.00" />
-        </tui-textfield>
-        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" class="currency-field">
-            <input tuiComboBox formControlName="creditCurrency" placeholder="e.g. EUR" [strict]="false" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.currencies() | tuiFilterByInput" />
-        </tui-textfield>
-    </div>
+        @if (isIncome() || !isSameCurrency()) {
+            <div class="row">
+                <tui-textfield>
+                    <input tuiAutoFocus tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
+                        placeholder="0.00" />
+                </tui-textfield>
+                <span>{{creditCurrencyValue()}}</span>
+            </div>
+        }
     }
     <!-- Category (Expense / Income only) -->
     @if (!isTransfer()) {

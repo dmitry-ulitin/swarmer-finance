@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiError, TuiFilterByInputPipe, TuiIcon, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiError, TuiIcon, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea, TuiTree } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
@@ -11,7 +11,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
-import { findCategoryById, flattenCategories } from '../../../models/category';
+import { findCategoryById } from '../../../models/category';
 import type { Transaction, TransactionAccount, TransactionCategory } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
@@ -37,7 +37,6 @@ export interface TransactionFormResult {
     TuiDataList,
     TuiTree,
     TuiIcon,
-    TuiFilterByInputPipe,
     TuiChevron,
     TuiButton,
     TuiError,
@@ -78,9 +77,9 @@ export class TransactionForm {
 
   private readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: null });
   private readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: null });
-  private readonly debitCurrencyValue = toSignal(this.form.controls.debitCurrency.valueChanges, { initialValue: "" });
+  readonly debitCurrencyValue = toSignal(this.form.controls.debitCurrency.valueChanges, { initialValue: "" });
   private readonly debitScale = toSignal(this.form.controls.debitScale.valueChanges, { initialValue: 2 });
-  private readonly creditCurrencyValue = toSignal(this.form.controls.creditCurrency.valueChanges, { initialValue: "" });
+  readonly creditCurrencyValue = toSignal(this.form.controls.creditCurrency.valueChanges, { initialValue: "" });
   private readonly creditScale = toSignal(this.form.controls.creditScale.valueChanges, { initialValue: 2 });
 
   readonly isExpense = computed(() => this.activeTypeIndex() === 0);
