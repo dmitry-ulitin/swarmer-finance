@@ -8,7 +8,7 @@ import type { Transaction } from '../../models/transaction';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
-import type { TransactionFormResult } from './transaction-form/transaction-form';
+import { TransactionRequest } from '../../core/api.service';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionDialogService {
@@ -25,6 +25,7 @@ export class TransactionDialogService {
     if (lastTransaction) {
       defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: undefined, credit: undefined };
     } else if (this.accountState.accounts().length < 1) {
+      this.notifications.showError('No accounts available'); 
       return null;
     } else {
       const account = this.accountState.accounts().find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || this.accountState.accounts()[0];
@@ -32,14 +33,14 @@ export class TransactionDialogService {
     }
     try {
       const result = await firstValueFrom(
-        this.dialogs.open<TransactionFormResult | null>(
+        this.dialogs.open<TransactionRequest | null>(
           new PolymorpheusComponent(TransactionForm, this.injector),
           { data: defaultData, label: 'Add Transaction', size: 's' }
         ),
         { defaultValue: null }
       );
       if (!result) return null;
-      const response = await firstValueFrom(this.transactionsState.create(result.request));
+      const response = await firstValueFrom(this.transactionsState.create(result));
       return response.data;
     } catch (e) {
       this.notifications.showError(e, 'Failed to create transaction');
@@ -51,14 +52,14 @@ export class TransactionDialogService {
     try {
       const { TransactionForm } = await import('./transaction-form/transaction-form');
       const result = await firstValueFrom(
-        this.dialogs.open<TransactionFormResult | null>(
+        this.dialogs.open<TransactionRequest | null>(
           new PolymorpheusComponent(TransactionForm, this.injector),
           { data: transaction, label: 'Edit Transaction', size: 's' }
         ),
         { defaultValue: null }
       );
       if (!result) return null;
-      const response = await firstValueFrom(this.transactionsState.update(transaction.id, result.request));
+      const response = await firstValueFrom(this.transactionsState.update(transaction.id, result));
       this.notifications.showSuccess('Transaction updated successfully');
       return response.data;
     } catch (e) {

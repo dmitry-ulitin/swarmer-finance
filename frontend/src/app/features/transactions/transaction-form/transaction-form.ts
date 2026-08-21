@@ -15,12 +15,8 @@ import { findCategoryById } from '../../../models/category';
 import type { Transaction, TransactionAccount, TransactionCategory } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
-import type { CreateTransactionRequest } from '../../../core/api.service';
-
-export interface TransactionFormResult {
-  id?: number;
-  request: CreateTransactionRequest;
-}
+import type { TransactionRequest } from '../../../core/api.service';
+import { NotificationService } from '../../../core/notification.service';
 
 @Component({
   selector: 'app-transaction-form',
@@ -39,7 +35,6 @@ export interface TransactionFormResult {
     TuiIcon,
     TuiChevron,
     TuiButton,
-    TuiError,
     TuiAutoFocus
   ],
   templateUrl: './transaction-form.html',
@@ -47,7 +42,8 @@ export interface TransactionFormResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TransactionForm {
-  private readonly context = inject<TuiDialogContext<TransactionFormResult | null, Partial<Transaction>>>(POLYMORPHEUS_CONTEXT);
+  private readonly context = inject<TuiDialogContext<TransactionRequest | null, Partial<Transaction>>>(POLYMORPHEUS_CONTEXT);
+  private readonly notifications = inject(NotificationService);
   private readonly transactionsState = inject(TransactionsState);
   protected readonly categoriesState = inject(CategoriesState);
   readonly accountsState = inject(AccountsState);
@@ -63,38 +59,27 @@ export class TransactionForm {
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
     category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? null),
-    debitCurrency: new FormControl<string>(this.context.data.debit_account?.currency ?? this.context.data.currency ?? '', { nonNullable: true }),
-    debitScale: new FormControl<number>(this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2, { nonNullable: true }),
-    creditCurrency: new FormControl<string>({ value: this.context.data.credit_account?.currency ?? this.context.data.currency ?? '', disabled: true }, { nonNullable: true }),
-    creditScale: new FormControl<number>({ value: this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2, disabled: true }, { nonNullable: true }),
     debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit / Math.pow(10, this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2) : null),
     creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit / Math.pow(10, this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2) : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),
     payee: new FormControl<string>(this.context.data.payee ?? '', { nonNullable: true }),
   });
 
-  readonly error = signal<TuiValidationError | null>(null);
-
-  private readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: null });
-  private readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: null });
-  readonly debitCurrencyValue = toSignal(this.form.controls.debitCurrency.valueChanges, { initialValue: "" });
-  private readonly debitScale = toSignal(this.form.controls.debitScale.valueChanges, { initialValue: 2 });
-  readonly creditCurrencyValue = toSignal(this.form.controls.creditCurrency.valueChanges, { initialValue: "" });
-  private readonly creditScale = toSignal(this.form.controls.creditScale.valueChanges, { initialValue: 2 });
-
+  readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: this.context.data.debit_account ?? null });
+  readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: this.context.data.credit_account ?? null });
   readonly isExpense = computed(() => this.activeTypeIndex() === 0);
   readonly isIncome = computed(() => this.activeTypeIndex() === 1);
   readonly isTransfer = computed(() => this.activeTypeIndex() === 2);
 
   readonly isSameCurrency = computed(() => {
-    const d = this.debitCurrencyValue();
-    const c = this.creditCurrencyValue();
-    return !!d && d === c;
+    const d = this.fromAccountValue()?.currency;
+    const c = this.toAccountValue()?.currency;
+    return !this.isTransfer() || (!!d && d === c);
   });
 
 
-  readonly debitQuantum = computed(() => 1 / Math.pow(10, this.debitScale()));
-  readonly creditQuantum = computed(() => 1 / Math.pow(10, this.creditScale()));
+  readonly debitQuantum = computed(() => 1 / Math.pow(10, this.fromAccountValue()?.scale ?? 2));
+  readonly creditQuantum = computed(() => 1 / Math.pow(10, this.toAccountValue()?.scale ?? 2));
 
   readonly treeMap = new Map<Category, boolean>();
   readonly treeHandler = computed(() => {
@@ -108,36 +93,6 @@ export class TransactionForm {
 
   constructor() {
     effect(() => {
-      const fromAccount = this.fromAccountValue();
-      const index = this.activeTypeIndex();
-
-      untracked(() => {
-        if (fromAccount) {
-          this.form.controls.debitCurrency.setValue(fromAccount?.currency ?? '');
-          this.form.controls.debitScale.setValue(fromAccount?.scale ?? 2);
-          if (index !== 2) {
-            this.form.controls.creditCurrency.setValue(fromAccount?.currency ?? '');
-            this.form.controls.creditScale.setValue(fromAccount?.scale ?? 2);
-          }
-        }
-      });
-    });
-    effect(() => {
-      const toAccount = this.toAccountValue();
-      const index = this.activeTypeIndex();
-
-      untracked(() => {
-        if (toAccount) {
-          this.form.controls.creditCurrency.setValue(toAccount?.currency ?? '');
-          this.form.controls.creditScale.setValue(toAccount?.scale ?? 2);
-          if (index !== 2) {
-            this.form.controls.debitCurrency.setValue(toAccount?.currency ?? '');
-            this.form.controls.debitScale.setValue(toAccount?.scale ?? 2);
-          }
-        }
-      });
-    });
-    effect(() => {
       const index = this.activeTypeIndex();
       untracked(() => {
         let fromAccount = this.form.controls.fromAccount.value;
@@ -146,8 +101,6 @@ export class TransactionForm {
           if (!!toAccount) {
             this.form.controls.category.setValue(null);
           }
-          this.form.controls.debitCurrency.disable();
-          this.form.controls.creditCurrency.enable();
           this.form.controls.toAccount.setValue(null);
           this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value);
           if (!fromAccount) {
@@ -157,16 +110,12 @@ export class TransactionForm {
           if (!!fromAccount) {
             this.form.controls.category.setValue(null);
           }
-          this.form.controls.debitCurrency.enable();
-          this.form.controls.creditCurrency.disable();
           this.form.controls.fromAccount.setValue(null);
           this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value);
           if (!toAccount) {
             this.form.controls.toAccount.setValue(fromAccount);
           }
         } else {
-          this.form.controls.debitCurrency.disable();
-          this.form.controls.creditCurrency.disable();
           if (!!fromAccount) {
             toAccount = this.transactionsState.transactions().filter(t => t.debit_account?.id === fromAccount!.id && !!t.credit_account)[0]?.credit_account ||
               this.accountsState.accounts().filter(a => a.id !== fromAccount!.id && a.currency === fromAccount!.currency)[0] ||
@@ -191,78 +140,33 @@ export class TransactionForm {
     let { date, fromAccount, toAccount, category, debitAmount, creditAmount, description, payee } = this.form.getRawValue();
 
     if (!date) {
-      this.error.set(new TuiValidationError('Date is required'));
+      this.notifications.showError('Date is required');
       return;
     }
 
-    const isExpense = this.isExpense();
-    const isIncome = this.isIncome();
     if (this.isSameCurrency()) {
-      if (isExpense) {
-        debitAmount = creditAmount ?? debitAmount;
-      } else {
-        creditAmount = debitAmount ?? creditAmount;
-      }
+      debitAmount = creditAmount = creditAmount ?? debitAmount;
     }
-
-    if (debitAmount == null || debitAmount <= 0) {
-      this.error.set(new TuiValidationError('Debit amount is required'));
-      return;
-    }
-    if (creditAmount == null || creditAmount <= 0) {
-      this.error.set(new TuiValidationError('Credit amount is required'));
+    if (debitAmount == null || debitAmount <= 0 || creditAmount == null || creditAmount <= 0) {
+      this.notifications.showError('Debit and credit amounts are required');
       return;
     }
 
-    const dScale = this.debitScale();
-    const cScale = this.creditScale();
+    const dScale = fromAccount?.scale ?? toAccount?.scale ?? 2;
+    const cScale = toAccount?.scale ?? fromAccount?.scale ?? 2;
     const debitCents = Math.round(debitAmount * Math.pow(10, dScale));
-    const creditRaw = this.isSameCurrency() ? debitAmount : (creditAmount ?? debitAmount);
-    const creditCents = Math.round(creditRaw * Math.pow(10, cScale));
+    const creditCents = Math.round(creditAmount * Math.pow(10, cScale));
 
-    let request: CreateTransactionRequest;
-
-    if (isExpense) {
-      request = {
-        debitAccountId: fromAccount!.id,
-        creditAccountId: null,
+    let request: TransactionRequest = {
+        debitAccountId: this.isIncome() ? null : fromAccount!.id,
+        creditAccountId: this.isExpense() ? null : toAccount!.id,
         debit: debitCents,
         credit: creditCents,
-        currency: this.creditCurrencyValue() || null,
-        scale: cScale,
-        categoryId: category?.id ?? null,
-        date: date.toJSON(),
+        categoryId: this.isTransfer() ? null : category?.id ?? null,
+        date: date.toJSON(), 
         description: description || null,
         payee: payee || null,
       };
-    } else if (isIncome) {
-      request = {
-        debitAccountId: null,
-        creditAccountId: toAccount!.id,
-        debit: debitCents,
-        credit: creditCents,
-        currency: this.debitCurrencyValue() || null,
-        scale: dScale,
-        categoryId: category?.id ?? null,
-        date: date.toJSON(),
-        description: description || null,
-        payee: payee || null,
-      };
-    } else {
-      request = {
-        debitAccountId: fromAccount!.id,
-        creditAccountId: toAccount!.id,
-        debit: debitCents,
-        credit: creditCents,
-        currency: null,
-        scale: null,
-        categoryId: null,
-        date: date.toJSON(),
-        description: description || null,
-        payee: payee || null,
-      };
-    }
-
-    this.context.completeWith({ id: this.context.data.id, request });
+    this.context.completeWith(request);
   }
 }

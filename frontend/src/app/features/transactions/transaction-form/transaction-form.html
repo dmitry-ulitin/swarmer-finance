@@ -28,7 +28,7 @@
                 <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
                     placeholder="0.00" />
             </tui-textfield>
-            <span>{{debitCurrencyValue()}}</span>
+            <span>{{fromAccountValue()?.currency}}</span>
         </div>
     }
     @if (isIncome() || isTransfer()) {
@@ -44,7 +44,7 @@
                     <input tuiAutoFocus tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
                         placeholder="0.00" />
                 </tui-textfield>
-                <span>{{creditCurrencyValue()}}</span>
+                <span>{{toAccountValue()?.currency}}</span>
             </div>
         }
     }
@@ -78,8 +78,6 @@
         <label tuiLabel>Description</label>
         <textarea tuiTextarea formControlName="description" placeholder="Optional"></textarea>
     </tui-textfield>
-
-    <tui-error [error]="error()" />
 
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>

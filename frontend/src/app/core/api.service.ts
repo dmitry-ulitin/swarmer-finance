@@ -10,14 +10,12 @@ export interface ApiResponse<T> {
   error: string | null;
 }
 
-export interface CreateTransactionRequest {
+export interface TransactionRequest {
   categoryId?: number | null;
   debitAccountId?: number | null;
   creditAccountId?: number | null;
   debit: number;
   credit: number;
-  currency?: string | null;
-  scale?: number | null;
   date: string;
   description?: string | null;
   payee?: string | null;
@@ -64,7 +62,7 @@ export class ApiService {
   }
 
   // Transactions
-  createTransaction(data: CreateTransactionRequest): Observable<ApiResponse<Transaction>> {
+  createTransaction(data: TransactionRequest): Observable<ApiResponse<Transaction>> {
     return this.http.post<ApiResponse<Transaction>>('/api/transactions', data);
   }
 
@@ -81,7 +79,7 @@ export class ApiService {
     return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
   }
 
-  updateTransaction(id: number, data: Partial<CreateTransactionRequest>): Observable<ApiResponse<Transaction>> {
+  updateTransaction(id: number, data: Partial<TransactionRequest>): Observable<ApiResponse<Transaction>> {
     return this.http.put<ApiResponse<Transaction>>(`/api/transactions/${id}`, data);
   }
 

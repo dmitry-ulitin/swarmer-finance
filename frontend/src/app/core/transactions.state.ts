@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Transaction, TransactionAccount, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
-import { ApiService, CreateTransactionRequest } from './api.service';
+import { ApiService, TransactionRequest } from './api.service';
 import { AccountsState } from './accounts.state';
 
 const PAGE_SIZE = 20;
@@ -85,11 +85,11 @@ export class TransactionsState {
     this.fetch(this._offset());
   }
 
-  create(data: CreateTransactionRequest) {
+  create(data: TransactionRequest) {
     return this.api.createTransaction(data).pipe(tap(() => this.reload()));
   }
 
-  update(id: number, data: Partial<CreateTransactionRequest>) {
+  update(id: number, data: Partial<TransactionRequest>) {
     return this.api.updateTransaction(id, data).pipe(tap(() => this.reload()));
   }
 
