@@ -2,7 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## What this is
+
+A personal finance management web app: multi-user, private per-user data (no
+sharing/invites yet — deferred, not built). Core scope for now: income/expense
+transactions with hierarchical categories, multi-currency accounts, manual
+entry (CSV bank-statement import planned, not built). Investments/assets and
+analytics/reports are deferred to later phases.
+
+Local-only deployment for now; no hosted/prod environment exists.## Commands
 
 ### Backend (`/backend`)
 ```bash
@@ -24,7 +32,7 @@ npm test             # Vitest unit tests
 
 ### Local Dev (Docker)
 ```bash
-docker-compose up --build   # Start backend + frontend + PostgreSQL
+docker-compose up --build   # Start local PostgreSQL
 ```
 
 ## Architecture
@@ -32,7 +40,7 @@ docker-compose up --build   # Start backend + frontend + PostgreSQL
 ### Monorepo Structure
 - `backend/` — Node.js + Express + PostgreSQL (raw SQL, no ORM)
 - `frontend/` — Angular 22 standalone components + Taiga UI v5
-- `docker-compose.yml` / `Dockerfile` — multi-stage production build; `start.sh` generates Nginx config dynamically at container startup for Render.com compatibility
+- `docker-compose.yml` — local Postgres 17 (db: finance_db, localhost:5432)
 
 ### Backend Request Flow
 ```
@@ -61,29 +69,23 @@ All API responses use this envelope format consistently.
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
-- Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` and `currency` are nullable
+- Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
 
-### Transaction Type Semantics
-Type is derived at runtime — no stored `type` column:
+#### Transactions — single table, double-entry style
 
-| Type | debit_account_id | credit_account_id | currency | category_id |
-|------|-------------------|---------------------|------------|---------------|
-| Expense | filled | null | account currency or FX currency | required (leaf) |
-| Income | null | filled | account currency or FX currency | required (leaf) |
-| Transfer | filled | filled | null | null |
+One `transactions` table covers expense, income, and transfer; the type is implied by which columns are populated — no stored `type` column:
 
-Currency handling for Expense / Income / Transfer follows a single rule:
+| Type | debit_account_id | credit_account_id | category_id |
+|------|------------------|-------------------|-------------|
+| Expense | filled | null | required |
+| Income | null | filled | required |
+| Transfer | filled | filled | null |
 
-- **Same-currency** — when the transaction's `currency` matches the account
-  currency on both sides, `debit` must equal `credit` (no value may silently
-  appear or disappear between sides).
-- **Cross-currency (FX)** — when currencies differ across sides, `debit`
-  and `credit` may differ according to the exchange rate. The transaction's
-  `currency` field carries the side of the single-account transaction
-  (Expense / Income); for Transfer the `currency` field is null.
-- Backend enforces this rule in `services/transactions.ts`:
-  `validateTransactionInput` rejects same-currency imbalances with 400,
-  and allows cross-currency differences.
+No per-transaction `currency` field and no stored exchange rate. Expense/
+income are always denominated in the account's own currency (`debit` and `credit` are equal). Transfers
+between accounts of different currencies simply carry two amounts
+(`debit`, `credit`) — the implied rate is never persisted separately;
+`debit` and `credit` amounts must be positive.
 
 ### Environment Variables
 Copy `.env.example` → `.env`:

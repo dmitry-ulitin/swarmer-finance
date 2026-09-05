@@ -30,30 +30,27 @@ A personal finance application for tracking income, expenses, and transfers acro
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose, **or**
 - Node.js 18+ and PostgreSQL 15+
 
-## Quick Start (Docker)
+## Local Development (Docker)
 
 ```bash
 git clone <repo-url>
 cd swarmer-finance
+```
+
+**1. Configure db**
+
+```bash
 docker-compose up --build
 ```
 
-| Service  | URL                   |
-|----------|-----------------------|
-| Frontend | http://localhost:80   |
-| Backend  | http://localhost:3000 |
-| Database | localhost:5432        |
-
-## Local Development (without Docker)
-
-**1. Configure environment**
+**2. Configure environment**
 
 ```bash
 cp .env.example backend/.env
 # Edit backend/.env with your PostgreSQL credentials
 ```
 
-**2. Backend**
+**3. Backend**
 
 ```bash
 cd backend
@@ -62,7 +59,7 @@ npm run migrate   # run database migrations
 npm run dev       # start dev server on port 3000
 ```
 
-**3. Frontend**
+**4. Frontend**
 
 ```bash
 cd frontend
@@ -130,11 +127,11 @@ All endpoints except `/api/auth/*` require a `Bearer` JWT token.
 
 Transactions use double-entry bookkeeping. The type is derived from which account references are populated:
 
-| Type | `debit_account_id` | `credit_account_id` | `currency` | `category_id` |
-|------|-------------------|---------------------|------------|---------------|
-| Expense | filled | null | credit currency | required (leaf) |
-| Income | null | filled | debit currency | required (leaf) |
-| Transfer | filled | filled | null | null |
+| Type | `debit_account_id` | `credit_account_id` | `category_id` |
+|------|--------------------|---------------------|---------------|
+| Expense | filled | null | required |
+| Income | null | filled | required |
+| Transfer | filled | filled | null |
 
 When both accounts share the same currency `debit == credit`; otherwise they differ by the exchange rate.
 
@@ -161,12 +158,4 @@ swarmer-finance/
 ├── docker-compose.yml
 ├── Dockerfile
 └── render.yaml            # Render.com deployment config
-```
-
-## Deployment
-
-The project is configured for [Render.com](https://render.com) deployment via `render.yaml`. It provisions a PostgreSQL database and runs the app as a single Docker container (Nginx serves the frontend and proxies `/api/*` to the backend).
-
-```bash
-# Deploy to Render: connect the repo and Render picks up render.yaml automatically
 ```
