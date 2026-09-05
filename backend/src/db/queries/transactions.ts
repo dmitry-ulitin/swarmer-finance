@@ -18,8 +18,6 @@ export interface CreateTransactionData {
   creditAccountId?: number;
   debit: number;
   credit: number;
-  currency?: string;
-  scale?: number;
   date: string;
   description?: string;
   payee?: string;
@@ -31,8 +29,6 @@ export interface UpdateTransactionData {
   creditAccountId?: number;
   debit?: number;
   credit?: number;
-  currency?: string;
-  scale?: number;
   date?: string;
   description?: string;
   payee?: string;
@@ -64,8 +60,6 @@ function toDTO(row: TransactionRow): TransactionDTO {
       : null,
     debit: row.debit,
     credit: row.credit,
-    currency: row.currency,
-    scale: row.scale,
     date: row.date,
     description: row.description,
     payee: row.payee,
@@ -169,8 +163,8 @@ export const createTransaction = async (
 ): Promise<TransactionDTO> => {
   const result = await query<{ id: number }>(
     `INSERT INTO transactions
-       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, currency, scale, date, description, payee)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, payee)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
     [
       userId,
       data.categoryId ?? null,
@@ -178,8 +172,6 @@ export const createTransaction = async (
       data.creditAccountId ?? null,
       data.debit,
       data.credit,
-      data.currency ?? null,
-      data.scale ?? 2,
       data.date,
       data.description || '',
       data.payee ?? null,
@@ -200,20 +192,16 @@ export const updateTransaction = async (
          credit_account_id = $3,
          debit = $4,
          credit = $5,
-         currency = $6,
-         scale = $7,
-         date = $8,
-         description = $9,
-         payee = $10
-     WHERE id = $11 AND user_id = $12`,
+         date = $6,
+         description = $7,
+         payee = $8
+     WHERE id = $9 AND user_id = $10`,
     [
       data.categoryId ?? null,
       data.debitAccountId ?? null,
       data.creditAccountId ?? null,
       data.debit ?? null,
       data.credit ?? null,
-      data.currency ?? null,
-      data.scale ?? 2,
       data.date ?? null,
       data.description ?? null,
       data.payee ?? null,

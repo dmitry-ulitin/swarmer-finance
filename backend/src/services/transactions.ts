@@ -84,18 +84,11 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     }
   } else if (hasDebit) {
     // Expense
-    if (input.currency == null) {
-      throw { statusCode: 400, message: 'Expense transactions must have a currency' };
-    }
     const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
-    // Same-currency rule: when the transaction currency matches the
-    // account currency, debit must equal credit (otherwise value silently
-    // appears or disappears between sides). Cross-currency expenses are
-    // allowed and may have debit != credit (FX conversion / fee).
-    if (debitAccount.currency === input.currency && input.debit !== input.credit) {
+    if (input.debit !== input.credit) {
       throw {
         statusCode: 400,
-        message: `Same-currency expenses require debit to equal credit (account and transaction are ${debitAccount.currency})`,
+        message: `Expenses require debit to equal credit (account and transaction are ${debitAccount.currency})`,
       };
     }
     if (input.categoryId != null) {
@@ -103,15 +96,11 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     }
   } else {
     // Income
-    if (input.currency == null) {
-      throw { statusCode: 400, message: 'Income transactions must have a currency' };
-    }
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
-    // Same rule as expense — see comment above.
-    if (creditAccount.currency === input.currency && input.debit !== input.credit) {
+    if (input.debit !== input.credit) {
       throw {
         statusCode: 400,
-        message: `Same-currency income requires debit to equal credit (account and transaction are ${creditAccount.currency})`,
+        message: `Income requires debit to equal credit (account and transaction are ${creditAccount.currency})`,
       };
     }
     if (input.categoryId != null) {
@@ -177,8 +166,6 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     creditAccountId: input.creditAccountId !== undefined ? (input.creditAccountId ?? undefined) : (existing.credit_account_id ?? undefined),
     debit: input.debit ?? existing.debit,
     credit: input.credit ?? existing.credit,
-    currency: input.currency !== undefined ? (input.currency ?? undefined) : (existing.currency ?? undefined),
-    scale: input.scale !== undefined ? (input.scale ?? undefined) : (existing.scale ?? 2),
     date: input.date ?? formatDate(existing.date),
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),

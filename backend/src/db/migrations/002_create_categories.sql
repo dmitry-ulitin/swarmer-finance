@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS categories (
   )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_sibling
+  ON categories (user_id, parent_id, name)
+  WHERE user_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
 

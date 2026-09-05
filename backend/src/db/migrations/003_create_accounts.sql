@@ -9,4 +9,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE accounts
+  ADD CONSTRAINT chk_accounts_currency_format
+  CHECK (currency ~ '^[A-Z]{3,4}$');
+
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);

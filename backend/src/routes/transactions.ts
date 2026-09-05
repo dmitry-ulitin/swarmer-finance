@@ -15,8 +15,6 @@ const createTransactionSchema = z.object({
   creditAccountId: z.number().int().positive().nullish(),
   debit: z.number().positive(),
   credit: z.number().positive(),
-  currency: z.string().min(1).nullish(),
-  scale: z.number().int().positive().nullish(),
   date: z.string(),
   description: z.string().nullish(),
   payee: z.string().nullish(),

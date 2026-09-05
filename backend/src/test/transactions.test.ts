@@ -64,14 +64,14 @@ describe('Transactions API', () => {
 
       // Income on testAccount: credit_account_id filled, debit_account_id null
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
-         VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-02-01', 'Test income')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-02-01', 'Test income')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
       // Expense on secondAccount: debit_account_id filled, credit_account_id null
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date, description, payee)
-         VALUES ($1, $2, $3, 50, 50, 'USD', '2026-02-15', 'Groceries run', 'Supermarket')`,
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description, payee)
+         VALUES ($1, $2, $3, 50, 50, '2026-02-15', 'Groceries run', 'Supermarket')`,
         [testUserId, expenseCategoryId, secondAccountId]
       );
     });
@@ -193,82 +193,14 @@ describe('Transactions API', () => {
           scale: 2,
           date: '2026-02-18',
           description: 'Test income',
-          currency: 'USD',
         });
 
       expect(res.status).toBe(200);
       expect(Number(res.body.data.debit)).toBe(500);
-      expect(res.body.data.currency).toBe('USD');
     });
 
-    it('should create a transaction with non-standard currency', async () => {
-      // Create a USDT account so the income can use a non-USD currency.
-      const usdtAccountResult = await pool.query(
-        `INSERT INTO accounts (user_id, name, currency, start_balance)
-         VALUES ($1, 'USDT Account', 'USDT', 0) RETURNING id`,
-        [testUserId]
-      );
-      const usdtAccountId = usdtAccountResult.rows[0].id;
-
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: incomeCategoryId,
-          creditAccountId: usdtAccountId,
-          debit: 100,
-          credit: 100,
-          scale: 2,
-          date: '2026-02-18',
-          currency: 'USDT',
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.data.currency).toBe('USDT');
-
-      // cleanup — delete the transaction referencing this account first
-      await pool.query('DELETE FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1', [usdtAccountId]);
-      await pool.query('DELETE FROM accounts WHERE id = $1', [usdtAccountId]);
-    });
-
-    it('should accept cross-currency expense with debit != credit (FX)', async () => {
-      // testAccountId is USD; sending currency: 'EUR' with debit != credit
-      // models an FX expense where 100 USD debits and 90 EUR credits.
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: expenseCategoryId,
-          debitAccountId: testAccountId,
-          debit: 10000,
-          credit: 9200,
-          date: '2026-02-18',
-          currency: 'EUR',
-        });
-
-      expect(res.status).toBe(200);
-    });
-
-    it('should accept cross-currency income with debit != credit (FX)', async () => {
-      // testAccountId is USD; sending currency: 'EUR' with debit != credit
-      // models FX income.
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: incomeCategoryId,
-          creditAccountId: testAccountId,
-          debit: 10000,
-          credit: 9200,
-          date: '2026-02-18',
-          currency: 'EUR',
-        });
-
-      expect(res.status).toBe(200);
-    });
-
-    it('should reject same-currency expense with debit != credit', async () => {
-      // testAccountId is USD; sending currency: 'USD' with debit != credit
+    it('should reject expense with debit != credit', async () => {
+      // debit != credit
       // would silently lose value between sides — must be rejected.
       const res = await request(app)
         .post('/api/transactions')
@@ -279,14 +211,13 @@ describe('Transactions API', () => {
           debit: 100,
           credit: 90,
           date: '2026-02-18',
-          currency: 'USD',
         });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/debit to equal credit/);
     });
 
-    it('should reject same-currency income with debit != credit', async () => {
+    it('should reject income with debit != credit', async () => {
       const res = await request(app)
         .post('/api/transactions')
         .set({ Authorization: `Bearer ${token}` })
@@ -296,41 +227,10 @@ describe('Transactions API', () => {
           debit: 100,
           credit: 90,
           date: '2026-02-18',
-          currency: 'USD',
         });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/debit to equal credit/);
-    });
-
-    it('should require currency for expense', async () => {
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: expenseCategoryId,
-          debitAccountId: testAccountId,
-          debit: 500,
-          credit: 500,
-          date: '2026-02-18',
-        });
-
-      expect(res.status).toBe(400);
-    });
-
-    it('should require currency for income', async () => {
-      const res = await request(app)
-        .post('/api/transactions')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          categoryId: incomeCategoryId,
-          creditAccountId: testAccountId,
-          debit: 500,
-          credit: 500,
-          date: '2026-02-18',
-        });
-
-      expect(res.status).toBe(400);
     });
 
     it('should create a transfer transaction', async () => {
@@ -354,7 +254,6 @@ describe('Transactions API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.category).toBeNull();
-      expect(res.body.data.currency).toBeNull();
     });
 
     it('should reject same-currency transfer with debit != credit', async () => {
@@ -418,8 +317,8 @@ describe('Transactions API', () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
 
       const result = await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
-         VALUES ($1, $2, $3, 100, 100, 'USD', '2026-02-01', 'Original')
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 100, 100, '2026-02-01', 'Original')
          RETURNING id`,
         [testUserId, incomeCategoryId, testAccountId]
       );
@@ -439,9 +338,8 @@ describe('Transactions API', () => {
       expect(Number(res.body.data.debit)).toBe(200);
     });
 
-    it('should reject update that would create a same-currency debit/credit imbalance', async () => {
-      // The transaction was created with currency: 'USD' against the
-      // USD test account. Sending currency: 'USD' with debit != credit
+    it('should reject update that would create  debit/credit imbalance', async () => {
+      // The transaction was created with debit != credit
       // would violate the same-currency contract.
       const res = await request(app)
         .put(`/api/transactions/${transactionId}`)
@@ -449,26 +347,12 @@ describe('Transactions API', () => {
         .send({
           debit: 200,
           credit: 100,
-          currency: 'USD',
         });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/debit to equal credit/);
     });
 
-    it('should accept update that switches to a cross-currency FX transaction', async () => {
-      // Same account, different currency — debit and credit may differ (FX).
-      const res = await request(app)
-        .put(`/api/transactions/${transactionId}`)
-        .set({ Authorization: `Bearer ${token}` })
-        .send({
-          debit: 10000,
-          credit: 9200,
-          currency: 'EUR',
-        });
-
-      expect(res.status).toBe(200);
-    });
   });
 
   describe('GET /api/transactions — running balances', () => {
@@ -478,8 +362,8 @@ describe('Transactions API', () => {
 
     it('attaches balance to account when no sequential-breaking filters are active', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 5000, 5000, 'USD', '2026-03-01')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 5000, 5000, '2026-03-01')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -494,8 +378,8 @@ describe('Transactions API', () => {
 
     it('does not attach balance when details filter is active', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, description)
-         VALUES ($1, $2, $3, 5000, 5000, 'USD', '2026-03-01', 'Salary')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 5000, 5000, '2026-03-01', 'Salary')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -509,8 +393,8 @@ describe('Transactions API', () => {
 
     it('does not attach balance when category filter is active', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 5000, 5000, 'USD', '2026-03-01')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 5000, 5000, '2026-03-01')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -524,8 +408,8 @@ describe('Transactions API', () => {
 
     it('does not attach balance when type filter is active', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 5000, 5000, 'USD', '2026-03-01')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 5000, 5000, '2026-03-01')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -540,10 +424,10 @@ describe('Transactions API', () => {
     it('computes correct running balances across multiple transactions', async () => {
       // Account starts at 0 (from beforeAll). Two incomes: 3000 then 2000.
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, created_at)
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, created_at)
          VALUES
-           ($1, $2, $3, 3000, 3000, 'USD', '2026-03-01', '2026-03-01 09:00:00'),
-           ($1, $2, $3, 2000, 2000, 'USD', '2026-03-10', '2026-03-10 09:00:00')`,
+           ($1, $2, $3, 3000, 3000, '2026-03-01', '2026-03-01 09:00:00'),
+           ($1, $2, $3, 2000, 2000, '2026-03-10', '2026-03-10 09:00:00')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -563,11 +447,11 @@ describe('Transactions API', () => {
     it('computes correct balance on page 2 without including page 1 transactions', async () => {
       // Three incomes: 1000 (oldest), 2000 (middle), 3000 (newest)
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date, created_at)
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, created_at)
          VALUES
-           ($1, $2, $3, 1000, 1000, 'USD', '2026-04-01', '2026-04-01 08:00:00'),
-           ($1, $2, $3, 2000, 2000, 'USD', '2026-04-10', '2026-04-10 08:00:00'),
-           ($1, $2, $3, 3000, 3000, 'USD', '2026-04-20', '2026-04-20 08:00:00')`,
+           ($1, $2, $3, 1000, 1000, '2026-04-01', '2026-04-01 08:00:00'),
+           ($1, $2, $3, 2000, 2000, '2026-04-10', '2026-04-10 08:00:00'),
+           ($1, $2, $3, 3000, 3000, '2026-04-20', '2026-04-20 08:00:00')`,
         [testUserId, incomeCategoryId, testAccountId]
       );
 
@@ -590,8 +474,8 @@ describe('Transactions API', () => {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
 
       const result = await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 100, 100, 'USD', '2026-02-01')
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 100, 100, '2026-02-01')
          RETURNING id`,
         [testUserId, incomeCategoryId, testAccountId]
       );

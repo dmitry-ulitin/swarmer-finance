@@ -69,8 +69,8 @@ describe('Accounts API — balance field', () => {
 
     it('increases balance when account receives income', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 5000, 5000, 'USD', '2026-01-10')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 5000, 5000, '2026-01-10')`,
         [testUserId, incomeCategoryId, accountId]
       );
 
@@ -84,8 +84,8 @@ describe('Accounts API — balance field', () => {
 
     it('decreases balance when account pays an expense', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 3000, 3000, 'USD', '2026-01-15')`,
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 3000, 3000, '2026-01-15')`,
         [testUserId, expenseCategoryId, accountId]
       );
 
@@ -221,8 +221,8 @@ describe('Accounts API — balance field', () => {
 
     it('reflects updated startBalance combined with existing transactions', async () => {
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-01-10')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-01-10')`,
         [testUserId, incomeCategoryId, accountId]
       );
 
@@ -270,8 +270,8 @@ describe('Accounts API — balance field', () => {
       const id = created.body.data.id;
 
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 10000, 10000, '2026-01-15')`,
         [testUserId, expenseCategoryId, id]
       );
 
@@ -297,8 +297,8 @@ describe('Accounts API — balance field', () => {
 
       // Add a transaction that does NOT zero out the balance.
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 1000, 1000, 'USD', '2026-01-15')`,
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-01-15')`,
         [testUserId, incomeCategoryId, id]
       );
 
@@ -323,8 +323,8 @@ describe('Accounts API — balance field', () => {
 
       // Add a transaction that zeroes the balance.
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 10000, 10000, '2026-01-15')`,
         [testUserId, expenseCategoryId, id]
       );
 
@@ -347,8 +347,8 @@ describe('Accounts API — balance field', () => {
       const id = created.body.data.id;
 
       await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, currency, date)
-         VALUES ($1, $2, $3, 10000, 10000, 'USD', '2026-01-15')`,
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 10000, 10000, '2026-01-15')`,
         [testUserId, expenseCategoryId, id]
       );
 

@@ -7,8 +7,6 @@ CREATE TABLE transactions (
   credit_account_id INTEGER REFERENCES accounts(id) ON DELETE RESTRICT,
   debit NUMERIC(24, 0) NOT NULL,
   credit NUMERIC(24, 0) NOT NULL,
-  currency TEXT,
-  scale INTEGER NOT NULL DEFAULT 2,
   date DATE NOT NULL,
   description TEXT DEFAULT '',
   payee TEXT,

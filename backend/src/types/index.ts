@@ -68,8 +68,6 @@ export interface TransactionDTO {
   credit_account: TransactionAccount | null;
   debit: number;
   credit: number;
-  currency: string | null;
-  scale: number | null;
   date: Date;
   description: string;
   payee: string | null;
