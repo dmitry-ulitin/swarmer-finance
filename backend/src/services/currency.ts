@@ -1,6 +1,7 @@
 import * as exchangeRateQueries from '../db/queries/exchangeRates';
 
 const FRANKFURTER_BASE_URL = process.env.FRANKFURTER_BASE_URL || 'https://api.frankfurter.dev/v1';
+const FRANKFURTER_TIMEOUT_MS = 5000;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -9,7 +10,9 @@ function today(): string {
 async function refreshRatesForBase(from: string, toCurrencies: string[]): Promise<void> {
   if (toCurrencies.length === 0) return;
   const symbols = toCurrencies.join(',');
-  const res = await fetch(`${FRANKFURTER_BASE_URL}/latest?base=${from}&symbols=${symbols}`);
+  const res = await fetch(`${FRANKFURTER_BASE_URL}/latest?base=${from}&symbols=${symbols}`, {
+    signal: AbortSignal.timeout(FRANKFURTER_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw { statusCode: 502, message: `Frankfurter request failed: ${res.status}` };
   }

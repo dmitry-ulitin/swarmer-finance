@@ -52,6 +52,40 @@ describe('getOrRefreshRate', () => {
   });
 });
 
+describe('refreshRatesForBase — request timeout', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(async () => {
+    global.fetch = originalFetch;
+    await pool.query(`DELETE FROM exchange_rates WHERE from_currency = 'TMO' AND to_currency = 'EUR'`);
+  });
+
+  it('calls fetch with an AbortSignal (so a hung Frankfurter request can be aborted)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: new Date().toISOString().slice(0, 10), rates: { EUR: 0.5 } }),
+    }) as unknown as typeof fetch;
+
+    await getOrRefreshRate('TMO', 'EUR');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('falls back to a stale cached rate when the request times out', async () => {
+    await pool.query(
+      `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)
+       VALUES ('TMO', 'EUR', 2.5, '2020-01-01')
+       ON CONFLICT (from_currency, to_currency, as_of) DO UPDATE SET rate = EXCLUDED.rate`
+    );
+    global.fetch = jest.fn().mockRejectedValue(new DOMException('The operation was aborted', 'TimeoutError'));
+
+    const rate = await getOrRefreshRate('TMO', 'EUR');
+    expect(rate).toBe(2.5);
+  });
+});
+
 describe('getRatesTo', () => {
   const originalFetch = global.fetch;
 
