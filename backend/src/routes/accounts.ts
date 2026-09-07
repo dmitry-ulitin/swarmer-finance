@@ -36,6 +36,15 @@ router.get('/', async (req: AuthRequest, res, next) => {
   }
 });
 
+router.get('/summary', async (req: AuthRequest, res, next) => {
+  try {
+    const summary = await accountService.getBalanceSummary(req.userId!);
+    res.json({ data: summary, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
     const { name, currency, startBalance, scale } = req.body;

@@ -50,6 +50,24 @@ describe('Auth API', () => {
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('password');
     });
+
+    it('should default currency_scale to 2 when not provided', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `test3${Date.now()}@example.com`, password: 'password123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.currency_scale).toBe(2);
+    });
+
+    it('should accept a custom currencyScale', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `test4${Date.now()}@example.com`, password: 'password123', currencyScale: 8 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.currency_scale).toBe(8);
+    });
   });
 
   describe('POST /api/auth/login', () => {

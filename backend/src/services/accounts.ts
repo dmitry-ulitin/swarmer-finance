@@ -1,5 +1,7 @@
 import * as accountQueries from '../db/queries/accounts';
+import * as userQueries from '../db/queries/users';
 import { getAccountBalances } from '../db/queries/transactions';
+import { getRatesTo, convertAmount } from './currency';
 import { Account } from '../types';
 
 async function withBalances(userId: number, accounts: Account[]): Promise<Account[]> {
@@ -14,9 +16,28 @@ async function withBalances(userId: number, accounts: Account[]): Promise<Accoun
   });
 }
 
+async function withConvertedBalances(userId: number, accounts: Account[]): Promise<Account[]> {
+  const user = await userQueries.getUserById(userId);
+  const rates = await getRatesTo(user!.currency, accounts.map(a => a.currency));
+  return accounts.map(account => {
+    const rate = rates.get(account.currency) ?? null;
+    const userBalance = convertAmount(account.balance, account.scale, rate, user!.currency_scale);
+    return { ...account, user_balance: userBalance };
+  });
+}
+
 export const getAccounts = async (userId: number) => {
   const accounts = await accountQueries.getAccountsByUserId(userId);
-  return withBalances(userId, accounts);
+  const withBal = await withBalances(userId, accounts);
+  return withConvertedBalances(userId, withBal);
+};
+
+export const getBalanceSummary = async (userId: number) => {
+  const accounts = await getAccounts(userId);
+  const user = await userQueries.getUserById(userId);
+  const total = accounts.reduce((sum, a) => sum + (a.user_balance ?? 0), 0);
+  const incomplete = accounts.some(a => a.user_balance === null || a.user_balance === undefined);
+  return { currency: user!.currency, scale: user!.currency_scale, total, incomplete };
 };
 
 export const createAccount = async (
@@ -27,7 +48,7 @@ export const createAccount = async (
   scale = 2
 ) => {
   const account = await accountQueries.createAccount(userId, name, currency, startBalance, scale);
-  return { ...account, balance: Number(account.start_balance) };
+  return (await withConvertedBalances(userId, [{ ...account, balance: Number(account.start_balance) }]))[0];
 };
 
 export const updateAccount = async (
@@ -40,7 +61,8 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account not found' };
   }
   const account = await accountQueries.updateAccount(id, userId, data);
-  return (await withBalances(userId, [account!]))[0];
+  const [withBal] = await withBalances(userId, [account!]);
+  return (await withConvertedBalances(userId, [withBal]))[0];
 };
 
 /**

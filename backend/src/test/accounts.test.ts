@@ -10,6 +10,21 @@ describe('Accounts API — balance field', () => {
   let incomeCategoryId: number;
   let expenseCategoryId: number;
 
+  // Every GET /api/accounts(/summary) call triggers currency conversion,
+  // which would otherwise hit the real Frankfurter API. Mock fetch for the
+  // whole suite so no test here makes a real network call; individual tests
+  // below override the resolved value where the actual rate matters.
+  const originalFetch = global.fetch;
+  beforeAll(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: new Date().toISOString().slice(0, 10), rates: {} }),
+    }) as unknown as typeof fetch;
+  });
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
+
   beforeAll(async () => {
     const email = `acc${Date.now()}@example.com`;
     const res = await request(app)
@@ -363,6 +378,80 @@ describe('Accounts API — balance field', () => {
         .delete(`/api/accounts/${id}`)
         .set({ Authorization: `Bearer ${token}` });
       expect(second.status).toBe(404);
+    });
+  });
+
+  describe('Currency conversion', () => {
+    // A currency code not used by any other test in this file, so a real
+    // (unmocked) fetch from an earlier test can never pre-cache a rate for
+    // this pair and shadow the mock here.
+    const FX_CURRENCY = 'QQQ';
+
+    beforeEach(() => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ date: new Date().toISOString().slice(0, 10), rates: { EUR: 0.5 } }),
+      }) as unknown as typeof fetch;
+    });
+
+    afterAll(async () => {
+      await pool.query(`DELETE FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'EUR'`, [FX_CURRENCY]);
+    });
+
+    afterEach(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [testUserId]);
+    });
+
+    it('includes user_balance converted into the user EUR currency', async () => {
+      await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
+         VALUES ($1, 'Wallet', $2, 10000, 2)`,
+        [testUserId, FX_CURRENCY]
+      );
+
+      const res = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      // 10000 minor units ($100) at rate 0.5 -> 5000 cents EUR (€50)
+      expect(res.body.data[0].user_balance).toBe(5000);
+    });
+
+    it('GET /api/accounts/summary returns the total balance in the user currency', async () => {
+      await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
+         VALUES ($1, 'Wallet', $2, 10000, 2)`,
+        [testUserId, FX_CURRENCY]
+      );
+
+      const res = await request(app)
+        .get('/api/accounts/summary')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ currency: 'EUR', scale: 2, total: 5000, incomplete: false });
+    });
+
+    it('sets user_balance to null and incomplete to true when no rate is available', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+
+      await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
+         VALUES ($1, 'Wallet', 'ZZZ', 10000, 2)`,
+        [testUserId]
+      );
+
+      const accountsRes = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+      expect(accountsRes.body.data[0].user_balance).toBeNull();
+
+      const summaryRes = await request(app)
+        .get('/api/accounts/summary')
+        .set({ Authorization: `Bearer ${token}` });
+      expect(summaryRes.body.data.incomplete).toBe(true);
     });
   });
 });

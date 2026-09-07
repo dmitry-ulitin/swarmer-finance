@@ -4,6 +4,7 @@ export interface User {
   password_hash: string;
   name: string;
   currency: string;
+  currency_scale: number;
   created_at: Date;
 }
 
@@ -26,6 +27,7 @@ export interface Account {
   start_balance: number;
   scale: number;
   balance: number;
+  user_balance?: number | null;
   created_at: Date;
   deleted?: boolean;
 }
@@ -82,7 +84,7 @@ export interface ApiResponse<T> {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user?: { id: number; email: string; name: string; currency: string };
+  user?: { id: number; email: string; name: string; currency: string; currency_scale: number };
 }
 
 export interface JwtPayload {
