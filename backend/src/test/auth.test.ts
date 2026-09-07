@@ -51,6 +51,15 @@ describe('Auth API', () => {
       expect(res.body.error).toContain('password');
     });
 
+    it('should return error for invalid currency format', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `test7${Date.now()}@example.com`, password: 'password123', currency: 'usd' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('Currency');
+    });
+
     it('should default currency_scale to 2 when not provided', async () => {
       const res = await request(app)
         .post('/api/auth/register')
