@@ -18,10 +18,13 @@ async function withBalances(userId: number, accounts: Account[]): Promise<Accoun
 
 async function withConvertedBalances(userId: number, accounts: Account[]): Promise<Account[]> {
   const user = await userQueries.getUserById(userId);
-  const rates = await getRatesTo(user!.currency, accounts.map(a => a.currency));
+  if (!user) {
+    throw { statusCode: 401, message: 'User not found' };
+  }
+  const rates = await getRatesTo(user.currency, accounts.map(a => a.currency));
   return accounts.map(account => {
     const rate = rates.get(account.currency) ?? null;
-    const userBalance = convertAmount(account.balance, account.scale, rate, user!.currency_scale);
+    const userBalance = convertAmount(account.balance, account.scale, rate, user.currency_scale);
     return { ...account, user_balance: userBalance };
   });
 }
@@ -35,9 +38,12 @@ export const getAccounts = async (userId: number) => {
 export const getBalanceSummary = async (userId: number) => {
   const accounts = await getAccounts(userId);
   const user = await userQueries.getUserById(userId);
+  if (!user) {
+    throw { statusCode: 401, message: 'User not found' };
+  }
   const total = accounts.reduce((sum, a) => sum + (a.user_balance ?? 0), 0);
   const incomplete = accounts.some(a => a.user_balance === null || a.user_balance === undefined);
-  return { currency: user!.currency, scale: user!.currency_scale, total, incomplete };
+  return { currency: user.currency, scale: user.currency_scale, total, incomplete };
 };
 
 export const createAccount = async (

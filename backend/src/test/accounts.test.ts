@@ -1,4 +1,5 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
 
@@ -453,5 +454,35 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` });
       expect(summaryRes.body.data.incomplete).toBe(true);
     });
+  });
+});
+
+describe('Accounts API — user not found', () => {
+  const app = createTestApp();
+
+  // A valid, well-formed access token whose userId has no backing row —
+  // simulates a still-unexpired JWT for a deleted/nonexistent user.
+  const tokenForMissingUser = jwt.sign(
+    { userId: 999999999, type: 'access' },
+    process.env.JWT_SECRET!,
+    { algorithm: 'HS256', expiresIn: '15m' }
+  );
+
+  it('GET /api/accounts returns 401 User not found instead of crashing', async () => {
+    const res = await request(app)
+      .get('/api/accounts')
+      .set({ Authorization: `Bearer ${tokenForMissingUser}` });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('User not found');
+  });
+
+  it('GET /api/accounts/summary returns 401 User not found instead of crashing', async () => {
+    const res = await request(app)
+      .get('/api/accounts/summary')
+      .set({ Authorization: `Bearer ${tokenForMissingUser}` });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('User not found');
   });
 });
