@@ -54,7 +54,13 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     const result = await authService.login(email, password);
     res.json({
       data: {
-        user: { id: result.user.id, email: result.user.email },
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+          currency: result.user.currency,
+          currency_scale: result.user.currency_scale,
+        },
         ...result.tokens,
       },
       error: null,
