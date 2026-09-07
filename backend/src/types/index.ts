@@ -40,8 +40,6 @@ export interface Transaction {
   credit_account_id: number | null;
   debit: number;
   credit: number;
-  currency: string | null;
-  scale: number | null;
   date: Date;
   description: string;
   payee: string | null;
