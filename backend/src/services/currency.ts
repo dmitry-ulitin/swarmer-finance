@@ -31,8 +31,12 @@ async function getRateInternal(from: string, to: string): Promise<number | null>
 
   try {
     await refreshRatesForBase(from, [to]);
-  } catch {
-    // Network/API failure — fall through to stale-cache fallback below.
+  } catch (error: unknown) {
+    // Network/API failure — log for visibility, then fall through to
+    // stale-cache fallback below.
+    const message =
+      error && typeof error === 'object' && 'message' in error ? error.message : String(error);
+    console.error(`Failed to refresh exchange rate ${from}->${to}:`, message);
   }
 
   const fresh = await exchangeRateQueries.getRate(from, to, today());
