@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AccountsState } from '../../../core/accounts.state';
 import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';
@@ -15,4 +15,20 @@ import { TransactionsState } from '../../../core/transactions.state';
 export class AccountList {
   protected readonly state = inject(AccountsState);
   protected readonly transactions = inject(TransactionsState);
+
+  protected readonly totalBalance = computed(() => {
+    const summary = this.state.summary();
+    if (!summary || summary.incomplete) return '';
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: summary.currency,
+        minimumFractionDigits: summary.scale,
+        maximumFractionDigits: summary.scale,
+      }).format(summary.total / Math.pow(10, summary.scale));
+    } catch {
+      return (summary.total / Math.pow(10, summary.scale))
+        .toLocaleString(undefined, { minimumFractionDigits: summary.scale, maximumFractionDigits: summary.scale });
+    }
+  });
 }

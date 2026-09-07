@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
 import { AccountsState } from '../../core/accounts.state';
 import { Account } from '../../models/account';
+import { AuthService } from '../../core/auth.service';
 import { TuiButton, TuiLoader } from '@taiga-ui/core';
 import { AccountDialogService } from './account-dialog.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-accounts',
-  imports: [TuiButton, TuiLoader, DecimalPipe],
+  imports: [TuiButton, TuiLoader],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -16,6 +16,7 @@ import { firstValueFrom } from 'rxjs';
 export class Accounts {
   readonly accountsState = inject(AccountsState);
   private readonly accountDialogs = inject(AccountDialogService);
+  private readonly auth = inject(AuthService);
 
   readonly selectedId = signal<number | null>(null);
   readonly selectedAccount = computed(() => {
@@ -48,6 +49,30 @@ export class Accounts {
     if (confirmed) {
       await firstValueFrom(this.accountsState.delete(account.id));
       this.selectedId.set(null);
+    }
+  }
+
+  formatBalance(account: Account): string {
+    return this.formatAmount(account.balance / Math.pow(10, account.scale), account.currency, account.scale);
+  }
+
+  formatUserBalance(account: Account): string {
+    if (account.user_balance === null) return '';
+    const user = this.auth.user();
+    if (!user || user.currency === account.currency) return '';
+    return this.formatAmount(account.user_balance / Math.pow(10, user.currency_scale), user.currency, user.currency_scale);
+  }
+
+  private formatAmount(value: number, currency: string, scale: number): string {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: scale,
+        maximumFractionDigits: scale,
+      }).format(value);
+    } catch {
+      return value.toLocaleString(undefined, { minimumFractionDigits: scale, maximumFractionDigits: scale });
     }
   }
 }

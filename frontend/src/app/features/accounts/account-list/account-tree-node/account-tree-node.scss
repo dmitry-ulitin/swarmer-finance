@@ -1,6 +1,8 @@
 .account-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   width: 100%;
   padding: 0.375rem 0.75rem;
   background: none;
@@ -22,10 +24,29 @@
   }
 }
 
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-balance {
+  flex-shrink: 0;
+  color: var(--tui-text-tertiary);
+  font-size: 0.8rem;
+}
+
 .group-header {
   display: flex;
   align-items: center;
+  gap: 0.5rem;
   padding-top: 0.5rem;
+}
+
+.group-balance {
+  flex-shrink: 0;
+  color: var(--tui-text-tertiary);
+  font-size: 0.75rem;
 }
 
 .group-name {

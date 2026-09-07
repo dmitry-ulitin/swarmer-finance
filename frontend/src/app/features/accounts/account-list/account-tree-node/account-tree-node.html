@@ -6,6 +6,9 @@
       [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
       (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
     >{{ node().name }}</button>
+    @if (groupBalance()) {
+      <span class="group-balance">{{ groupBalance() }}</span>
+    }
     <button
       class="chevron"
       type="button"
@@ -26,7 +29,8 @@
         [class.active]="transactions.selectedAccountIds().includes(item.account.id)"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(item.account.id) : transactions.selectAccount(item.account.id)"
       >
-        {{ item.account.displayName }}
+        <span class="account-name">{{ item.account.displayName }}</span>
+        <span class="account-balance">{{ formatUserBalance(item.account.user_balance) }}</span>
       </button>
     } @else {
       <app-account-tree-node [node]="item.node" [depth]="node().name ? depth() + 1 : depth()" />

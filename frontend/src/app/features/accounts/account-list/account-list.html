@@ -5,7 +5,10 @@
     type="button"
     (click)="transactions.selectAllAccounts()"
   >
-    All accounts
+    <span class="all-row-name">All accounts</span>
+    @if (totalBalance()) {
+      <span class="all-row-balance">{{ totalBalance() }}</span>
+    }
   </button>
 
   @for (node of state.groupedAccounts(); track node.fullPath) {

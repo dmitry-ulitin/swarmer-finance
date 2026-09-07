@@ -10,6 +10,13 @@ export interface ApiResponse<T> {
   error: string | null;
 }
 
+export interface BalanceSummary {
+  currency: string;
+  scale: number;
+  total: number;
+  incomplete: boolean;
+}
+
 export interface TransactionRequest {
   categoryId?: number | null;
   debitAccountId?: number | null;
@@ -59,6 +66,10 @@ export class ApiService {
 
   deleteAccount(id: number): Observable<ApiResponse<{ success: boolean }>> {
     return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/accounts/${id}`);
+  }
+
+  getBalanceSummary(): Observable<ApiResponse<BalanceSummary>> {
+    return this.http.get<ApiResponse<BalanceSummary>>('/api/accounts/summary');
   }
 
   // Transactions

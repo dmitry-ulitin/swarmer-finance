@@ -2,7 +2,7 @@ import { Injectable, computed, inject, resource } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Account } from '../models/account';
-import { ApiService } from './api.service';
+import { ApiService, BalanceSummary } from './api.service';
 
 export type AccountItem =
   | { kind: 'account'; account: Account & { displayName: string } }
@@ -76,6 +76,24 @@ export function collectAccountIds(node: AccountNode): number[] {
   return ids;
 }
 
+// Sums user_balance across all accounts in a subtree. Returns null if any
+// account's user_balance is null (rate unavailable), rather than silently
+// showing a total that's missing part of its data.
+export function collectUserBalance(node: AccountNode): number | null {
+  let total = 0;
+  for (const item of node.children) {
+    if (item.kind === 'account') {
+      if (item.account.user_balance === null) return null;
+      total += item.account.user_balance;
+    } else {
+      const subtotal = collectUserBalance(item.node);
+      if (subtotal === null) return null;
+      total += subtotal;
+    }
+  }
+  return total;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountsState {
   private readonly api = inject(ApiService);
@@ -90,8 +108,18 @@ export class AccountsState {
     }
   });
 
+  private readonly summaryResource = resource<BalanceSummary | null, boolean>({
+    params: () => this.auth.isAuthenticated(),
+    loader: async ({ params }) => {
+      if (!params) return null;
+      const r = await firstValueFrom(this.api.getBalanceSummary());
+      return r.data ?? null;
+    }
+  });
+
   readonly accounts = computed(() => this.resource.value() ?? []);
   readonly groupedAccounts = computed<AccountNode[]>(() => buildAccountTree(this.accounts()));
+  readonly summary = computed(() => this.summaryResource.value() ?? null);
   readonly currencies = computed(() => {
     const defaultCurrency = this.auth.user()?.currency;
     const fromAccounts = [...new Set(this.accounts().map(a => a.currency))].sort();
@@ -102,17 +130,18 @@ export class AccountsState {
 
   reload() {
     this.resource.reload();
+    this.summaryResource.reload();
   }
 
   create(data: { name: string; currency: string; startBalance: number }) {
-    return this.api.createAccount(data).pipe(tap(() => this.resource.reload()));
+    return this.api.createAccount(data).pipe(tap(() => this.reload()));
   }
 
   update(id: number, data: { name?: string; currency?: string; startBalance?: number }) {
-    return this.api.updateAccount(id, data).pipe(tap(() => this.resource.reload()));
+    return this.api.updateAccount(id, data).pipe(tap(() => this.reload()));
   }
 
   delete(id: number) {
-    return this.api.deleteAccount(id).pipe(tap(() => this.resource.reload()));
+    return this.api.deleteAccount(id).pipe(tap(() => this.reload()));
   }
 }

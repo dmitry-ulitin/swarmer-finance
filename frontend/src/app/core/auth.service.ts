@@ -9,6 +9,7 @@ export interface User {
   email: string;
   name: string;
   currency: string;
+  currency_scale: number;
 }
 
 export interface AuthResponse {

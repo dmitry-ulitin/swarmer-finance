@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccountTree, collectAccountIds, AccountNode } from './accounts.state';
+import { buildAccountTree, collectAccountIds, collectUserBalance, AccountNode } from './accounts.state';
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
-  return { id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '' };
+  return { id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '' };
 }
 
 describe('buildAccountTree', () => {
@@ -126,8 +126,8 @@ describe('collectAccountIds', () => {
       name: '',
       fullPath: '',
       children: [
-        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '', displayName: 'a' } },
-        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '', displayName: 'b' } },
+        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '', displayName: 'a' } },
+        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '', displayName: 'b' } },
       ],
     };
     expect(collectAccountIds(node)).toEqual([1, 2]);
@@ -138,18 +138,47 @@ describe('collectAccountIds', () => {
       name: 'Sub',
       fullPath: 'Group/Sub',
       children: [
-        { kind: 'account', account: { id: 3, user_id: 1, name: 'c', currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '', displayName: 'c' } },
+        { kind: 'account', account: { id: 3, user_id: 1, name: 'c', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '', displayName: 'c' } },
       ],
     };
     const node: AccountNode = {
       name: 'Group',
       fullPath: 'Group',
       children: [
-        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '', displayName: 'a' } },
+        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '', displayName: 'a' } },
         { kind: 'group', node: inner },
-        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, start_balance: 0, created_at: '', displayName: 'b' } },
+        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, created_at: '', displayName: 'b' } },
       ],
     };
     expect(collectAccountIds(node).sort()).toEqual([1, 2, 3]);
+  });
+});
+
+describe('collectUserBalance', () => {
+  function accountItem(id: number, userBalance: number | null) {
+    return {
+      kind: 'account' as const,
+      account: { ...makeAccount(id, `a${id}`), user_balance: userBalance, displayName: `a${id}` },
+    };
+  }
+
+  it('sums user_balance across direct accounts in a flat node', () => {
+    const node: AccountNode = { name: '', fullPath: '', children: [accountItem(1, 100), accountItem(2, 250)] };
+    expect(collectUserBalance(node)).toBe(350);
+  });
+
+  it('sums recursively across nested groups', () => {
+    const inner: AccountNode = { name: 'Sub', fullPath: 'Group/Sub', children: [accountItem(3, 50)] };
+    const node: AccountNode = {
+      name: 'Group',
+      fullPath: 'Group',
+      children: [accountItem(1, 100), { kind: 'group', node: inner }, accountItem(2, 200)],
+    };
+    expect(collectUserBalance(node)).toBe(350);
+  });
+
+  it('returns null if any account in the subtree has no user_balance', () => {
+    const node: AccountNode = { name: '', fullPath: '', children: [accountItem(1, 100), accountItem(2, null)] };
+    expect(collectUserBalance(node)).toBeNull();
   });
 });
