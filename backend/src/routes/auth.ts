@@ -10,7 +10,6 @@ const registerSchema = z.object({
   password: z.string().min(6),
   name: z.string().optional(),
   currency: z.string().optional(),
-  currencyScale: z.number().optional(),
 });
 
 const loginSchema = z.object({
@@ -24,8 +23,8 @@ const refreshSchema = z.object({
 
 router.post('/register', validate(registerSchema), async (req, res, next) => {
   try {
-    const { email, password, name, currency, currencyScale } = req.body;
-    const result = await authService.register(email, password, name, currency, currencyScale);
+    const { email, password, name, currency } = req.body;
+    const result = await authService.register(email, password, name, currency);
     res.json({
       data: {
         user: {

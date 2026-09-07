@@ -60,13 +60,31 @@ describe('Auth API', () => {
       expect(res.body.data.user.currency_scale).toBe(2);
     });
 
-    it('should accept a custom currencyScale', async () => {
+    it('should ignore a client-supplied currencyScale and derive it from currency', async () => {
       const res = await request(app)
         .post('/api/auth/register')
         .send({ email: `test4${Date.now()}@example.com`, password: 'password123', currencyScale: 8 });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.user.currency_scale).toBe(8);
+      expect(res.body.data.user.currency_scale).toBe(2);
+    });
+
+    it('should derive currency_scale of 0 for a zero-decimal currency', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `test5${Date.now()}@example.com`, password: 'password123', currency: 'JPY' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.currency_scale).toBe(0);
+    });
+
+    it('should derive currency_scale of 3 for a three-decimal currency', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `test6${Date.now()}@example.com`, password: 'password123', currency: 'BHD' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.currency_scale).toBe(3);
     });
   });
 

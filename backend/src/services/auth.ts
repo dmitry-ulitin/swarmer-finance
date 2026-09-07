@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import * as userQueries from '../db/queries/users';
 import * as categoryQueries from '../db/queries/categories';
+import { getCurrencyScale } from './currencyScale';
 import { User, AuthTokens, JwtPayload } from '../types';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
@@ -23,14 +24,17 @@ const generateTokens = (userId: number): AuthTokens => {
   return { accessToken, refreshToken };
 };
 
-export const register = async (email: string, password: string, name: string, currency: string, currencyScale?: number): Promise<{ user: User; tokens: AuthTokens }> => {
+export const register = async (email: string, password: string, name: string, currency: string): Promise<{ user: User; tokens: AuthTokens }> => {
   const existingUser = await userQueries.getUserByEmail(email);
   if (existingUser) {
     throw { statusCode: 400, message: 'Email already registered' };
   }
 
+  const resolvedCurrency = currency || 'EUR';
+  const currencyScale = getCurrencyScale(resolvedCurrency);
+
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await userQueries.createUser(email, passwordHash, name || email.split('@')[0], currency || 'EUR', currencyScale ?? 2);
+  const user = await userQueries.createUser(email, passwordHash, name || email.split('@')[0], resolvedCurrency, currencyScale);
   
   // Seed default categories for new user
   await seedDefaultCategories(user.id);
