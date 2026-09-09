@@ -330,31 +330,6 @@ describe('Accounts API — balance field', () => {
       expect(r.rows[0].deleted).toBe(false);
     });
 
-    it('hides soft-deleted accounts from GET /api/accounts', async () => {
-      const created = await request(app)
-        .post('/api/accounts')
-        .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'ToArchive', currency: 'USD', startBalance: 10000, scale: 2 });
-      const id = created.body.data.id;
-
-      // Add a transaction that zeroes the balance.
-      await pool.query(
-        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
-         VALUES ($1, $2, $3, 10000, 10000, '2026-01-15')`,
-        [testUserId, expenseCategoryId, id]
-      );
-
-      await request(app)
-        .delete(`/api/accounts/${id}`)
-        .set({ Authorization: `Bearer ${token}` });
-
-      const list = await request(app)
-        .get('/api/accounts')
-        .set({ Authorization: `Bearer ${token}` });
-      expect(list.status).toBe(200);
-      expect(list.body.data.find((a: { id: number }) => a.id === id)).toBeUndefined();
-    });
-
     it('returns 404 when deleting an already soft-deleted account', async () => {
       const created = await request(app)
         .post('/api/accounts')
@@ -388,7 +363,9 @@ describe('Accounts API — balance field', () => {
     // this pair and shadow the mock here.
     const FX_CURRENCY = 'QQQ';
 
-    beforeEach(() => {
+    beforeEach(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [testUserId]);
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ date: new Date().toISOString().slice(0, 10), rates: { EUR: 0.5 } }),

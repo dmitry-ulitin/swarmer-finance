@@ -3,27 +3,12 @@ import { Account } from '../../types';
 
 export const getAccountsByUserId = async (userId: number): Promise<Account[]> => {
   return query<Account>(
-    'SELECT * FROM accounts WHERE user_id = $1 AND deleted = false ORDER BY name',
+    'SELECT * FROM accounts WHERE user_id = $1 ORDER BY name',
     [userId]
   );
 };
 
 export const getAccountById = async (id: number, userId: number): Promise<Account | null> => {
-  return queryOne<Account>(
-    'SELECT * FROM accounts WHERE id = $1 AND user_id = $2 AND deleted = false',
-    [id, userId]
-  );
-};
-
-/**
- * Lookup that ignores the soft-delete flag. Used by the service-layer
- * pre-delete check to know whether the row still exists (and to
- * distinguish 404 from "already deleted").
- */
-export const getAccountByIdIncludingDeleted = async (
-  id: number,
-  userId: number
-): Promise<Account | null> => {
   return queryOne<Account>(
     'SELECT * FROM accounts WHERE id = $1 AND user_id = $2',
     [id, userId]

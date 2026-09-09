@@ -71,6 +71,9 @@ export const updateAccount = async (
   if (!existing) {
     throw { statusCode: 404, message: 'Account not found' };
   }
+  if (existing.deleted) {
+    throw { statusCode: 404, message: 'Account is deleted' };
+  }
   const user = await getUserOrThrow(userId);
   const account = await accountQueries.updateAccount(id, userId, data);
   const [withBal] = await withBalances(userId, [account!]);
@@ -84,8 +87,7 @@ export const updateAccount = async (
  *   2. Transactions exist and balance is zero → soft DELETE (deleted = true)
  *   3. Transactions exist and balance is non-zero → 409 Conflict
  *
- * Soft-deleted accounts are hidden from read paths (getAccounts,
- * getAccountById filter `deleted = false`) but their transaction
+ * Soft-deleted accounts are hidden from UI but their transaction
  * history stays intact for audit purposes. The FK from
  * transactions.{debit,credit}_account_id to accounts.id is RESTRICT
  * (migration 004) — that is why we cannot simply hard-delete accounts
@@ -100,12 +102,12 @@ export const deleteAccount = async (
 ): Promise<{ kind: 'hard-deleted' | 'soft-deleted' }> => {
   // Include-deleted lookup so an already-deleted account reports 404
   // rather than being silently re-soft-deleted.
-  const existing = await accountQueries.getAccountByIdIncludingDeleted(id, userId);
+  const existing = await accountQueries.getAccountById(id, userId);
   if (!existing) {
     throw { statusCode: 404, message: 'Account not found' };
   }
   if (existing.deleted) {
-    throw { statusCode: 404, message: 'Account not found' };
+    throw { statusCode: 404, message: 'Account is deleted' };
   }
 
   const hasTx = await accountQueries.hasTransactions(id);
