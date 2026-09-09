@@ -50,15 +50,22 @@ export class TransactionForm {
 
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
-  readonly stringifyCategory: TuiStringHandler<Category | null> = c => c?.fullName ?? c?.name ?? 'Undefined';
+  readonly stringifyCategory: TuiStringHandler<Category | null> = c => c?.fullName ?? c?.name ?? 'Uncategorized';
   readonly categoryMatcher = (a: Category | null, b: Category | null): boolean => a?.id === b?.id;
   readonly activeTypeIndex = signal(this.context.data.debit_account && this.context.data.credit_account ? 2 : (this.context.data.debit_account ? 0 : 1));
+  readonly isExpense = computed(() => this.activeTypeIndex() === 0);
+  readonly isIncome = computed(() => this.activeTypeIndex() === 1);
+  readonly isTransfer = computed(() => this.activeTypeIndex() === 2);
+  readonly visibleCategories = computed(() => {
+    const rootId = this.isIncome() ? 1 : 2;
+    return this.categoriesState.categories().find(c => c.id === rootId)?.children || [];
+  });
 
   readonly form = new FormGroup({
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
-    category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? null),
+    category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? this.visibleCategories()[0], {nonNullable: true}),
     debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit / Math.pow(10, this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2) : null),
     creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit / Math.pow(10, this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2) : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),
@@ -67,9 +74,6 @@ export class TransactionForm {
 
   readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: this.context.data.debit_account ?? null });
   readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: this.context.data.credit_account ?? null });
-  readonly isExpense = computed(() => this.activeTypeIndex() === 0);
-  readonly isIncome = computed(() => this.activeTypeIndex() === 1);
-  readonly isTransfer = computed(() => this.activeTypeIndex() === 2);
 
   readonly isSameCurrency = computed(() => {
     const d = this.fromAccountValue()?.currency;
@@ -86,10 +90,6 @@ export class TransactionForm {
     return (item: Category): readonly Category[] =>
       (item.children || []);
   });
-  readonly visibleCategories = computed(() => {
-    const rootId = this.isIncome() ? 1 : 2;
-    return this.categoriesState.categories().find(c => c.id === rootId)?.children || [];
-  });
 
   constructor() {
     effect(() => {
@@ -98,18 +98,14 @@ export class TransactionForm {
         let fromAccount = this.form.controls.fromAccount.value;
         let toAccount = this.form.controls.toAccount.value;
         if (index === 0) {
-          if (!!toAccount) {
-            this.form.controls.category.setValue(null);
-          }
+          this.form.controls.category.setValue(this.visibleCategories()[0]);
           this.form.controls.toAccount.setValue(null);
           this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value);
           if (!fromAccount) {
             this.form.controls.fromAccount.setValue(toAccount);
           }
         } else if (index === 1) {
-          if (!!fromAccount) {
-            this.form.controls.category.setValue(null);
-          }
+          this.form.controls.category.setValue(this.visibleCategories()[0]);
           this.form.controls.fromAccount.setValue(null);
           this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value);
           if (!toAccount) {

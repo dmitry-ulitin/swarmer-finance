@@ -9,6 +9,7 @@ import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { TransactionRequest } from '../../core/api.service';
+import { CategoriesState } from '../../core/categories.state';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionDialogService {
@@ -16,6 +17,7 @@ export class TransactionDialogService {
   private readonly injector = inject(INJECTOR);
   private readonly transactionsState = inject(TransactionsState);
   private readonly accountState = inject(AccountsState);
+  private readonly categoriesState = inject(CategoriesState);
   private readonly notifications = inject(NotificationService);
 
   async openCreate(): Promise<Transaction | null> {
@@ -23,7 +25,7 @@ export class TransactionDialogService {
     const lastTransaction = this.transactionsState.transactions()[0];
     let defaultData: Partial<Transaction> = { date: new Date().toISOString().split('T')[0] };
     if (lastTransaction) {
-      defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: undefined, credit: undefined };
+      defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: undefined, credit: undefined, date: defaultData.date };
     } else if (this.accountState.accounts().length < 1) {
       this.notifications.showError('No accounts available'); 
       return null;
