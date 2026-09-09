@@ -333,6 +333,82 @@ describe('Transactions API', () => {
     });
   });
 
+  describe('Default categorization (Uncategorized)', () => {
+    beforeEach(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+    });
+
+    it('should default an expense without categoryId to Uncategorized', async () => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debitAccountId: testAccountId,
+          debit: 25,
+          credit: 25,
+          date: '2026-02-20',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.category.id).toBe(4);
+      expect(res.body.data.category.name).toBe('Uncategorized');
+    });
+
+    it('should default an income without categoryId to Uncategorized', async () => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          creditAccountId: testAccountId,
+          debit: 25,
+          credit: 25,
+          date: '2026-02-20',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.category.id).toBe(3);
+      expect(res.body.data.category.name).toBe('Uncategorized');
+    });
+
+    it('should default to Uncategorized when categoryId is explicitly cleared on update', async () => {
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: expenseCategoryId,
+          debitAccountId: testAccountId,
+          debit: 25,
+          credit: 25,
+          date: '2026-02-20',
+        });
+      expect(created.body.data.category.id).toBe(expenseCategoryId);
+
+      const res = await request(app)
+        .put(`/api/transactions/${created.body.data.id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ categoryId: null });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.category.id).toBe(4);
+    });
+
+    it('should still leave transfers without a category', async () => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          debitAccountId: testAccountId,
+          creditAccountId: secondAccountId,
+          debit: 25,
+          credit: 25,
+          date: '2026-02-20',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.category).toBeNull();
+    });
+  });
+
   describe('PUT /api/transactions/:id', () => {
     let transactionId: number;
 

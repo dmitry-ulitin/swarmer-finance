@@ -41,6 +41,20 @@ describe('Categories API', () => {
       expect(income).toHaveProperty('children');
     });
 
+    it('should nest Uncategorized under Income and Expenses, not as a top-level root', async () => {
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((c: any) => c.id).sort()).toEqual([1, 2]);
+
+      const income = res.body.data.find((c: any) => c.id === 1);
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      expect(income.children.some((c: any) => c.id === 3 && c.name === 'Uncategorized')).toBe(true);
+      expect(expenses.children.some((c: any) => c.id === 4 && c.name === 'Uncategorized')).toBe(true);
+    });
+
     it('should require authentication', async () => {
       const res = await request(app)
         .get('/api/categories');
@@ -117,6 +131,16 @@ describe('Categories API', () => {
     it('should not allow editing system categories', async () => {
       const res = await request(app)
         .put('/api/categories/1')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Hacked' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Cannot edit system categories');
+    });
+
+    it('should not allow editing the Uncategorized category', async () => {
+      const res = await request(app)
+        .put('/api/categories/4')
         .set({ Authorization: `Bearer ${token}` })
         .send({ name: 'Hacked' });
 
@@ -224,6 +248,15 @@ describe('Categories API', () => {
     it('should not allow deleting system categories', async () => {
       const res = await request(app)
         .delete('/api/categories/1')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Cannot delete system categories');
+    });
+
+    it('should not allow deleting the Uncategorized category', async () => {
+      const res = await request(app)
+        .delete('/api/categories/3')
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(403);

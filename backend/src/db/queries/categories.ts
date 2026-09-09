@@ -43,16 +43,16 @@ export const updateCategory = async (
 ): Promise<Category | null> => {
   const result = await query<Category>(
     `UPDATE categories SET name = $1, color = COALESCE($2, color), icon = COALESCE($3, icon)
-     WHERE id = $4 AND user_id = $5 AND id NOT IN (1, 2) RETURNING *`,
+     WHERE id = $4 AND user_id = $5 AND id NOT IN (1, 2, 3, 4) RETURNING *`,
     [name, color, icon, id, userId]
   );
   return result[0] || null;
 };
 
 export const deleteCategory = async (id: number, userId: number): Promise<boolean> => {
-  if (id === 1 || id === 2) return false;
+  if (id === 1 || id === 2 || id === 3 || id === 4) return false;
   const count = await execute(
-    'DELETE FROM categories WHERE id = $1 AND user_id = $2 AND id NOT IN (1, 2)',
+    'DELETE FROM categories WHERE id = $1 AND user_id = $2 AND id NOT IN (1, 2, 3, 4)',
     [id, userId]
   );
   return count > 0;

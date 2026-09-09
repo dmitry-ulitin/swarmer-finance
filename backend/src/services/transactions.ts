@@ -3,6 +3,9 @@ import * as categoryQueries from '../db/queries/categories';
 import * as accountQueries from '../db/queries/accounts';
 import { Account } from '../types';
 
+const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
+const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
+
 type CreateInput = {
   categoryId?: number;
   debitAccountId?: number;
@@ -91,9 +94,10 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
         message: `Expenses require debit to equal credit (account and transaction are ${debitAccount.currency})`,
       };
     }
-    if (input.categoryId != null) {
-      await validateCategory(input.categoryId, userId);
+    if (input.categoryId == null) {
+      input.categoryId = UNCATEGORIZED_EXPENSE_CATEGORY_ID;
     }
+    await validateCategory(input.categoryId, userId);
   } else {
     // Income
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
@@ -103,9 +107,10 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
         message: `Income requires debit to equal credit (account and transaction are ${creditAccount.currency})`,
       };
     }
-    if (input.categoryId != null) {
-      await validateCategory(input.categoryId, userId);
+    if (input.categoryId == null) {
+      input.categoryId = UNCATEGORIZED_INCOME_CATEGORY_ID;
     }
+    await validateCategory(input.categoryId, userId);
   }
 }
 

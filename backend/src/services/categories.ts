@@ -18,12 +18,12 @@ function isUniqueViolation(err: unknown): boolean {
 export const getCategoryTree = async (userId: number): Promise<Category[]> => {
   const allCategories = await categoryQueries.getCategoriesByUserId(userId);
   
-  const systemRoots = allCategories.filter(c => c.user_id === null);
-  const userCategories = allCategories.filter(c => c.user_id === userId);
-  
+  const systemRoots = allCategories.filter(c => c.user_id === null && c.parent_id === null);
+  const treeCategories = allCategories.filter(c => c.user_id === userId || c.user_id === null);
+
   return systemRoots.map(root => ({
     ...root,
-    children: buildTree(userCategories, root.id),
+    children: buildTree(treeCategories, root.id),
   }));
 };
 
@@ -76,7 +76,7 @@ export const updateCategory = async (
   color?: string,
   icon?: string
 ): Promise<Category> => {
-  if (id === 1 || id === 2) {
+  if (id === 1 || id === 2 || id === 3 || id === 4) {
     throw { statusCode: 403, message: 'Cannot edit system categories' };
   }
 
@@ -101,7 +101,7 @@ export const updateCategory = async (
 };
 
 export const deleteCategory = async (id: number, userId: number): Promise<void> => {
-  if (id === 1 || id === 2) {
+  if (id === 1 || id === 2 || id === 3 || id === 4) {
     throw { statusCode: 403, message: 'Cannot delete system categories' };
   }
   
