@@ -12,8 +12,6 @@ type CreateInput = {
   creditAccountId?: number;
   debit: number;
   credit: number;
-  currency?: string;
-  scale?: number;
   date: string;
   description?: string;
   payee?: string;
@@ -25,8 +23,6 @@ type UpdateInput = {
   creditAccountId?: number | null;
   debit?: number;
   credit?: number;
-  currency?: string | null;
-  scale?: number | null;
   date?: string;
   description?: string | null;
   payee?: string | null;
@@ -67,12 +63,6 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     // Transfer
     if (input.categoryId != null) {
       throw { statusCode: 400, message: 'Transfers must not have a category' };
-    }
-    if (input.currency != null) {
-      throw { statusCode: 400, message: 'Transfers must not have a currency' };
-    }
-    if (input.scale != null) {
-      throw { statusCode: 400, message: 'Transfers must not have a scale' };
     }
     const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
