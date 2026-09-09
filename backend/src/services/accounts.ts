@@ -5,7 +5,7 @@ import { getRatesTo, convertAmount } from './currency';
 import { Account, User } from '../types';
 
 async function withBalances(userId: number, accounts: Account[]): Promise<Account[]> {
-  const rows = await getAccountBalances(userId, []);
+  const rows = await getAccountBalances(userId, accounts.map(a => a.id));
   return accounts.map(account => {
     let balance = Number(account.start_balance);
     for (const row of rows) {
