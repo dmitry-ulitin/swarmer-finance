@@ -33,7 +33,8 @@ const buildTree = (categories: Category[], parentId: number): Category[] => {
     .map(c => ({
       ...c,
       children: buildTree(categories, c.id),
-    }));
+    }))
+    .sort((a, b) => a.user_id === null ? -1 : (b.user_id === null ? 1 : a.name.localeCompare(b.name)));
 };
 
 export const createCategory = async (

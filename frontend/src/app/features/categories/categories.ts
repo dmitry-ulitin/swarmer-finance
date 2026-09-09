@@ -22,7 +22,7 @@ export class Categories {
   protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children ?? [];
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
-    const newCategories = this.categoriesState.categories();
+    const newCategories = this.categoriesState.categories().map(c => ({ ...c, children: c.children?.filter(child => child.user_id !== null)}));
     const expandedIds = new Set<number>();
     this.map.forEach((expanded, category) => {
       if (expanded) expandedIds.add(category.id);

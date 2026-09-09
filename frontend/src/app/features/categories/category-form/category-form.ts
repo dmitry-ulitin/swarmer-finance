@@ -29,7 +29,7 @@ export class CategoryForm {
   readonly treeHandler = computed(() => {
     const currentId = this.context.data?.id;
     return (item: Category): readonly Category[] =>
-      (item.children || []).filter((c: Category) => c.id !== currentId);
+      (item.children || []).filter((c: Category) => c.id !== currentId && c.user_id !== null);
   });
 
   readonly treeMap = new Map<Category, boolean>();
