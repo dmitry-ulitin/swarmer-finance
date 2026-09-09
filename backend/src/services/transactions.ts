@@ -129,22 +129,30 @@ async function attachRunningBalances(
     transactions.flatMap(t => [t.debit_account?.id, t.credit_account?.id].filter((id): id is number => id != null))
   )];
 
-  const first = transactions[0];
-  const d = new Date(first.date);
-  const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const balanceRows = await transactionQueries.getBalancesAt(userId, accountIds, dateStr);
+  // transactions are ordered newest-first (date DESC, created_at DESC, id
+  // DESC); anchor the seed balance strictly before the oldest transaction
+  // on this page, then walk forward (oldest to newest) applying each
+  // transaction's own effect. Seeding from a specific transaction's cursor
+  // — rather than a bare date — avoids double-counting same-date
+  // transactions that fall on a different page.
+  const last = transactions[transactions.length - 1];
+  const lastDate = new Date(last.date);
+  const dateStr = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')}`;
+  const balanceRows = await transactionQueries.getBalancesAt(userId, accountIds, dateStr, last.created_at, last.id);
   const balanceMap = new Map(balanceRows.map(r => [r.id, r.balance]));
 
-  return transactions.map(t => {
-    const dto = {
+  const withBalances = [];
+  for (let i = transactions.length - 1; i >= 0; i--) {
+    const t = transactions[i];
+    if (t.debit_account) balanceMap.set(t.debit_account.id, (balanceMap.get(t.debit_account.id) ?? 0) - Number(t.debit));
+    if (t.credit_account) balanceMap.set(t.credit_account.id, (balanceMap.get(t.credit_account.id) ?? 0) + Number(t.credit));
+    withBalances[i] = {
       ...t,
       debit_account: t.debit_account ? { ...t.debit_account, balance: balanceMap.get(t.debit_account.id) } : null,
       credit_account: t.credit_account ? { ...t.credit_account, balance: balanceMap.get(t.credit_account.id) } : null,
     };
-    if (t.debit_account) balanceMap.set(t.debit_account.id, (balanceMap.get(t.debit_account.id) ?? 0) + Number(t.debit));
-    if (t.credit_account) balanceMap.set(t.credit_account.id, (balanceMap.get(t.credit_account.id) ?? 0) - Number(t.credit));
-    return dto;
-  });
+  }
+  return withBalances;
 }
 
 export const createTransaction = async (userId: number, input: CreateInput) => {

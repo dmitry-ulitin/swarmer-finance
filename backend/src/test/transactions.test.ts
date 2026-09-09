@@ -488,6 +488,39 @@ describe('Transactions API', () => {
       // After Apr 10: 0 + 1000 + 2000 = 3000 (Apr 20 transaction is NOT included)
       expect(res.body.data[0].credit_account.balance).toBe(3000);
     });
+
+    it('computes correct balance when same-date transactions span a page boundary', async () => {
+      // Three same-date incomes (100, 200, 300), newest created_at first.
+      // Page size 2: page 1 = [300, 200], page 2 = [100].
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, created_at)
+         VALUES
+           ($1, $2, $3, 100, 100, '2026-05-01', '2026-05-01 08:00:00'),
+           ($1, $2, $3, 200, 200, '2026-05-01', '2026-05-01 09:00:00'),
+           ($1, $2, $3, 300, 300, '2026-05-01', '2026-05-01 10:00:00')`,
+        [testUserId, incomeCategoryId, testAccountId]
+      );
+
+      const page1 = await request(app)
+        .get('/api/transactions?offset=0&limit=2')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(page1.status).toBe(200);
+      expect(page1.body.data.length).toBe(2);
+      // After 300 (10:00): 0 + 100 + 200 + 300 = 600
+      expect(page1.body.data[0].credit_account.balance).toBe(600);
+      // After 200 (09:00): 0 + 100 + 200 = 300
+      expect(page1.body.data[1].credit_account.balance).toBe(300);
+
+      const page2 = await request(app)
+        .get('/api/transactions?offset=2&limit=2')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(page2.status).toBe(200);
+      expect(page2.body.data.length).toBe(1);
+      // After 100 (08:00): 0 + 100 = 100
+      expect(page2.body.data[0].credit_account.balance).toBe(100);
+    });
   });
 
   describe('DELETE /api/transactions/:id', () => {

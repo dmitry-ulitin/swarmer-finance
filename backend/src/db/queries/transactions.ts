@@ -139,7 +139,7 @@ export const getTransactionsByUserId = async (
   const rows = await query<TransactionRow>(
     `${WITH_DETAILS_SQL}
      WHERE ${whereClause}
-     ORDER BY t.date DESC, t.created_at DESC
+     ORDER BY t.date DESC, t.created_at DESC, t.id DESC
      LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
     [...params, limit, offset]
   );
@@ -229,10 +229,17 @@ export interface AccountBalanceAt {
   balance: number;
 }
 
+// Balance strictly before the (date, createdAt, id) cursor — matching the
+// (date DESC, created_at DESC, id DESC) order transactions are listed in,
+// so a cursor anchored to one page's oldest transaction excludes exactly
+// the transactions already summed on earlier pages, even when several
+// transactions share the same date and created_at.
 export const getBalancesAt = async (
   userId: number,
   accountIds: number[],
-  date: string
+  date: string,
+  createdAt: Date,
+  id: number
 ): Promise<AccountBalanceAt[]> => {
   const rows = await query<{ id: number; balance: string }>(
     `SELECT a.id,
@@ -244,11 +251,11 @@ export const getBalancesAt = async (
      LEFT JOIN transactions t
             ON (t.credit_account_id = a.id OR t.debit_account_id = a.id)
            AND t.user_id = $1
-           AND t.date <= $2::date
-     WHERE a.id = ANY($3::int[])
+           AND (t.date, t.created_at, t.id) < ($2::date, $3::timestamptz, $4::int)
+     WHERE a.id = ANY($5::int[])
        AND a.user_id = $1
      GROUP BY a.id, a.start_balance`,
-    [userId, date, accountIds]
+    [userId, date, createdAt, id, accountIds]
   );
   return rows.map(r => ({ id: r.id, balance: Number(r.balance) }));
 };
