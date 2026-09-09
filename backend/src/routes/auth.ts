@@ -45,11 +45,7 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
       },
       error: null,
     });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -71,11 +67,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       },
       error: null,
     });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -85,11 +77,7 @@ router.post('/refresh', validate(refreshSchema), async (req, res, next) => {
     const { refreshToken } = req.body;
     const tokens = await authService.refreshTokens(refreshToken);
     res.json({ data: tokens, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });

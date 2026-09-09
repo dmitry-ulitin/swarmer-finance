@@ -50,11 +50,7 @@ router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, ne
     const { name, currency, startBalance, scale } = req.body;
     const account = await accountService.createAccount(req.userId!, name, currency, startBalance, scale);
     res.json({ data: account, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -64,11 +60,7 @@ router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, 
     const id = parseInt(req.params.id as string, 10);
     const account = await accountService.updateAccount(id, req.userId!, req.body);
     res.json({ data: account, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -78,11 +70,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     const id = parseInt(req.params.id as string, 10);
     const result = await accountService.deleteAccount(id, req.userId!);
     res.json({ data: { success: true, kind: result.kind }, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });

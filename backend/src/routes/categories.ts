@@ -35,11 +35,7 @@ router.post('/', validate(createCategorySchema), async (req: AuthRequest, res, n
     const { name, parentId, color, icon } = req.body;
     const category = await categoryService.createCategory(req.userId!, name, parentId, color, icon);
     res.json({ data: category, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -50,11 +46,7 @@ router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res,
     const { name, color, icon } = req.body;
     const category = await categoryService.updateCategory(id, req.userId!, name, color, icon);
     res.json({ data: category, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -64,11 +56,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     const id = parseInt(req.params.id as string, 10);
     await categoryService.deleteCategory(id, req.userId!);
     res.json({ data: { success: true }, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });

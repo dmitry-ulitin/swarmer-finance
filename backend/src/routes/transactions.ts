@@ -68,11 +68,7 @@ router.post('/', validate(createTransactionSchema), async (req: AuthRequest, res
   try {
     const transaction = await transactionService.createTransaction(req.userId!, req.body);
     res.json({ data: transaction, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -82,11 +78,7 @@ router.put('/:id', validate(updateTransactionSchema), async (req: AuthRequest, r
     const id = parseInt(req.params.id as string, 10);
     const transaction = await transactionService.updateTransaction(id, req.userId!, req.body);
     res.json({ data: transaction, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
@@ -96,11 +88,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     const id = parseInt(req.params.id as string, 10);
     await transactionService.deleteTransaction(id, req.userId!);
     res.json({ data: { success: true }, error: null });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const err = error as { statusCode: number; message: string };
-      return res.status(err.statusCode).json({ data: null, error: err.message });
-    }
+  } catch (error) {
     next(error);
   }
 });
