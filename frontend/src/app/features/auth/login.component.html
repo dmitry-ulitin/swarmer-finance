@@ -2,15 +2,17 @@
   <div class="auth-card card">
     <h1>Login</h1>
     <form [formGroup]="form" (submit)="onSubmit($event)" tuiTextfieldSize="m">
-      <tui-textfield>
-        <label tuiLabel>Email</label>
-        <input tuiInput type="email" formControlName="email" placeholder="Enter your email">
-      </tui-textfield>
-      <tui-textfield>
-        <label tuiLabel>Password</label>
-        <input tuiInput type="password" formControlName="password" placeholder="Enter your password">
-        <tui-icon tuiPassword />
-      </tui-textfield>
+      <label tuiLabel>Email
+        <tui-textfield>
+          <input tuiInput type="email" formControlName="email" placeholder="Enter your email">
+        </tui-textfield>
+      </label>
+      <label tuiLabel>Password
+        <tui-textfield>
+          <input tuiInput type="password" formControlName="password" placeholder="Enter your password">
+          <tui-icon tuiPassword />
+        </tui-textfield>
+      </label>
       <button tuiButton size="m" type="submit" [disabled]="loading()">
         {{ loading() ? 'Loading...' : 'Login' }}
       </button>

@@ -42,7 +42,7 @@ export class RegisterComponent {
         this.form.value.email!,
         this.form.value.password!,
         this.form.value.name!,
-        this.form.value.currency!
+        this.form.value.currency || 'EUR'
       ));
       this.router.navigate(['/dashboard']);
     } catch (err) {
