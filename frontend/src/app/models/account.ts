@@ -7,5 +7,6 @@ export interface Account {
   start_balance: number;
   balance: number;
   user_balance: number | null;
+  deleted: boolean;
   created_at: string;
 }

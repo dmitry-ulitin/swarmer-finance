@@ -118,7 +118,11 @@ export class AccountsState {
   });
 
   readonly accounts = computed(() => this.resource.value() ?? []);
-  readonly groupedAccounts = computed<AccountNode[]>(() => buildAccountTree(this.accounts()));
+  // Excludes soft-deleted accounts — for display in the accounts list UI.
+  // Use `accounts` instead where deleted accounts must remain selectable
+  // (e.g. editing an existing transaction that references one).
+  readonly visibleAccounts = computed(() => this.accounts().filter(a => !a.deleted));
+  readonly groupedAccounts = computed<AccountNode[]>(() => buildAccountTree(this.visibleAccounts()));
   readonly summary = computed(() => this.summaryResource.value() ?? null);
   readonly currencies = computed(() => {
     const defaultCurrency = this.auth.user()?.currency;

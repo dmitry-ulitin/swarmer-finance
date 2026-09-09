@@ -87,8 +87,12 @@ export const updateAccount = async (
  *   2. Transactions exist and balance is zero → soft DELETE (deleted = true)
  *   3. Transactions exist and balance is non-zero → 409 Conflict
  *
- * Soft-deleted accounts are hidden from UI but their transaction
- * history stays intact for audit purposes. The FK from
+ * Soft-deleted accounts are hidden from the accounts list UI, but
+ * remain visible elsewhere (e.g. when editing existing transactions
+ * that reference them) and their transaction history stays intact for
+ * audit purposes. Operations that would change a soft-deleted
+ * account's balance (creating/updating a transaction against it) must
+ * be rejected. The FK from
  * transactions.{debit,credit}_account_id to accounts.id is RESTRICT
  * (migration 004) — that is why we cannot simply hard-delete accounts
  * with transactions attached.

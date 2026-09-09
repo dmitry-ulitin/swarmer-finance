@@ -22,7 +22,7 @@ export class Accounts {
   readonly selectedAccount = computed(() => {
     const id = this.selectedId();
     if (id === null) return null;
-    return this.accountsState.accounts().find(a => a.id === id) ?? null;
+    return this.accountsState.visibleAccounts().find(a => a.id === id) ?? null;
   });
 
   setAsSelected(account: Account) {

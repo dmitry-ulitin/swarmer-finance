@@ -39,7 +39,7 @@ function formatDate(date: string | Date): string {
 
 async function loadAccount(accountId: number, userId: number, label: string): Promise<Account> {
   const account = await accountQueries.getAccountById(accountId, userId);
-  if (!account) {
+  if (!account || account.deleted) {
     throw { statusCode: 403, message: `Cannot use this ${label} account` };
   }
   return account;

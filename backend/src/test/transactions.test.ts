@@ -233,6 +233,29 @@ describe('Transactions API', () => {
       expect(res.body.error).toMatch(/debit to equal credit/);
     });
 
+    it('should reject a transaction against a soft-deleted account', async () => {
+      const softDeletedResult = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, deleted)
+         VALUES ($1, 'Deleted Account', 'USD', 0, true) RETURNING id`,
+        [testUserId]
+      );
+      const softDeletedAccountId = softDeletedResult.rows[0].id;
+
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: expenseCategoryId,
+          debitAccountId: softDeletedAccountId,
+          debit: 100,
+          credit: 100,
+          date: '2026-02-18',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/Cannot use this debit account/);
+    });
+
     it('should create a transfer transaction', async () => {
       const secondAccountResult = await pool.query(
         `INSERT INTO accounts (user_id, name, currency, start_balance)
