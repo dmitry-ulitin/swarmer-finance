@@ -40,16 +40,6 @@ export const getAccounts = async (userId: number) => {
   return withConvertedBalances(user, withBal);
 };
 
-export const getBalanceSummary = async (userId: number) => {
-  const user = await getUserOrThrow(userId);
-  const accounts = await accountQueries.getAccountsByUserId(userId);
-  const withBal = await withBalances(userId, accounts);
-  const converted = await withConvertedBalances(user, withBal);
-  const total = converted.reduce((sum, a) => sum + (a.user_balance ?? 0), 0);
-  const incomplete = converted.some(a => a.user_balance === null || a.user_balance === undefined);
-  return { currency: user.currency, scale: user.currency_scale, total, incomplete };
-};
-
 export const createAccount = async (
   userId: number,
   name: string,

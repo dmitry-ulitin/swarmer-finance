@@ -11,7 +11,7 @@ describe('Accounts API — balance field', () => {
   let incomeCategoryId: number;
   let expenseCategoryId: number;
 
-  // Every GET /api/accounts(/summary) call triggers currency conversion,
+  // Every GET /api/accounts call triggers currency conversion,
   // which would otherwise hit the real Frankfurter API. Mock fetch for the
   // whole suite so no test here makes a real network call; individual tests
   // below override the resolved value where the actual rate matters.
@@ -397,22 +397,7 @@ describe('Accounts API — balance field', () => {
       expect(res.body.data[0].user_balance).toBe(5000);
     });
 
-    it('GET /api/accounts/summary returns the total balance in the user currency', async () => {
-      await pool.query(
-        `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
-         VALUES ($1, 'Wallet', $2, 10000, 2)`,
-        [testUserId, FX_CURRENCY]
-      );
-
-      const res = await request(app)
-        .get('/api/accounts/summary')
-        .set({ Authorization: `Bearer ${token}` });
-
-      expect(res.status).toBe(200);
-      expect(res.body.data).toEqual({ currency: 'EUR', scale: 2, total: 5000, incomplete: false });
-    });
-
-    it('sets user_balance to null and incomplete to true when no rate is available', async () => {
+    it('sets user_balance to null when no rate is available', async () => {
       global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
 
       await pool.query(
@@ -425,11 +410,6 @@ describe('Accounts API — balance field', () => {
         .get('/api/accounts')
         .set({ Authorization: `Bearer ${token}` });
       expect(accountsRes.body.data[0].user_balance).toBeNull();
-
-      const summaryRes = await request(app)
-        .get('/api/accounts/summary')
-        .set({ Authorization: `Bearer ${token}` });
-      expect(summaryRes.body.data.incomplete).toBe(true);
     });
   });
 });
@@ -448,15 +428,6 @@ describe('Accounts API — user not found', () => {
   it('GET /api/accounts returns 401 User not found instead of crashing', async () => {
     const res = await request(app)
       .get('/api/accounts')
-      .set({ Authorization: `Bearer ${tokenForMissingUser}` });
-
-    expect(res.status).toBe(401);
-    expect(res.body.error).toBe('User not found');
-  });
-
-  it('GET /api/accounts/summary returns 401 User not found instead of crashing', async () => {
-    const res = await request(app)
-      .get('/api/accounts/summary')
       .set({ Authorization: `Bearer ${tokenForMissingUser}` });
 
     expect(res.status).toBe(401);
