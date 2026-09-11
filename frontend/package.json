@@ -23,6 +23,7 @@
     "@taiga-ui/icons": "^5.10.0",
     "@taiga-ui/kit": "^5.10.0",
     "@taiga-ui/styles": "^5.10.0",
+    "@taiga-ui/addon-commerce": "^5.10.0",
     "less": "^4.6.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
