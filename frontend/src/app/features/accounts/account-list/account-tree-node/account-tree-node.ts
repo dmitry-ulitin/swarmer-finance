@@ -30,7 +30,7 @@ export class AccountTreeNode {
     if (value === null) return '';
     const user = this.auth.user();
     if (!user) return '';
-    return this.formatAmount(value / Math.pow(10, user.currency_scale), user.currency, user.currency_scale);
+    return this.formatAmount(value, user.currency, user.currency_scale);
   }
 
   private formatAmount(value: number, currency: string, scale: number): string {

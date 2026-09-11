@@ -1,8 +1,17 @@
 import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
 import { getAccountBalances } from '../db/queries/transactions';
-import { getRatesTo, convertAmount } from './currency';
+import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, User } from '../types';
+
+function toDecimalDTO(account: Account, userScale: number): Account {
+  return {
+    ...account,
+    start_balance: toDecimal(account.start_balance, account.scale),
+    balance: toDecimal(account.balance, account.scale),
+    user_balance: account.user_balance != null ? toDecimal(account.user_balance, userScale) : account.user_balance,
+  };
+}
 
 async function withBalances(userId: number, accounts: Account[]): Promise<Account[]> {
   const rows = await getAccountBalances(userId, accounts.map(a => a.id));
@@ -37,7 +46,8 @@ export const getAccounts = async (userId: number) => {
   const user = await getUserOrThrow(userId);
   const accounts = await accountQueries.getAccountsByUserId(userId);
   const withBal = await withBalances(userId, accounts);
-  return withConvertedBalances(user, withBal);
+  const converted = await withConvertedBalances(user, withBal);
+  return converted.map(a => toDecimalDTO(a, user.currency_scale));
 };
 
 export const createAccount = async (
@@ -48,8 +58,9 @@ export const createAccount = async (
   scale = 2
 ) => {
   const user = await getUserOrThrow(userId);
-  const account = await accountQueries.createAccount(userId, name, currency, startBalance, scale);
-  return (await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]))[0];
+  const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale);
+  const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
+  return toDecimalDTO(converted, user.currency_scale);
 };
 
 export const updateAccount = async (
@@ -65,9 +76,13 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   const user = await getUserOrThrow(userId);
-  const account = await accountQueries.updateAccount(id, userId, data);
+  const startBalance = data.startBalance != null
+    ? toCents(data.startBalance, data.scale ?? existing.scale)
+    : undefined;
+  const account = await accountQueries.updateAccount(id, userId, { ...data, startBalance });
   const [withBal] = await withBalances(userId, [account!]);
-  return (await withConvertedBalances(user, [withBal]))[0];
+  const [converted] = await withConvertedBalances(user, [withBal]);
+  return toDecimalDTO(converted, user.currency_scale);
 };
 
 /**

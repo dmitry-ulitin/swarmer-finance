@@ -53,14 +53,14 @@ export class Accounts {
   }
 
   formatBalance(account: Account): string {
-    return this.formatAmount(account.balance / Math.pow(10, account.scale), account.currency, account.scale);
+    return this.formatAmount(account.balance, account.currency, account.scale);
   }
 
   formatUserBalance(account: Account): string {
     if (account.user_balance === null) return '';
     const user = this.auth.user();
     if (!user || user.currency === account.currency) return '';
-    return this.formatAmount(account.user_balance / Math.pow(10, user.currency_scale), user.currency, user.currency_scale);
+    return this.formatAmount(account.user_balance, user.currency, user.currency_scale);
   }
 
   private formatAmount(value: number, currency: string, scale: number): string {

@@ -80,7 +80,7 @@ describe('Accounts API — balance field', () => {
 
       expect(res.status).toBe(200);
       const account = res.body.data[0];
-      expect(account.balance).toBe(10000);
+      expect(account.balance).toBe(100);
     });
 
     it('increases balance when account receives income', async () => {
@@ -95,7 +95,7 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data[0].balance).toBe(15000); // 10000 + 5000
+      expect(res.body.data[0].balance).toBe(150); // 100 + 50
     });
 
     it('decreases balance when account pays an expense', async () => {
@@ -110,7 +110,7 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      expect(res.body.data[0].balance).toBe(7000); // 10000 - 3000
+      expect(res.body.data[0].balance).toBe(70); // 100 - 30
     });
 
     it('updates both account balances correctly for a transfer', async () => {
@@ -135,8 +135,8 @@ describe('Accounts API — balance field', () => {
       const accounts = res.body.data as Array<{ id: number; balance: number }>;
       const wallet = accounts.find(a => a.id === accountId)!;
       const savings = accounts.find(a => a.id === savingsId)!;
-      expect(wallet.balance).toBe(6000);  // 10000 - 4000
-      expect(savings.balance).toBe(4000); // 0 + 4000
+      expect(wallet.balance).toBe(60);  // 100 - 40
+      expect(savings.balance).toBe(40); // 0 + 40
     });
   });
 
@@ -150,10 +150,10 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'New Account', currency: 'EUR', startBalance: 2000, scale: 2 });
+        .send({ name: 'New Account', currency: 'EUR', startBalance: 20, scale: 2 });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.balance).toBe(2000);
+      expect(res.body.data.balance).toBe(20);
     });
 
     it('accepts 4-letter crypto-style currency codes (USDT, USDC)', async () => {
@@ -229,10 +229,10 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ startBalance: 8000 });
+        .send({ startBalance: 80 });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.balance).toBe(8000);
+      expect(res.body.data.balance).toBe(80);
     });
 
     it('reflects updated startBalance combined with existing transactions', async () => {
@@ -245,10 +245,10 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ startBalance: 3000 });
+        .send({ startBalance: 30 });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.balance).toBe(4000); // 3000 + 1000
+      expect(res.body.data.balance).toBe(40); // 30 + 10
     });
   });
 
@@ -278,11 +278,11 @@ describe('Accounts API — balance field', () => {
     });
 
     it('soft-deletes an account with transactions and zero balance', async () => {
-      // Account with start_balance 10000; one expense of 10000 → balance = 0
+      // Account with start_balance 10000 cents ($100); one expense of $100 → balance = 0
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'ZeroBalance', currency: 'USD', startBalance: 10000, scale: 2 });
+        .send({ name: 'ZeroBalance', currency: 'USD', startBalance: 100, scale: 2 });
       const id = created.body.data.id;
 
       await pool.query(
@@ -308,7 +308,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Positive', currency: 'USD', startBalance: 5000, scale: 2 });
+        .send({ name: 'Positive', currency: 'USD', startBalance: 50, scale: 2 });
       const id = created.body.data.id;
 
       // Add a transaction that does NOT zero out the balance.
@@ -334,7 +334,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Twice', currency: 'USD', startBalance: 10000, scale: 2 });
+        .send({ name: 'Twice', currency: 'USD', startBalance: 100, scale: 2 });
       const id = created.body.data.id;
 
       await pool.query(
@@ -393,8 +393,8 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
-      // 10000 minor units ($100) at rate 0.5 -> 5000 cents EUR (€50)
-      expect(res.body.data[0].user_balance).toBe(5000);
+      // $100 at rate 0.5 -> €50
+      expect(res.body.data[0].user_balance).toBe(50);
     });
 
     it('sets user_balance to null when no rate is available', async () => {

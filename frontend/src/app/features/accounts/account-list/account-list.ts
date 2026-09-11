@@ -25,9 +25,9 @@ export class AccountList {
         currency: summary.currency,
         minimumFractionDigits: summary.scale,
         maximumFractionDigits: summary.scale,
-      }).format(summary.total / Math.pow(10, summary.scale));
+      }).format(summary.total);
     } catch {
-      return (summary.total / Math.pow(10, summary.scale))
+      return summary.total
         .toLocaleString(undefined, { minimumFractionDigits: summary.scale, maximumFractionDigits: summary.scale });
     }
   });

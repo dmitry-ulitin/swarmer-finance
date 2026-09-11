@@ -1,7 +1,8 @@
 import * as transactionQueries from '../db/queries/transactions';
 import * as categoryQueries from '../db/queries/categories';
 import * as accountQueries from '../db/queries/accounts';
-import { Account } from '../types';
+import { toDecimal, toCents } from './currency';
+import { Account, TransactionDTO } from '../types';
 
 const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
 const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
@@ -66,6 +67,8 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     }
     const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
+    input.debit = toCents(input.debit, debitAccount.scale);
+    input.credit = toCents(input.credit, creditAccount.scale);
     // When both accounts share a currency, debit and credit must be equal —
     // otherwise value silently disappears or appears between the two sides.
     // Cross-currency transfers allow debit != credit (FX conversion / fee).
@@ -78,6 +81,8 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
   } else if (hasDebit) {
     // Expense
     const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
+    input.debit = toCents(input.debit, debitAccount.scale);
+    input.credit = toCents(input.credit, debitAccount.scale);
     if (input.debit !== input.credit) {
       throw {
         statusCode: 400,
@@ -91,6 +96,8 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
   } else {
     // Income
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
+    input.debit = toCents(input.debit, creditAccount.scale);
+    input.credit = toCents(input.credit, creditAccount.scale);
     if (input.debit !== input.credit) {
       throw {
         statusCode: 400,
@@ -104,16 +111,32 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
   }
 }
 
+function toDecimalTransactionDTO(t: TransactionDTO): TransactionDTO {
+  const debitScale = t.debit_account?.scale ?? t.credit_account?.scale ?? 2;
+  const creditScale = t.credit_account?.scale ?? t.debit_account?.scale ?? 2;
+  return {
+    ...t,
+    debit: toDecimal(t.debit, debitScale),
+    credit: toDecimal(t.credit, creditScale),
+    debit_account: t.debit_account && t.debit_account.balance != null
+      ? { ...t.debit_account, balance: toDecimal(t.debit_account.balance, t.debit_account.scale) }
+      : t.debit_account,
+    credit_account: t.credit_account && t.credit_account.balance != null
+      ? { ...t.credit_account, balance: toDecimal(t.credit_account.balance, t.credit_account.scale) }
+      : t.credit_account,
+  };
+}
+
 export const getTransactions = async (
   userId: number,
   filters: transactionQueries.TransactionFilters
 ) => {
   const transactions = await transactionQueries.getTransactionsByUserId(userId, filters);
   const sequential = !filters.details && !filters.category?.length && !filters.type;
-  if (sequential && transactions.length > 0) {
-    return attachRunningBalances(userId, transactions);
-  }
-  return transactions;
+  const result = sequential && transactions.length > 0
+    ? await attachRunningBalances(userId, transactions)
+    : transactions;
+  return result.map(toDecimalTransactionDTO);
 };
 
 async function attachRunningBalances(
@@ -152,7 +175,8 @@ async function attachRunningBalances(
 
 export const createTransaction = async (userId: number, input: CreateInput) => {
   await validateTransactionInput(input, userId);
-  return transactionQueries.createTransaction(userId, input);
+  const transaction = await transactionQueries.createTransaction(userId, input);
+  return toDecimalTransactionDTO(transaction);
 };
 
 export const updateTransaction = async (id: number, userId: number, input: UpdateInput) => {
@@ -161,21 +185,34 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     throw { statusCode: 404, message: 'Transaction not found' };
   }
 
+  // existing.debit/credit are stored in cents; input.debit/credit (when
+  // provided) arrive as decimal from the API. Convert existing to decimal
+  // using its own accounts' scales so the merged object is consistently
+  // decimal before re-validation converts it back to cents.
+  const existingDebitAccount = existing.debit_account_id != null
+    ? await accountQueries.getAccountById(existing.debit_account_id, userId)
+    : null;
+  const existingCreditAccount = existing.credit_account_id != null
+    ? await accountQueries.getAccountById(existing.credit_account_id, userId)
+    : null;
+  const existingScale = existingDebitAccount?.scale ?? existingCreditAccount?.scale ?? 2;
+
   // Merge input with existing values to re-validate the full resulting state.
   // null in input means "clear this field"; undefined means "keep existing".
   const merged: CreateInput = {
     categoryId: input.categoryId !== undefined ? (input.categoryId ?? undefined) : (existing.category_id ?? undefined),
     debitAccountId: input.debitAccountId !== undefined ? (input.debitAccountId ?? undefined) : (existing.debit_account_id ?? undefined),
     creditAccountId: input.creditAccountId !== undefined ? (input.creditAccountId ?? undefined) : (existing.credit_account_id ?? undefined),
-    debit: input.debit ?? existing.debit,
-    credit: input.credit ?? existing.credit,
+    debit: input.debit ?? toDecimal(existing.debit, existingScale),
+    credit: input.credit ?? toDecimal(existing.credit, existingScale),
     date: input.date ?? formatDate(existing.date),
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };
 
   await validateTransactionInput(merged, userId);
-  return transactionQueries.updateTransaction(id, userId, merged);
+  const transaction = await transactionQueries.updateTransaction(id, userId, merged);
+  return transaction ? toDecimalTransactionDTO(transaction) : transaction;
 };
 
 export const deleteTransaction = async (id: number, userId: number): Promise<void> => {

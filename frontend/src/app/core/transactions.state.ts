@@ -129,7 +129,7 @@ export class TransactionsState {
       const scale = showCredit
         ? (t.credit_account?.scale ?? t.scale ?? 2)
         : (t.debit_account?.scale ?? t.scale ?? 2);
-      const val = (showCredit ? t.credit : t.debit) / Math.pow(10, scale);
+      const val = showCredit ? t.credit : t.debit;
       const currency = showCredit
         ? (t.credit_account?.currency ?? t.currency ?? '')
         : (t.debit_account?.currency ?? t.currency ?? '');
@@ -139,12 +139,12 @@ export class TransactionsState {
     if (type === TransactionType.Income) {
       const scale = t.credit_account?.scale ?? t.scale ?? 2;
       const currency = t.credit_account?.currency ?? t.currency ?? '';
-      return `+${this.formatAmount(t.credit / Math.pow(10, scale), currency, scale)}`;
+      return `+${this.formatAmount(t.credit, currency, scale)}`;
     }
 
     const scale = t.debit_account?.scale ?? t.scale ?? 2;
     const currency = t.debit_account?.currency ?? t.currency ?? '';
-    return `−${this.formatAmount(t.debit / Math.pow(10, scale), currency, scale)}`;
+    return `−${this.formatAmount(t.debit, currency, scale)}`;
   }
 
   private getFormattedBalance(t: Transaction, accountFilter?: number[]): string {
@@ -165,8 +165,7 @@ export class TransactionsState {
     }
 
     if (account?.balance == null) return '';
-    const scale = account.scale;
-    return this.formatAmount(account.balance / Math.pow(10, scale), account.currency, scale);
+    return this.formatAmount(account.balance, account.currency, account.scale);
   }
 
   private formatAmount(value: number, currency: string, scale: number): string {

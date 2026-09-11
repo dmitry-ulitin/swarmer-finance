@@ -81,3 +81,11 @@ export function convertAmount(
   const toMajor = fromMajor * rate;
   return Math.round(toMajor * 10 ** toScale);
 }
+
+export function toDecimal(amountCents: number, scale: number): number {
+  return amountCents / 10 ** scale;
+}
+
+export function toCents(amountDecimal: number, scale: number): number {
+  return Math.round(amountDecimal * 10 ** scale);
+}

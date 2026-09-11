@@ -66,8 +66,8 @@ export class TransactionForm {
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
     category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? this.visibleCategories()[0], {nonNullable: true}),
-    debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit / Math.pow(10, this.context.data.debit_account?.scale ?? this.context.data.scale ?? 2) : null),
-    creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit / Math.pow(10, this.context.data.credit_account?.scale ?? this.context.data.scale ?? 2) : null),
+    debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit : null),
+    creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),
     payee: new FormControl<string>(this.context.data.payee ?? '', { nonNullable: true }),
   });
@@ -148,16 +148,11 @@ export class TransactionForm {
       return;
     }
 
-    const dScale = fromAccount?.scale ?? toAccount?.scale ?? 2;
-    const cScale = toAccount?.scale ?? fromAccount?.scale ?? 2;
-    const debitCents = Math.round(debitAmount * Math.pow(10, dScale));
-    const creditCents = Math.round(creditAmount * Math.pow(10, cScale));
-
     let request: TransactionRequest = {
         debitAccountId: this.isIncome() ? null : fromAccount!.id,
         creditAccountId: this.isExpense() ? null : toAccount!.id,
-        debit: debitCents,
-        credit: creditCents,
+        debit: debitAmount,
+        credit: creditAmount,
         categoryId: this.isTransfer() ? null : category?.id ?? null,
         date: date.toJSON(), 
         description: description || null,

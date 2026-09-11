@@ -537,10 +537,10 @@ describe('Transactions API', () => {
       expect(res.status).toBe(200);
       // Transactions arrive DESC: [Mar 10 (+2000), Mar 1 (+3000)]
       const [newer, older] = res.body.data;
-      // After Mar 10: 0 + 3000 + 2000 = 5000
-      expect(newer.credit_account.balance).toBe(5000);
-      // After Mar 1: 0 + 3000 = 3000
-      expect(older.credit_account.balance).toBe(3000);
+      // After Mar 10: 0 + 30 + 20 = 50
+      expect(newer.credit_account.balance).toBe(50);
+      // After Mar 1: 0 + 30 = 30
+      expect(older.credit_account.balance).toBe(30);
     });
 
     it('computes correct balance on page 2 without including page 1 transactions', async () => {
@@ -561,8 +561,8 @@ describe('Transactions API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(1);
-      // After Apr 10: 0 + 1000 + 2000 = 3000 (Apr 20 transaction is NOT included)
-      expect(res.body.data[0].credit_account.balance).toBe(3000);
+      // After Apr 10: 0 + 10 + 20 = 30 (Apr 20 transaction is NOT included)
+      expect(res.body.data[0].credit_account.balance).toBe(30);
     });
 
     it('computes correct balance when same-date transactions span a page boundary', async () => {
@@ -583,10 +583,10 @@ describe('Transactions API', () => {
 
       expect(page1.status).toBe(200);
       expect(page1.body.data.length).toBe(2);
-      // After 300 (10:00): 0 + 100 + 200 + 300 = 600
-      expect(page1.body.data[0].credit_account.balance).toBe(600);
-      // After 200 (09:00): 0 + 100 + 200 = 300
-      expect(page1.body.data[1].credit_account.balance).toBe(300);
+      // After 300 (10:00): 0 + 1 + 2 + 3 = 6
+      expect(page1.body.data[0].credit_account.balance).toBe(6);
+      // After 200 (09:00): 0 + 1 + 2 = 3
+      expect(page1.body.data[1].credit_account.balance).toBe(3);
 
       const page2 = await request(app)
         .get('/api/transactions?offset=2&limit=2')
@@ -594,8 +594,8 @@ describe('Transactions API', () => {
 
       expect(page2.status).toBe(200);
       expect(page2.body.data.length).toBe(1);
-      // After 100 (08:00): 0 + 100 = 100
-      expect(page2.body.data[0].credit_account.balance).toBe(100);
+      // After 100 (08:00): 0 + 1 = 1
+      expect(page2.body.data[0].credit_account.balance).toBe(1);
     });
   });
 
