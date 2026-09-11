@@ -6,8 +6,8 @@
     (click)="transactions.selectAllAccounts()"
   >
     <span class="all-row-name">All accounts</span>
-    @if (totalBalance()) {
-      <span class="all-row-balance">{{ totalBalance() }}</span>
+    @if (state.summary() && !state.summary()?.incomplete) {
+      <span class="all-row-balance">{{ state.summary()?.total  | currency: state.summary()?.currency : 'symbol' : '1.'+state.summary()?.scale+'-'+state.summary()?.scale }}</span>
     }
   </button>
 

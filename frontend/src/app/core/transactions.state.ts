@@ -36,8 +36,8 @@ export class TransactionsState {
     return this._transactions().map(t => ({
       ...t,
       accountName: this.getAccountName(t),
-      formattedAmount: this.getFormattedAmount(t, accountFilter),
-      formattedBalance: this.getFormattedBalance(t, accountFilter),
+      ...this.getAmount(t, accountFilter),
+      ...this.getBalance(t, accountFilter),
       type: getTransactionType(t),
     }));
   });
@@ -117,7 +117,7 @@ export class TransactionsState {
     return `${t.debit_account?.name ?? '?'} → ${t.credit_account?.name ?? '?'}`;
   }
 
-  private getFormattedAmount(t: Transaction, accountFilter?: number[]): string {
+  private getAmount(t: Transaction, accountFilter?: number[]): Pick<TransactionView, 'amount' | 'amountCurrency' | 'amountScale'> {
     const type = getTransactionType(t);
 
     if (type === TransactionType.Transfer) {
@@ -126,28 +126,33 @@ export class TransactionsState {
         && t.credit_account != null
         && filterIds.includes(t.credit_account.id)
         && !(t.debit_account != null && filterIds.includes(t.debit_account.id));
-      const scale = showCredit
-        ? (t.credit_account?.scale ?? t.scale ?? 2)
-        : (t.debit_account?.scale ?? t.scale ?? 2);
-      const val = showCredit ? t.credit : t.debit;
-      const currency = showCredit
-        ? (t.credit_account?.currency ?? t.currency ?? '')
-        : (t.debit_account?.currency ?? t.currency ?? '');
-      return this.formatAmount(val, currency, scale);
+      return {
+        amount: showCredit ? t.credit : t.debit,
+        amountCurrency: showCredit
+          ? (t.credit_account?.currency ?? t.currency ?? '')
+          : (t.debit_account?.currency ?? t.currency ?? ''),
+        amountScale: showCredit
+          ? (t.credit_account?.scale ?? t.scale ?? 2)
+          : (t.debit_account?.scale ?? t.scale ?? 2),
+      };
     }
 
     if (type === TransactionType.Income) {
-      const scale = t.credit_account?.scale ?? t.scale ?? 2;
-      const currency = t.credit_account?.currency ?? t.currency ?? '';
-      return `+${this.formatAmount(t.credit, currency, scale)}`;
+      return {
+        amount: t.credit,
+        amountCurrency: t.credit_account?.currency ?? t.currency ?? '',
+        amountScale: t.credit_account?.scale ?? t.scale ?? 2,
+      };
     }
 
-    const scale = t.debit_account?.scale ?? t.scale ?? 2;
-    const currency = t.debit_account?.currency ?? t.currency ?? '';
-    return `−${this.formatAmount(t.debit, currency, scale)}`;
+    return {
+      amount: t.debit,
+      amountCurrency: t.debit_account?.currency ?? t.currency ?? '',
+      amountScale: t.debit_account?.scale ?? t.scale ?? 2,
+    };
   }
 
-  private getFormattedBalance(t: Transaction, accountFilter?: number[]): string {
+  private getBalance(t: Transaction, accountFilter?: number[]): Pick<TransactionView, 'balance' | 'balanceCurrency' | 'balanceScale'> {
     const type = getTransactionType(t);
     let account: TransactionAccount | null = null;
 
@@ -164,21 +169,11 @@ export class TransactionsState {
       account = t.debit_account;
     }
 
-    if (account?.balance == null) return '';
-    return this.formatAmount(account.balance, account.currency, account.scale);
-  }
-
-  private formatAmount(value: number, currency: string, scale: number): string {
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: scale,
-        maximumFractionDigits: scale,
-      }).format(value);
-    } catch {
-      return value.toLocaleString(undefined, { minimumFractionDigits: scale, maximumFractionDigits: scale });
-    }
+    return {
+      balance: account?.balance ?? null,
+      balanceCurrency: account?.currency ?? '',
+      balanceScale: account?.scale ?? 2,
+    };
   }
 
   private async fetch(offset: number): Promise<void> {

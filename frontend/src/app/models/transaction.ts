@@ -45,8 +45,12 @@ export enum TransactionType {
 
 export interface TransactionView extends Transaction {
     accountName: string;
-    formattedAmount: string;
-    formattedBalance: string;
+    amount: number;
+    amountCurrency: string;
+    amountScale: number;
+    balance: number | null;
+    balanceCurrency: string;
+    balanceScale: number;
     type: TransactionType;
 }
 

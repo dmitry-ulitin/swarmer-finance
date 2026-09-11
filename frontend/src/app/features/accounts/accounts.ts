@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
 import { AccountsState } from '../../core/accounts.state';
 import { Account } from '../../models/account';
 import { AuthService } from '../../core/auth.service';
@@ -8,15 +9,15 @@ import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-accounts',
-  imports: [TuiButton, TuiLoader],
+  imports: [TuiButton, TuiLoader, CurrencyPipe],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Accounts {
   readonly accountsState = inject(AccountsState);
+  protected readonly auth = inject(AuthService);
   private readonly accountDialogs = inject(AccountDialogService);
-  private readonly auth = inject(AuthService);
 
   readonly selectedId = signal<number | null>(null);
   readonly selectedAccount = computed(() => {
@@ -52,27 +53,8 @@ export class Accounts {
     }
   }
 
-  formatBalance(account: Account): string {
-    return this.formatAmount(account.balance, account.currency, account.scale);
-  }
-
-  formatUserBalance(account: Account): string {
-    if (account.user_balance === null) return '';
+  showUserBalance(account: Account): boolean {
     const user = this.auth.user();
-    if (!user || user.currency === account.currency) return '';
-    return this.formatAmount(account.user_balance, user.currency, user.currency_scale);
-  }
-
-  private formatAmount(value: number, currency: string, scale: number): string {
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: scale,
-        maximumFractionDigits: scale,
-      }).format(value);
-    } catch {
-      return value.toLocaleString(undefined, { minimumFractionDigits: scale, maximumFractionDigits: scale });
-    }
+    return account.user_balance !== null && !!user && user.currency !== account.currency;
   }
 }

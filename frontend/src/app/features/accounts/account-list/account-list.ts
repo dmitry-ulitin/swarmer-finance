@@ -3,10 +3,11 @@ import { AccountsState } from '../../../core/accounts.state';
 import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';
 import { TransactionsState } from '../../../core/transactions.state';
+import { CurrencyPipe } from '@angular/common';
 
 @Component({
   selector: 'app-account-list',
-  imports: [AccountTreeNode],
+  imports: [AccountTreeNode, CurrencyPipe],
   providers: [AccountListStore],
   templateUrl: './account-list.html',
   styleUrl: './account-list.scss',
@@ -15,20 +16,4 @@ import { TransactionsState } from '../../../core/transactions.state';
 export class AccountList {
   protected readonly state = inject(AccountsState);
   protected readonly transactions = inject(TransactionsState);
-
-  protected readonly totalBalance = computed(() => {
-    const summary = this.state.summary();
-    if (!summary || summary.incomplete) return '';
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: summary.currency,
-        minimumFractionDigits: summary.scale,
-        maximumFractionDigits: summary.scale,
-      }).format(summary.total);
-    } catch {
-      return summary.total
-        .toLocaleString(undefined, { minimumFractionDigits: summary.scale, maximumFractionDigits: summary.scale });
-    }
-  });
 }

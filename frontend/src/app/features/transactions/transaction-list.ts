@@ -1,17 +1,19 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, inject, viewChild } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { TransactionsState } from '../../core/transactions.state';
 import { TuiButton, TuiLoader } from '@taiga-ui/core';
-import type { TransactionView } from '../../models/transaction';
+import { TransactionType, type TransactionView } from '../../models/transaction';
 
 @Component({
   selector: 'app-transaction-list',
-  imports: [TuiLoader, TuiButton, DatePipe],
+  imports: [TuiLoader, TuiButton, DatePipe, CurrencyPipe],
   templateUrl: './transaction-list.html',
   styleUrl: './transaction-list.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TransactionList {
+  protected readonly TransactionType = TransactionType;
+
   readonly state = inject(TransactionsState);
   private readonly destroyRef = inject(DestroyRef);
   private readonly sentinel = viewChild.required<ElementRef<HTMLElement>>('sentinel');

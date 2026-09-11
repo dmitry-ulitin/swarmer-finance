@@ -17,9 +17,9 @@
              (click)="setAsSelected(account)">
             <span class="account-name">{{ account.name }}</span>
             <span class="account-meta">
-                {{ formatBalance(account) }}
-                @if (formatUserBalance(account); as userBalance) {
-                    <span class="account-user-balance">&middot; {{ userBalance }}</span>
+                {{ account.balance | currency: account.currency : 'symbol' : '1.'+account.scale+'-'+account.scale }}
+                @if (showUserBalance(account)) {
+                    <span class="account-user-balance">&middot; {{ account.user_balance | currency: auth.user()?.currency : 'symbol' : '1.'+auth.user()?.currency_scale+'-'+auth.user()?.currency_scale }}</span>
                 }
             </span>
         </div>
