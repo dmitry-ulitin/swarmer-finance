@@ -1,37 +1,39 @@
 @if (item(); as it) {
   @if (it.kind === 'account') {
+    @let account = asAccount(it).account;
     <div class="row-header" [style.padding-left]="indent">
       <button
         class="row-name"
         type="button"
-        [class.active]="transactions.selectedAccountIds().includes(asAccount(it).account.id)"
-        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(asAccount(it).account.id) : transactions.selectAccount(asAccount(it).account.id)"
-      >{{ asAccount(it).account.displayName }}</button>
-      @if (asAccount(it).account.user_balance !== null && auth.user(); as user) {
-        <span class="row-balance">{{ asAccount(it).account.user_balance | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
+        [class.active]="transactions.selectedAccountIds().includes(account.id)"
+        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
+      >{{ account.displayName }}</button>
+      @if (account.balance !== null) {
+        <span class="row-balance">{{ account.balance | currency: account.currency : 'symbol' : '1.'+account.scale+'-'+account.scale }}</span>
       }
     </div>
   } @else {
+    @let group = asGroup(it);
     <div class="row-header" [style.padding-left]="indent">
       <button
         class="row-name uppercase"
         type="button"
         [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
-      >{{ asGroup(it).displayName }}</button>
+      >{{ group.displayName }}</button>
       <button
         class="chevron"
         type="button"
-        [attr.aria-expanded]="store.isExpanded(asGroup(it).fullPath)"
-        [attr.aria-label]="'Toggle ' + asGroup(it).displayName"
-        (click)="store.toggleExpanded(asGroup(it).fullPath)"
+        [attr.aria-expanded]="store.isExpanded(group.fullPath)"
+        [attr.aria-label]="'Toggle ' + group.displayName"
+        (click)="store.toggleExpanded(group.fullPath)"
       >›</button>
       @if (groupBalance() !== null && auth.user(); as user) {
         <span class="row-balance">{{ groupBalance() | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
       }
     </div>
-    <tui-expand [expanded]="store.isExpanded(asGroup(it).fullPath)">
-      @for (child of asGroup(it).children; track child.kind === 'account' ? child.account.id : child.fullPath) {
+    <tui-expand [expanded]="store.isExpanded(group.fullPath)">
+      @for (child of group.children; track child.kind === 'account' ? child.account.id : child.fullPath) {
         <app-account-tree-node [item]="child" [depth]="depth() + 1" />
       }
     </tui-expand>
