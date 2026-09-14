@@ -11,7 +11,7 @@
     }
   </button>
 
-  @for (node of state.groupedAccounts(); track node.fullPath) {
-    <app-account-tree-node [node]="node" />
+  @for (item of state.groupedAccounts(); track item.kind === 'account' ? item.account.id : item.fullPath) {
+    <app-account-tree-node [item]="item" />
   }
 </nav>

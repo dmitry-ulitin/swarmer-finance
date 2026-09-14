@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AccountsState } from '../../../core/accounts.state';
 import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';

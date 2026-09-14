@@ -11,74 +11,100 @@ export interface BalanceSummary {
   incomplete: boolean;
 }
 
-export type AccountItem =
-  | { kind: 'account'; account: Account & { displayName: string } }
-  | { kind: 'group'; node: AccountNode };
-
-export interface AccountNode {
-  name: string;
-  fullPath: string;
-  children: AccountItem[];
+export interface AccountLeafItem {
+  kind: 'account';
+  account: Account & { displayName: string };
 }
 
-export function buildAccountTree(accounts: Account[]): AccountNode[] {
-  const nodeMap = new Map<string, AccountNode>();
-  const roots: AccountNode[] = [];
+export interface AccountGroupItem {
+  kind: 'group';
+  displayName: string;
+  fullPath: string;
+  children: AccountTreeItem[];
+}
 
-  function getOrCreate(segments: string[]): AccountNode {
-    const path = segments.join('/');
-    if (nodeMap.has(path)) return nodeMap.get(path)!;
-    const node: AccountNode = { name: segments[segments.length - 1], fullPath: path, children: [] };
-    nodeMap.set(path, node);
-    if (segments.length === 1) {
-      roots.push(node);
-    } else {
-      const parent = getOrCreate(segments.slice(0, -1));
-      parent.children.push({ kind: 'group', node });
+export type AccountTreeItem = AccountLeafItem | AccountGroupItem;
+
+function itemName(item: AccountTreeItem): string {
+  return item.kind === 'account' ? item.account.displayName : item.displayName;
+}
+
+function sortItems(items: AccountTreeItem[]): void {
+  items.sort((a, b) => itemName(a).localeCompare(itemName(b), undefined, { sensitivity: 'base' }));
+  for (const item of items) {
+    if (item.kind === 'group') sortItems(item.children);
+  }
+}
+
+// Groups with fewer than 2 children collapse: a lone child is spliced into
+// the parent's level. When the lone child is itself a group, the two group
+// names merge (e.g. "Bank" + "Savings" -> "Bank/Savings") so the path isn't lost.
+// When the lone child is an account, its displayName is recomputed relative
+// to the surviving ancestor group (or the account's full name, at the root)
+// so the collapsed group segments aren't silently dropped from the label.
+// `ancestorPath` is the fullPath of the nearest ancestor group that will
+// still exist in the final tree (undefined at the root).
+function collapseSingleChildGroups(items: AccountTreeItem[], ancestorPath?: string): AccountTreeItem[] {
+  return items.map(item => {
+    if (item.kind !== 'group') return item;
+    let children = item.children;
+    let displayName = item.displayName;
+    let fullPath = item.fullPath;
+    while (children.length === 1 && children[0].kind === 'group') {
+      displayName = `${displayName}/${children[0].displayName}`;
+      fullPath = children[0].fullPath;
+      children = children[0].children;
     }
-    return node;
+    if (children.length === 1 && children[0].kind === 'account') {
+      const leaf = children[0];
+      const accountDisplayName = ancestorPath === undefined
+        ? leaf.account.name
+        : leaf.account.name.slice(ancestorPath.length + 1);
+      return { kind: 'account', account: { ...leaf.account, displayName: accountDisplayName } };
+    }
+    return { kind: 'group', displayName, fullPath, children: collapseSingleChildGroups(children, fullPath) };
+  });
+}
+
+export function buildAccountTree(accounts: Account[]): AccountTreeItem[] {
+  const groupMap = new Map<string, AccountGroupItem>();
+  const roots: AccountTreeItem[] = [];
+
+  function getOrCreateGroup(segments: string[]): AccountGroupItem {
+    const path = segments.join('/');
+    if (groupMap.has(path)) return groupMap.get(path)!;
+    const group: AccountGroupItem = { kind: 'group', displayName: segments[segments.length - 1], fullPath: path, children: [] };
+    groupMap.set(path, group);
+    if (segments.length === 1) {
+      roots.push(group);
+    } else {
+      getOrCreateGroup(segments.slice(0, -1)).children.push(group);
+    }
+    return group;
   }
 
   for (const account of accounts) {
     const segments = account.name.split('/');
     const displayName = segments[segments.length - 1];
     const groupSegments = segments.slice(0, -1);
+    const leaf: AccountLeafItem = { kind: 'account', account: { ...account, displayName } };
 
     if (groupSegments.length === 0) {
-      let ungrouped = nodeMap.get('');
-      if (!ungrouped) {
-        ungrouped = { name: '', fullPath: '', children: [] };
-        nodeMap.set('', ungrouped);
-        roots.push(ungrouped);
-      }
-      ungrouped.children.push({ kind: 'account', account: { ...account, displayName } });
+      roots.push(leaf);
     } else {
-      const parent = getOrCreate(groupSegments);
-      parent.children.push({ kind: 'account', account: { ...account, displayName } });
+      getOrCreateGroup(groupSegments).children.push(leaf);
     }
   }
 
-  function sortNode(node: AccountNode): void {
-    node.children.sort((a, b) => {
-      const nameA = a.kind === 'account' ? a.account.displayName : a.node.name;
-      const nameB = b.kind === 'account' ? b.account.displayName : b.node.name;
-      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
-    });
-    for (const item of node.children) {
-      if (item.kind === 'group') sortNode(item.node);
-    }
-  }
-  for (const root of roots) sortNode(root);
-  roots.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-
-  return roots;
+  sortItems(roots);
+  return collapseSingleChildGroups(roots);
 }
 
-export function collectAccountIds(node: AccountNode): number[] {
+export function collectAccountIds(group: AccountGroupItem): number[] {
   const ids: number[] = [];
-  for (const item of node.children) {
+  for (const item of group.children) {
     if (item.kind === 'account') ids.push(item.account.id);
-    else ids.push(...collectAccountIds(item.node));
+    else ids.push(...collectAccountIds(item));
   }
   return ids;
 }
@@ -86,14 +112,14 @@ export function collectAccountIds(node: AccountNode): number[] {
 // Sums user_balance across all accounts in a subtree. Returns null if any
 // account's user_balance is null (rate unavailable), rather than silently
 // showing a total that's missing part of its data.
-export function collectUserBalance(node: AccountNode): number | null {
+export function collectUserBalance(group: AccountGroupItem): number | null {
   let total = 0;
-  for (const item of node.children) {
+  for (const item of group.children) {
     if (item.kind === 'account') {
       if (item.account.user_balance === null) return null;
       total += item.account.user_balance;
     } else {
-      const subtotal = collectUserBalance(item.node);
+      const subtotal = collectUserBalance(item);
       if (subtotal === null) return null;
       total += subtotal;
     }
@@ -120,7 +146,7 @@ export class AccountsState {
   // Use `accounts` instead where deleted accounts must remain selectable
   // (e.g. editing an existing transaction that references one).
   readonly visibleAccounts = computed(() => this.accounts().filter(a => !a.deleted));
-  readonly groupedAccounts = computed<AccountNode[]>(() => buildAccountTree(this.visibleAccounts()));
+  readonly groupedAccounts = computed<AccountTreeItem[]>(() => buildAccountTree(this.visibleAccounts()));
   readonly summary = computed<BalanceSummary | null>(() => {
     const user = this.auth.user();
     if (!user) return null;

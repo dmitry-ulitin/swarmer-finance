@@ -1,41 +1,40 @@
-@if (node().name) {
-  <div class="group-header" [style.padding-left]="indent">
+@if (item(); as it) {
+  @if (it.kind === 'account') {
     <button
-      class="group-name"
+      class="account-row"
       type="button"
-      [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
-      (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
-    >{{ node().name }}</button>
-    @if (groupBalance() !== null && auth.user(); as user) {
-      <span class="group-balance">{{ groupBalance() | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
-    }
-    <button
-      class="chevron"
-      type="button"
-      [attr.aria-expanded]="store.isExpanded(node().fullPath)"
-      [attr.aria-label]="'Toggle ' + node().name"
-      (click)="store.toggleExpanded(node().fullPath)"
-    >›</button>
-  </div>
-}
-
-@if (!node().name || store.isExpanded(node().fullPath)) {
-  @for (item of node().children; track item.kind === 'account' ? item.account.id : item.node.fullPath) {
-    @if (item.kind === 'account') {
+      [style.padding-left]="indent"
+      [class.active]="transactions.selectedAccountIds().includes(asAccount(it).account.id)"
+      (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(asAccount(it).account.id) : transactions.selectAccount(asAccount(it).account.id)"
+    >
+      <span class="account-name">{{ asAccount(it).account.displayName }}</span>
+      @if (asAccount(it).account.user_balance !== null && auth.user(); as user) {
+        <span class="account-balance">{{ asAccount(it).account.user_balance | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
+      }
+    </button>
+  } @else {
+    <div class="group-header" [style.padding-left]="indent">
       <button
-        class="account-row"
+        class="group-name"
         type="button"
-        [style.padding-left]="node().name ? 'calc(' + indent + ' + 1rem)' : indent"
-        [class.active]="transactions.selectedAccountIds().includes(item.account.id)"
-        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(item.account.id) : transactions.selectAccount(item.account.id)"
-      >
-        <span class="account-name">{{ item.account.displayName }}</span>
-        @if (item.account.user_balance !== null && auth.user(); as user) {
-          <span class="account-balance">{{ item.account.user_balance | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
-        }
-      </button>
-    } @else {
-      <app-account-tree-node [node]="item.node" [depth]="node().name ? depth() + 1 : depth()" />
-    }
+        [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
+        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
+      >{{ asGroup(it).displayName }}</button>
+      <button
+        class="chevron"
+        type="button"
+        [attr.aria-expanded]="store.isExpanded(asGroup(it).fullPath)"
+        [attr.aria-label]="'Toggle ' + asGroup(it).displayName"
+        (click)="store.toggleExpanded(asGroup(it).fullPath)"
+      >›</button>
+      @if (groupBalance() !== null && auth.user(); as user) {
+        <span class="group-balance">{{ groupBalance() | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
+      }
+    </div>
+    <tui-expand [expanded]="store.isExpanded(asGroup(it).fullPath)">
+      @for (child of asGroup(it).children; track child.kind === 'account' ? child.account.id : child.fullPath) {
+        <app-account-tree-node [item]="child" [depth]="depth() + 1" />
+      }
+    </tui-expand>
   }
 }
