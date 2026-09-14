@@ -29,6 +29,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
 
+      // A refresh may have already completed while this 401 was in
+      // flight (e.g. a sibling request's refresh round finished first).
+      // In that case the stored token is already newer than the one
+      // this request was sent with — just retry with it instead of
+      // triggering a redundant /api/auth/refresh call.
+      const currentToken = authService.getToken();
+      if (currentToken && currentToken !== token) {
+        return next(withToken(req, currentToken).clone({
+          setHeaders: { 'X-Retry-After-Refresh': '1' },
+        }));
+      }
+
       // Single-flight: all concurrent 401s share one /api/auth/refresh call.
       return refreshCoordinator.refresh().pipe(
         switchMap(newToken =>

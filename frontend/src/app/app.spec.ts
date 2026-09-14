@@ -6,7 +6,7 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [{ provide:  TUI_OPTIONS, useValue: {} }],
+      providers: [{ provide: TUI_OPTIONS, useValue: { apis: 'stable' } }],
     }).compileComponents();
   });
 

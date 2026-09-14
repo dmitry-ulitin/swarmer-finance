@@ -86,15 +86,15 @@ export class TransactionsState {
   }
 
   create(data: TransactionRequest) {
-    return this.api.createTransaction(data).pipe(tap(() => this.reload()));
+    return this.api.createTransaction(data).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
   }
 
   update(id: number, data: Partial<TransactionRequest>) {
-    return this.api.updateTransaction(id, data).pipe(tap(() => this.reload()));
+    return this.api.updateTransaction(id, data).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
   }
 
   delete(id: number) {
-    return this.api.deleteTransaction(id).pipe(tap(() => this.reload()));
+    return this.api.deleteTransaction(id).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
   }
 
   selectTransaction(transaction: Transaction | null): void {

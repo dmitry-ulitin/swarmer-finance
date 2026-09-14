@@ -5,11 +5,43 @@ import type { TuiConfirmData } from '@taiga-ui/kit';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import type { Transaction } from '../../models/transaction';
+import type { Account } from '../../models/account';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { TransactionRequest } from '../../core/api.service';
 import { CategoriesState } from '../../core/categories.state';
+
+/**
+ * Prefill for "Add transaction". Always defaults to Expense (a
+ * debit_account with no credit_account) regardless of the last
+ * transaction's type, so the dialog doesn't open on Transfer/Income
+ * just because the previous entry happened to be one.
+ */
+export function buildCreateDefaults(
+  lastTransaction: Transaction | undefined,
+  preferredAccount: Account | undefined,
+  today: string,
+): Partial<Transaction> | null {
+  if (lastTransaction) {
+    const debitAccount = lastTransaction.debit_account ?? lastTransaction.credit_account;
+    return {
+      ...lastTransaction,
+      id: undefined,
+      created_at: undefined,
+      description: '',
+      payee: '',
+      category: null,
+      debit: undefined,
+      credit: undefined,
+      date: today,
+      debit_account: debitAccount,
+      credit_account: null,
+    };
+  }
+  if (!preferredAccount) return null;
+  return { date: today, debit_account: preferredAccount, currency: preferredAccount.currency };
+}
 
 @Injectable({ providedIn: 'root' })
 export class TransactionDialogService {
@@ -23,16 +55,12 @@ export class TransactionDialogService {
   async openCreate(): Promise<Transaction | null> {
     const { TransactionForm } = await import('./transaction-form/transaction-form');
     const lastTransaction = this.transactionsState.transactions()[0];
-    let defaultData: Partial<Transaction> = { date: new Date().toISOString().split('T')[0] };
-    if (lastTransaction) {
-      defaultData = { ...lastTransaction, id: undefined, created_at: undefined, description: '', payee: '', category: null, debit: undefined, credit: undefined, date: defaultData.date };
-    } else if (this.accountState.accounts().length < 1) {
-      this.notifications.showError('No accounts available'); 
+    if (!lastTransaction && this.accountState.accounts().length < 1) {
+      this.notifications.showError('No accounts available');
       return null;
-    } else {
-      const account = this.accountState.accounts().find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || this.accountState.accounts()[0];
-      defaultData = { ...defaultData, debit_account: account, currency: account.currency };
     }
+    const preferredAccount = this.accountState.accounts().find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || this.accountState.accounts()[0];
+    const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, new Date().toISOString().split('T')[0])!;
     try {
       const result = await firstValueFrom(
         this.dialogs.open<TransactionRequest | null>(
