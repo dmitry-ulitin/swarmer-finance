@@ -1,7 +1,7 @@
 <span class="title">Swarmer Finance</span>
 @if(authService.isAuthenticated()) {
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="reload()" [iconStart]="'@tui.refresh-cw'"></button>
-<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="addTransaction()" [iconStart]="'@tui.plus'" aria-label="Add transaction" [disabled]="accountState.accounts().length === 0"></button>
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="addTransaction()" [iconStart]="'@tui.diff'" aria-label="Add transaction" [disabled]="accountState.accounts().length === 0"></button>
 }
 @if(authService.isAuthenticated() && selectedTransaction()) {
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="editTransaction()" [iconStart]="'@tui.pencil'" aria-label="Edit transaction"></button>
