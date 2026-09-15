@@ -29,6 +29,7 @@ export class Header {
   }
 
   reload(): void {
+    this.accountState.reload();
     this.transactionsState.reload();
   }
 
