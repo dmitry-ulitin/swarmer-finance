@@ -10,3 +10,24 @@ html, body {
   display: flex;
   flex-direction: column;
 }
+
+tui-dialog > header {
+  margin: -1.75rem -1.75rem 1.5rem;
+  padding: 0.5rem 1.75rem;
+  border-radius: 1.5rem 1.5rem 0 0;
+  background: rgb(13, 110, 29);
+}
+
+tui-dialog[data-size='s'] > header {
+  margin: -1.5rem -1.5rem 1.5rem;
+  padding: 0.5rem 1.5rem;
+}
+
+tui-dialog > header h2 {
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+tui-dialog > [tuiButtonX] {
+  inset-block-start: 0.125rem !important;
+}
