@@ -7,18 +7,27 @@ export interface ExchangeRateRow {
   as_of: string;
 }
 
-export const getRate = (from: string, to: string, asOf: string) =>
-  queryOne<ExchangeRateRow>(
-    `SELECT * FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2 AND as_of = $3`,
-    [from, to, asOf]
-  );
-
 export const getLatestRate = (from: string, to: string) =>
   queryOne<ExchangeRateRow>(
     `SELECT * FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2
      ORDER BY as_of DESC LIMIT 1`,
     [from, to]
   );
+
+// True if the latest cached rate for this pair is dated on or after `since`
+// (e.g. today's date) — used to decide whether a Frankfurter refresh is
+// needed without pulling as_of into JS, since pg returns DATE columns as
+// timezone-shifted Date objects rather than the plain string it was stored as.
+export const hasRateSince = async (from: string, to: string, since: string): Promise<boolean> => {
+  const result = await queryOne<{ exists: boolean }>(
+    `SELECT EXISTS(
+       SELECT 1 FROM exchange_rates
+       WHERE from_currency = $1 AND to_currency = $2 AND as_of >= $3
+     ) AS exists`,
+    [from, to, since]
+  );
+  return result?.exists ?? false;
+};
 
 export const upsertRate = (from: string, to: string, rate: number, asOf: string) =>
   execute(

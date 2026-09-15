@@ -23,11 +23,17 @@ async function refreshRatesForBase(from: string, toCurrencies: string[]): Promis
 }
 
 // Shared cache/refresh/fallback policy for a single currency pair:
-// check today's cache -> refresh via Frankfurter on miss -> re-check today's
-// cache -> fall back to the latest stale cached rate -> null if nothing exists.
+// use the latest cached rate if any row is dated today or later -> otherwise
+// refresh via Frankfurter -> re-check the latest cache -> null if nothing
+// exists. The freshness check is done in SQL (hasRateSince) rather than by
+// pulling as_of into JS and comparing, since pg returns DATE columns as
+// Date objects that shift with the local timezone, not the plain date
+// string they were stored as.
 async function getRateInternal(from: string, to: string): Promise<number | null> {
-  const cached = await exchangeRateQueries.getRate(from, to, today());
-  if (cached) return Number(cached.rate);
+  if (await exchangeRateQueries.hasRateSince(from, to, today())) {
+    const latest = await exchangeRateQueries.getLatestRate(from, to);
+    if (latest) return Number(latest.rate);
+  }
 
   try {
     await refreshRatesForBase(from, [to]);
@@ -39,11 +45,8 @@ async function getRateInternal(from: string, to: string): Promise<number | null>
     console.error(`Failed to refresh exchange rate ${from}->${to}:`, message);
   }
 
-  const fresh = await exchangeRateQueries.getRate(from, to, today());
-  if (fresh) return Number(fresh.rate);
-
-  const stale = await exchangeRateQueries.getLatestRate(from, to);
-  return stale ? Number(stale.rate) : null;
+  const fresh = await exchangeRateQueries.getLatestRate(from, to);
+  return fresh ? Number(fresh.rate) : null;
 }
 
 export async function getOrRefreshRate(from: string, to: string): Promise<number | null> {
