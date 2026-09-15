@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
-import { TuiButton } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDropdown, TuiIcon } from '@taiga-ui/core';
 import { CategoryDialogService } from '../categories/category-dialog.service';
 import { AccountDialogService } from '../accounts/account-dialog.service';
 import { TransactionsState } from '../../core/transactions.state';
 import { TransactionDialogService } from '../transactions/transaction-dialog.service';
 import { AccountsState } from '../../core/accounts.state';
+import { TuiChevron } from '@taiga-ui/kit/directives/chevron';
 
 @Component({
   selector: 'app-header',
-  imports: [TuiButton],
+  imports: [TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiIcon],
   templateUrl: './header.html',
   styleUrl: './header.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

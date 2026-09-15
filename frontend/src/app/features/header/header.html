@@ -9,8 +9,13 @@
 }
 <div class="fill"></div>
 @if(authService.isAuthenticated()) {
-<button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="accounts()" [iconStart]="'@tui.wallet'">Accounts</button>
-<button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="categories()" [iconStart]="'@tui.folder'">Categories</button>
+<button #settingsButton tuiButton tuiChevron type="button" appearance="flat-grayscale" size="xs" class="light" [tuiDropdown]="settingsDropdown" tuiDropdownAuto><tui-icon icon="@tui.settings"></tui-icon></button>
+<ng-template #settingsDropdown>
+  <tui-data-list [size]="'s'">
+    <button tuiOption (click)="accounts();settingsButton.click()" [iconEnd]="'@tui.wallet'">Accounts</button>
+    <button tuiOption (click)="categories();settingsButton.click()" [iconEnd]="'@tui.folder'">Categories</button>
+  </tui-data-list>
+</ng-template>
 <span>{{ authService.user()?.name }}</span>
 <button tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="authService.logout()" [iconStart]="'@tui.user'">Logout</button>
 }
