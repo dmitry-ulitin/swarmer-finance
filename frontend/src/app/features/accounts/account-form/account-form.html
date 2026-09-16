@@ -1,4 +1,10 @@
 <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="typeLabel">
+        <label tuiLabel>Type</label>
+        <input tuiSelect formControlName="type" />
+        <tui-data-list-wrapper *tuiDropdown [items]="accountTypes" [itemContent]="typeLabel" />
+    </tui-textfield>
+
     <tui-textfield>
         <label tuiLabel>Name</label>
         <input tuiInput tuiAutoFocus formControlName="name" placeholder="Account name" />
@@ -16,6 +22,25 @@
             <tui-data-list-wrapper *tuiDropdown [items]="currencies() | tuiFilterByInput" />
         </tui-textfield>
     </div>
+
+    @if (type() === 'bank') {
+        <tui-textfield>
+            <label tuiLabel>Account Number</label>
+            <input tuiInput formControlName="accountNumber" placeholder="IBAN or account number" />
+        </tui-textfield>
+    }
+
+    @if (type() === 'crypto') {
+        <tui-textfield>
+            <label tuiLabel>Wallet Address</label>
+            <input tuiInput formControlName="address" placeholder="Wallet address" />
+        </tui-textfield>
+
+        <tui-textfield>
+            <label tuiLabel>Blockchain</label>
+            <input tuiInput formControlName="blockchain" placeholder="e.g. bitcoin, ethereum" />
+        </tui-textfield>
+    }
 
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
