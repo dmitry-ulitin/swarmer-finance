@@ -2,7 +2,7 @@
     <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="typeLabel">
         <label tuiLabel>Type</label>
         <input tuiSelect formControlName="type" />
-        <tui-data-list-wrapper *tuiDropdown [items]="accountTypes" [itemContent]="typeLabel" />
+        <tui-data-list-wrapper *tuiDropdown [items]="accountTypes" [itemContent]="typeLabel | tuiStringifyContent" />
     </tui-textfield>
 
     <tui-textfield>
