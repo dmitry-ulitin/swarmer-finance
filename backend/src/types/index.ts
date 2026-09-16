@@ -19,6 +19,8 @@ export interface Category {
   children?: Category[];
 }
 
+export type AccountType = 'cash' | 'bank' | 'crypto';
+
 export interface Account {
   id: number;
   user_id: number;
@@ -30,6 +32,8 @@ export interface Account {
   user_balance?: number | null;
   created_at: Date;
   deleted?: boolean;
+  type: AccountType;
+  settings: Record<string, unknown>;
 }
 
 export interface Transaction {
