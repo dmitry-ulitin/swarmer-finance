@@ -229,7 +229,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ type: 'cash', startBalance: 80 });
+        .send({ type: 'cash', startBalance: 80, settings: {} });
 
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(80);
@@ -245,7 +245,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ type: 'cash', startBalance: 30 });
+        .send({ type: 'cash', startBalance: 30, settings: {} });
 
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(40); // 30 + 10
@@ -522,6 +522,72 @@ describe('Accounts API — balance field', () => {
         .send({ name: 'Renamed' });
 
       expect(res.status).toBe(400);
+    });
+
+    it('rejects a PUT that omits settings, and leaves stored settings untouched', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Bank Account', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { accountNumber: 'DE89370400440532013000' },
+        });
+      const id = created.body.data.id;
+
+      const res = await request(app)
+        .put(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Renamed', type: 'bank' });
+
+      expect(res.status).toBe(400);
+
+      const stillThere = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+      const account = stillThere.body.data.find((a: { id: number }) => a.id === id);
+      expect(account.settings).toEqual({ accountNumber: 'DE89370400440532013000' });
+    });
+
+    it('accepts an explicit empty settings object on PUT and clears stored settings', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Bank Account 2', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { accountNumber: 'DE89370400440532013000' },
+        });
+      const id = created.body.data.id;
+
+      const res = await request(app)
+        .put(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Bank Account 2', type: 'bank', settings: {} });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.settings).toEqual({});
+    });
+
+    it('preserves accountNumber when renaming a bank account with settings supplied', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Bank Account 3', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { accountNumber: 'DE89370400440532013000' },
+        });
+      const id = created.body.data.id;
+
+      const res = await request(app)
+        .put(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'New Name', type: 'bank',
+          settings: { accountNumber: 'DE89370400440532013000' },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.name).toBe('New Name');
+      expect(res.body.data.settings).toEqual({ accountNumber: 'DE89370400440532013000' });
     });
   });
 });

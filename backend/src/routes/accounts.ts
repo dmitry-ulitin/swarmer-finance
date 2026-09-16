@@ -18,15 +18,18 @@ const currencySchema = z
   .string()
   .regex(/^[A-Z]{3,4}$/, 'Currency must be 3 or 4 uppercase ASCII letters (e.g. USD, EUR, USDT)');
 
+// No `.default({})` here: create and update need different defaulting
+// behavior (see createAccountSchema and updateAccountSchema below), so each
+// applies its own default at the point of use.
 const settingsByType = {
-  cash: z.strictObject({}).default({}),
+  cash: z.strictObject({}),
   bank: z.strictObject({
     accountNumber: z.string().max(64).optional(),
-  }).default({}),
+  }),
   crypto: z.strictObject({
     address: z.string().max(128).optional(),
     blockchain: z.string().max(64).optional(),
-  }).default({}),
+  }),
 };
 
 // Base fields are spread into each union member rather than combined with
@@ -47,9 +50,9 @@ const createAccountSchema = z.preprocess(
   (val) =>
     val && typeof val === 'object' && !('type' in val) ? { ...val, type: 'cash' } : val,
   z.discriminatedUnion('type', [
-    z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash }),
-    z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank }),
-    z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+    z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto.default({}) }),
   ])
 );
 
@@ -63,6 +66,12 @@ const updateBase = {
   scale: z.number().optional(),
 };
 
+// Unlike create, `settings` has NO default here — it is required on every
+// PUT. updateAccount (db/queries/accounts.ts) writes settings wholesale, not
+// COALESCEd, so a PUT that omitted settings would silently wipe out whatever
+// was previously stored (e.g. a bank account's accountNumber) instead of
+// leaving it untouched. Requiring the field forces callers to state intent;
+// sending `settings: {}` explicitly still clears it.
 const updateAccountSchema = z.discriminatedUnion('type', [
   z.strictObject({ ...updateBase, type: z.literal('cash'), settings: settingsByType.cash }),
   z.strictObject({ ...updateBase, type: z.literal('bank'), settings: settingsByType.bank }),
