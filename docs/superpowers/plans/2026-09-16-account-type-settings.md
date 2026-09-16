@@ -21,7 +21,7 @@
 - Use `z.strictObject(...)`, not `z.object(...).strict()` (deprecated in Zod 4).
 - **Never build the account schemas with `.and()`** — see Task 2, this silently disables settings validation.
 - Angular: standalone components, `ChangeDetectionStrategy.OnPush`, `input()`/`output()`, `computed()`, native `@if`/`@for`, no `ngClass`/`ngStyle`.
-- Backend tests: `cd backend && npx jest --testPathPattern=accounts`. Frontend tests: `cd frontend && npm test` (not bare `npx vitest run`).
+- Backend tests: `cd backend && npx jest --testPathPatterns=accounts`. Frontend tests: `cd frontend && npm test` (not bare `npx vitest run`).
 - Commit messages end with: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 
 ## File Structure
@@ -265,7 +265,7 @@ Append to `backend/src/test/accounts.test.ts`, inside the outer `describe('Accou
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-cd backend && npx jest --testPathPattern=accounts -t "Account type and settings"
+cd backend && npx jest --testPathPatterns=accounts -t "Account type and settings"
 ```
 
 Expected: FAIL. The first three fail because `res.body.data.type` is `undefined`; the rejection tests fail because the current schema ignores unknown keys and returns 200.
@@ -334,7 +334,7 @@ The PUT handler already forwards `req.body` wholesale — leave it as is.
 - [ ] **Step 5: Run the tests**
 
 ```bash
-cd backend && npx jest --testPathPattern=accounts -t "Account type and settings"
+cd backend && npx jest --testPathPatterns=accounts -t "Account type and settings"
 ```
 
 Expected: the four rejection tests (`400`) PASS. The round-trip tests still FAIL — the service and queries do not persist the columns yet; that is Task 3. Do not commit yet.
@@ -468,7 +468,7 @@ Update the import to `import { Account, AccountType, User } from '../types';`.
 - [ ] **Step 3: Run the tests**
 
 ```bash
-cd backend && npx jest --testPathPattern=accounts
+cd backend && npx jest --testPathPatterns=accounts
 ```
 
 Expected: PASS, all of them — the eight new tests plus every pre-existing accounts test.

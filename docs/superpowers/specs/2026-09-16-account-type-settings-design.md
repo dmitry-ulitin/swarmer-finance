@@ -134,11 +134,28 @@ pass; with the spread, both are rejected. Building the union with
 
 A discriminated union also cannot be made `.partial()` — the
 discriminant has to be present. So **PUT requires `type` on every
-request**, even one that only renames. The form already submits its
-full value via `getRawValue()`, so nothing in the UI changes. The
-alternative — infer the type from the stored row, then validate
-settings against it — is materially more logic for a case the UI never
-produces.
+request**, even one that only renames. The alternative — infer the type
+from the stored row, then validate settings against it — is materially
+more logic, and it reintroduces exactly the merge semantics this design
+rejects: a PUT with no `type` cannot express "keep the existing
+settings" when settings are written whole.
+
+The Angular form submits its full value via `getRawValue()`, so the UI
+is unaffected. **The test suite is also a caller, and was not:** two
+existing tests issued partial updates (`{ startBalance: N }`) and
+expected 200. They now send `type: 'cash'` alongside the balance. Any
+future non-form caller must send `type` too — this is a breaking change
+to the PUT contract, not merely a new optional field.
+
+A matching wrinkle applies to POST. `z.discriminatedUnion` cannot
+select a member when the discriminant key is **absent entirely** — it
+fails with "No matching discriminator" rather than falling back to a
+default. Since creating an account without `type` must default to
+`cash`, `createAccountSchema` is wrapped in a `z.preprocess` that
+injects `type: 'cash'` when the key is missing, matching the idiom
+already used in `routes/transactions.ts`. `updateAccountSchema` gets no
+such wrapper — on PUT, a missing `type` is an error, by the paragraph
+above.
 
 ```ts
 const createBase = {
@@ -148,11 +165,17 @@ const createBase = {
   scale: z.number().optional().default(2),
 };
 
-const createAccountSchema = z.discriminatedUnion('type', [
-  z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash }),
-  z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank }),
-  z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
-]);
+// The preprocess is required: a discriminated union cannot select a
+// member when `type` is absent entirely, and an omitted type must
+// default to cash.
+const createAccountSchema = z.preprocess(
+  (val) => (val && typeof val === 'object' && !('type' in val) ? { ...val, type: 'cash' } : val),
+  z.discriminatedUnion('type', [
+    z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash }),
+    z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank }),
+    z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+  ])
+);
 
 const updateBase = {
   name: z.string().min(1).max(255).optional(),
