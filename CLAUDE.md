@@ -114,11 +114,12 @@ This project uses Angular 22 patterns — follow these strictly:
 ### Backend (Jest)
 - Test files: `backend/src/test/*.test.ts`
 - Setup: `backend/src/test/setup.ts` (DB fixtures), `testApp.ts` (Express test instance)
-- Run single test: `npx jest --testPathPattern=auth`
+- Run single test: `npx jest --testPathPatterns=auth`
 
 ### Frontend (Vitest + jsdom)
 - Tests live alongside components as `*.spec.ts`
-- Run single test: `npx vitest run --reporter=verbose src/app/app.spec.ts`
+- Run single test: `npx ng test --watch=false --include=src/app/app.spec.ts`
+- Always run via `ng test` (the `@angular/build:unit-test` builder), never bare `npx vitest run` — raw vitest bypasses the builder config that wires up Zone.js/TestBed globals and JIT compilation
 
 ## Behavioral guidelines
 
