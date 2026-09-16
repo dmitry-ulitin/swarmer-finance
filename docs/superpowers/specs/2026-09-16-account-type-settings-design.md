@@ -96,29 +96,23 @@ belong to accounts only. Groups neither carry nor inherit a type.
 `backend/src/routes/accounts.ts` gains a discriminated union beside the
 existing `currencySchema`:
 
+The per-type settings shapes, with `z.strictObject` (Zod 4's spelling;
+`.object().strict()` is deprecated there):
+
 ```ts
-const accountSettingsSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('cash'),
-    settings: z.object({}).strict().default({}),
-  }),
-  z.object({
-    type: z.literal('bank'),
-    settings: z.object({
-      accountNumber: z.string().max(64).optional(),
-    }).strict().default({}),
-  }),
-  z.object({
-    type: z.literal('crypto'),
-    settings: z.object({
-      address: z.string().max(128).optional(),
-      blockchain: z.string().max(64).optional(),
-    }).strict().default({}),
-  }),
-]);
+const settingsByType = {
+  cash: z.strictObject({}).default({}),
+  bank: z.strictObject({
+    accountNumber: z.string().max(64).optional(),
+  }).default({}),
+  crypto: z.strictObject({
+    address: z.string().max(128).optional(),
+    blockchain: z.string().max(64).optional(),
+  }).default({}),
+};
 ```
 
-`.strict()` makes an unknown key a 400 rather than silently persisted
+Strictness makes an unknown key a 400 rather than silently persisted
 noise — without it a typo such as `adress` would live in the database
 forever.
 
@@ -128,28 +122,57 @@ rejected, which untyped JSONB could not do.
 
 ### Schemas
 
-A discriminated union cannot be made `.partial()` — the discriminant
-has to be present. So **PUT requires `type` on every request**, even
-one that only renames. The form already submits its full value via
-`getRawValue()`, so nothing in the UI changes. The alternative — infer
-the type from the stored row, then validate settings against it — is
-materially more logic for a case the UI never produces.
+**The base fields are spread into each union member, not intersected
+with `.and()`.** This is not a style preference. `.and()` produces a
+`ZodIntersection`, which parses each side against the input
+independently and merges the results; the strict settings object then
+never sees a conflict, so `{ type: 'cash', settings: { accountNumber:
+'1' } }` is *accepted*. Verified against the repo's own Zod 4.4.3:
+with `.and()`, both the unknown-key case and the wrong-type-key case
+pass; with the spread, both are rejected. Building the union with
+`.and()` would silently disable the validation this design exists for.
+
+A discriminated union also cannot be made `.partial()` — the
+discriminant has to be present. So **PUT requires `type` on every
+request**, even one that only renames. The form already submits its
+full value via `getRawValue()`, so nothing in the UI changes. The
+alternative — infer the type from the stored row, then validate
+settings against it — is materially more logic for a case the UI never
+produces.
 
 ```ts
-const createAccountSchema = z.object({
+const createBase = {
   name: z.string().min(1).max(255),
   currency: currencySchema,
   startBalance: z.number().default(0),
   scale: z.number().optional().default(2),
-}).and(accountSettingsSchema);
+};
 
-const updateAccountSchema = z.object({
+const createAccountSchema = z.discriminatedUnion('type', [
+  z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash }),
+  z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank }),
+  z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+]);
+
+const updateBase = {
   name: z.string().min(1).max(255).optional(),
   currency: currencySchema.optional(),
   startBalance: z.number().optional(),
   scale: z.number().optional(),
-}).and(accountSettingsSchema);
+};
+
+const updateAccountSchema = z.discriminatedUnion('type', [
+  z.strictObject({ ...updateBase, type: z.literal('cash'), settings: settingsByType.cash }),
+  z.strictObject({ ...updateBase, type: z.literal('bank'), settings: settingsByType.bank }),
+  z.strictObject({ ...updateBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+]);
 ```
+
+`z.strictObject` at the top level also rejects unknown top-level keys,
+which the previous `z.object` did not. That is a behavior change worth
+noting: a client sending a stray field now gets a 400 instead of having
+it ignored. The only client is this frontend, which sends exactly these
+fields.
 
 The `validate` middleware replaces `req.body` with the parsed result,
 so Zod's `settings: {}` default reaches the route handler.
@@ -197,8 +220,21 @@ export type Account = {
 After `@if (account.type === 'crypto')`, TypeScript knows
 `settings.address` exists.
 
-`AccountsState.create` and `.update` widen their parameter types to
-carry `type` and `settings`.
+The request body gets its own union, since `type` and `settings` always
+travel together and PUT requires `type` too:
+
+```ts
+export type AccountPayload = {
+  name: string;
+  currency: string;
+  startBalance: number;
+} & {
+  [T in AccountType]: { type: T; settings: AccountSettings[T] };
+}[AccountType];
+```
+
+`ApiService.createAccount` / `.updateAccount` and
+`AccountsState.create` / `.update` all take `AccountPayload`.
 
 ### Form
 
