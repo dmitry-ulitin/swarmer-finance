@@ -3,8 +3,30 @@ import { buildAccountTree, collectAccountIds, collectUserBalance, AccountGroupIt
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
-  return { id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '' };
+  return {
+    id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, user_balance: 0,
+    start_balance: 0, deleted: false, created_at: '',
+    type: 'cash', settings: {},
+  };
 }
+
+function makeCryptoAccount(id: number, name: string): Account {
+  return {
+    id, user_id: 1, name, currency: 'BTC', scale: 8, balance: 0, user_balance: 0,
+    start_balance: 0, deleted: false, created_at: '',
+    type: 'crypto', settings: { address: 'bc1qxy2k', blockchain: 'bitcoin' },
+  };
+}
+
+describe('account type in the tree', () => {
+  it('carries type and settings through to the leaf account', () => {
+    const tree = buildAccountTree([makeCryptoAccount(1, 'Crypto/Ledger')]);
+    expect(tree[0]).toMatchObject({
+      kind: 'account',
+      account: { type: 'crypto', settings: { blockchain: 'bitcoin' } },
+    });
+  });
+});
 
 function itemName(item: { kind: 'account' | 'group'; account?: { displayName: string }; displayName?: string }): string {
   return item.kind === 'account' ? item.account!.displayName : item.displayName!;
@@ -139,8 +161,8 @@ describe('collectAccountIds', () => {
       displayName: 'G',
       fullPath: 'G',
       children: [
-        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', displayName: 'a' } },
-        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', displayName: 'b' } },
+        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {}, displayName: 'a' } },
+        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {}, displayName: 'b' } },
       ],
     };
     expect(collectAccountIds(group)).toEqual([1, 2]);
@@ -152,7 +174,7 @@ describe('collectAccountIds', () => {
       displayName: 'Sub',
       fullPath: 'Group/Sub',
       children: [
-        { kind: 'account', account: { id: 3, user_id: 1, name: 'c', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', displayName: 'c' } },
+        { kind: 'account', account: { id: 3, user_id: 1, name: 'c', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {}, displayName: 'c' } },
       ],
     };
     const group: AccountGroupItem = {
@@ -160,9 +182,9 @@ describe('collectAccountIds', () => {
       displayName: 'Group',
       fullPath: 'Group',
       children: [
-        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', displayName: 'a' } },
+        { kind: 'account', account: { id: 1, user_id: 1, name: 'a', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {}, displayName: 'a' } },
         inner,
-        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', displayName: 'b' } },
+        { kind: 'account', account: { id: 2, user_id: 1, name: 'b', currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {}, displayName: 'b' } },
       ],
     };
     expect(collectAccountIds(group).sort()).toEqual([1, 2, 3]);

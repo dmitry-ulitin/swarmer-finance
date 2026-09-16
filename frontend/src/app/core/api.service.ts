@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category } from '../models/category';
-import { Account } from '../models/account';
+import { Account, AccountPayload } from '../models/account';
 import { Transaction, TransactionFilters } from '../models/transaction';
 import { Observable } from 'rxjs';
 
@@ -49,11 +49,11 @@ export class ApiService {
     return this.http.get<ApiResponse<Account[]>>('/api/accounts');
   }
 
-  createAccount(data: { name: string; currency: string; startBalance: number }): Observable<ApiResponse<Account>> {
+  createAccount(data: AccountPayload): Observable<ApiResponse<Account>> {
     return this.http.post<ApiResponse<Account>>('/api/accounts', data);
   }
 
-  updateAccount(id: number, data: { name?: string; currency?: string; startBalance?: number }): Observable<ApiResponse<Account>> {
+  updateAccount(id: number, data: AccountPayload): Observable<ApiResponse<Account>> {
     return this.http.put<ApiResponse<Account>>(`/api/accounts/${id}`, data);
   }
 

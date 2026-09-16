@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, resource } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { Account } from '../models/account';
+import { Account, AccountPayload } from '../models/account';
 import { ApiService } from './api.service';
 
 export interface BalanceSummary {
@@ -167,11 +167,11 @@ export class AccountsState {
     this.resource.reload();
   }
 
-  create(data: { name: string; currency: string; startBalance: number }) {
+  create(data: AccountPayload) {
     return this.api.createAccount(data).pipe(tap(() => this.reload()));
   }
 
-  update(id: number, data: { name?: string; currency?: string; startBalance?: number }) {
+  update(id: number, data: AccountPayload) {
     return this.api.updateAccount(id, data).pipe(tap(() => this.reload()));
   }
 

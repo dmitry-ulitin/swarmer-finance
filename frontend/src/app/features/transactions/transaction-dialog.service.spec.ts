@@ -8,7 +8,7 @@ function makeTxAccount(id: number, name: string): TransactionAccount {
 }
 
 function makeAccount(id: number, name: string): Account {
-  return { id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '' };
+  return { id, user_id: 1, name, currency: 'USD', scale: 2, balance: 0, user_balance: 0, start_balance: 0, deleted: false, created_at: '', type: 'cash', settings: {} };
 }
 
 function makeTransaction(overrides: Partial<Transaction>): Transaction {
