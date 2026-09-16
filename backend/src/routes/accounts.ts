@@ -18,14 +18,56 @@ const currencySchema = z
   .string()
   .regex(/^[A-Z]{3,4}$/, 'Currency must be 3 or 4 uppercase ASCII letters (e.g. USD, EUR, USDT)');
 
-const createAccountSchema = z.object({
+const settingsByType = {
+  cash: z.strictObject({}).default({}),
+  bank: z.strictObject({
+    accountNumber: z.string().max(64).optional(),
+  }).default({}),
+  crypto: z.strictObject({
+    address: z.string().max(128).optional(),
+    blockchain: z.string().max(64).optional(),
+  }).default({}),
+};
+
+// Base fields are spread into each union member rather than combined with
+// `.and()`: a ZodIntersection parses both sides independently and merges
+// them, so the strict settings object never sees a cross-type key and
+// `{ type: 'cash', settings: { accountNumber } }` would be accepted.
+const createBase = {
   name: z.string().min(1).max(255),
   currency: currencySchema,
   startBalance: z.number().default(0),
   scale: z.number().optional().default(2),
-});
+};
 
-const updateAccountSchema = createAccountSchema.partial();
+// A discriminated union can't default a missing discriminant itself, so a
+// request that omits `type` entirely is preprocessed to `type: 'cash'`
+// before the union runs.
+const createAccountSchema = z.preprocess(
+  (val) =>
+    val && typeof val === 'object' && !('type' in val) ? { ...val, type: 'cash' } : val,
+  z.discriminatedUnion('type', [
+    z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash }),
+    z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank }),
+    z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+  ])
+);
+
+// A discriminated union cannot be `.partial()` — the discriminant must be
+// present — so PUT requires `type` on every request. The account form always
+// submits its full value, so no caller is affected.
+const updateBase = {
+  name: z.string().min(1).max(255).optional(),
+  currency: currencySchema.optional(),
+  startBalance: z.number().optional(),
+  scale: z.number().optional(),
+};
+
+const updateAccountSchema = z.discriminatedUnion('type', [
+  z.strictObject({ ...updateBase, type: z.literal('cash'), settings: settingsByType.cash }),
+  z.strictObject({ ...updateBase, type: z.literal('bank'), settings: settingsByType.bank }),
+  z.strictObject({ ...updateBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+]);
 
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
@@ -38,8 +80,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { name, currency, startBalance, scale } = req.body;
-    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, scale);
+    const { name, currency, startBalance, scale, type, settings } = req.body;
+    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, scale, type, settings);
     res.json({ data: account, error: null });
   } catch (error) {
     next(error);

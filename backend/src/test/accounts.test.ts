@@ -229,7 +229,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ startBalance: 80 });
+        .send({ type: 'cash', startBalance: 80 });
 
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(80);
@@ -245,7 +245,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .put(`/api/accounts/${accountId}`)
         .set({ Authorization: `Bearer ${token}` })
-        .send({ startBalance: 30 });
+        .send({ type: 'cash', startBalance: 30 });
 
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(40); // 30 + 10
@@ -410,6 +410,118 @@ describe('Accounts API — balance field', () => {
         .get('/api/accounts')
         .set({ Authorization: `Bearer ${token}` });
       expect(accountsRes.body.data[0].user_balance).toBeNull();
+    });
+  });
+
+  describe('Account type and settings', () => {
+    it('defaults to cash with empty settings when type is omitted', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'No Type', currency: 'USD', startBalance: 0 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.type).toBe('cash');
+      expect(res.body.data.settings).toEqual({});
+    });
+
+    it('round-trips bank settings', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Checking', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { accountNumber: 'DE89370400440532013000' },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.type).toBe('bank');
+      expect(res.body.data.settings).toEqual({ accountNumber: 'DE89370400440532013000' });
+    });
+
+    it('round-trips crypto settings', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Wallet', currency: 'BTC', startBalance: 0,
+          type: 'crypto', settings: { address: 'bc1qxy2k', blockchain: 'bitcoin' },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.settings).toEqual({ address: 'bc1qxy2k', blockchain: 'bitcoin' });
+    });
+
+    it('rejects a settings key belonging to another type', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Wrong', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { address: 'bc1qxy2k' },
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an unknown settings key', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Typo', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { acountNumber: '123' },
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an unknown account type', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Debt', currency: 'USD', startBalance: 0, type: 'debt' });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('replaces settings rather than merging them when the type changes', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Switcher', currency: 'USD', startBalance: 0,
+          type: 'bank', settings: { accountNumber: '111' },
+        });
+      const id = created.body.data.id;
+
+      const updated = await request(app)
+        .put(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          name: 'Switcher', currency: 'USD', startBalance: 0,
+          type: 'crypto', settings: { address: '0xabc' },
+        });
+
+      expect(updated.status).toBe(200);
+      expect(updated.body.data.type).toBe('crypto');
+      expect(updated.body.data.settings).toEqual({ address: '0xabc' });
+      expect(updated.body.data.settings.accountNumber).toBeUndefined();
+    });
+
+    it('rejects a PUT that omits type', async () => {
+      const created = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Renamable', currency: 'USD', startBalance: 0, type: 'cash' });
+      const id = created.body.data.id;
+
+      const res = await request(app)
+        .put(`/api/accounts/${id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Renamed' });
+
+      expect(res.status).toBe(400);
     });
   });
 });

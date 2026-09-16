@@ -2,7 +2,7 @@ import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
 import { getAccountBalances } from '../db/queries/transactions';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
-import { Account, User } from '../types';
+import { Account, AccountType, User } from '../types';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -55,10 +55,12 @@ export const createAccount = async (
   name: string,
   currency: string,
   startBalance: number,
-  scale = 2
+  scale = 2,
+  type: AccountType = 'cash',
+  settings: Record<string, unknown> = {}
 ) => {
   const user = await getUserOrThrow(userId);
-  const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale);
+  const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
   return toDecimalDTO(converted, user.currency_scale);
 };
@@ -66,7 +68,14 @@ export const createAccount = async (
 export const updateAccount = async (
   id: number,
   userId: number,
-  data: { name?: string; currency?: string; startBalance?: number; scale?: number }
+  data: {
+    name?: string;
+    currency?: string;
+    startBalance?: number;
+    scale?: number;
+    type: AccountType;
+    settings: Record<string, unknown>;
+  }
 ) => {
   const existing = await accountQueries.getAccountById(id, userId);
   if (!existing) {

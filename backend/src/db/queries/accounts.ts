@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../index';
-import { Account } from '../../types';
+import { Account, AccountType } from '../../types';
 
 export const getAccountsByUserId = async (userId: number): Promise<Account[]> => {
   return query<Account>(
@@ -20,12 +20,14 @@ export const createAccount = async (
   name: string,
   currency: string,
   startBalance: number,
-  scale: number
+  scale: number,
+  type: AccountType,
+  settings: Record<string, unknown>
 ): Promise<Account> => {
   const result = await query<Account>(
-    `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [userId, name, currency, startBalance, scale]
+    `INSERT INTO accounts (user_id, name, currency, start_balance, scale, type, settings)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [userId, name, currency, startBalance, scale, type, JSON.stringify(settings)]
   );
   return result[0];
 };
@@ -33,16 +35,36 @@ export const createAccount = async (
 export const updateAccount = async (
   id: number,
   userId: number,
-  data: { name?: string; currency?: string; startBalance?: number; scale?: number }
+  data: {
+    name?: string;
+    currency?: string;
+    startBalance?: number;
+    scale?: number;
+    type: AccountType;
+    settings: Record<string, unknown>;
+  }
 ): Promise<Account | null> => {
+  // `type` and `settings` are written unconditionally, not COALESCEd:
+  // changing an account's type must drop the previous type's fields.
   const result = await query<Account>(
     `UPDATE accounts
      SET name = COALESCE($1, name),
          currency = COALESCE($2, currency),
          start_balance = COALESCE($3, start_balance),
-         scale = COALESCE($4, scale)
-     WHERE id = $5 AND user_id = $6 AND deleted = false RETURNING *`,
-    [data.name ?? null, data.currency ?? null, data.startBalance ?? null, data.scale ?? null, id, userId]
+         scale = COALESCE($4, scale),
+         type = $5,
+         settings = $6
+     WHERE id = $7 AND user_id = $8 AND deleted = false RETURNING *`,
+    [
+      data.name ?? null,
+      data.currency ?? null,
+      data.startBalance ?? null,
+      data.scale ?? null,
+      data.type,
+      JSON.stringify(data.settings),
+      id,
+      userId,
+    ]
   );
   return result[0] || null;
 };
