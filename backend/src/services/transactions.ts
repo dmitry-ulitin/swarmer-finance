@@ -3,6 +3,7 @@ import * as categoryQueries from '../db/queries/categories';
 import * as accountQueries from '../db/queries/accounts';
 import { toDecimal, toCents } from './currency';
 import { Account, TransactionDTO } from '../types';
+import { LEVEL, getAccessibleAccountIds, requireLevelOnAll } from './access';
 
 const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
 const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
@@ -38,10 +39,11 @@ function formatDate(date: string | Date): string {
 }
 
 async function loadAccount(accountId: number, userId: number, label: string): Promise<Account> {
-  const account = await accountQueries.getAccountById(accountId, userId);
+  const account = await accountQueries.getAccountById(accountId);
   if (!account || account.deleted) {
     throw { statusCode: 403, message: `Cannot use this ${label} account` };
   }
+  await requireLevelOnAll([accountId], userId, LEVEL.WRITE);
   return account;
 }
 
@@ -131,16 +133,22 @@ export const getTransactions = async (
   userId: number,
   filters: transactionQueries.TransactionFilters
 ) => {
-  const transactions = await transactionQueries.getTransactionsByUserId(userId, filters);
+  const accessibleIds = await getAccessibleAccountIds(userId);
+  // A supplied `account` filter is intersected with what the user may see,
+  // never trusted on its own.
+  const accountIds = filters.account?.length
+    ? filters.account.filter(id => accessibleIds.includes(id))
+    : accessibleIds;
+
+  const transactions = await transactionQueries.getTransactions(accountIds, { ...filters, account: undefined });
   const sequential = !filters.details && !filters.category?.length && !filters.type;
   const result = sequential && transactions.length > 0
-    ? await attachRunningBalances(userId, transactions)
+    ? await attachRunningBalances(transactions)
     : transactions;
   return result.map(toDecimalTransactionDTO);
 };
 
 async function attachRunningBalances(
-  userId: number,
   transactions: import('../types').TransactionDTO[]
 ) {
   const accountIds = [...new Set(
@@ -156,7 +164,7 @@ async function attachRunningBalances(
   const last = transactions[transactions.length - 1];
   const lastDate = new Date(last.date);
   const dateStr = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')}`;
-  const balanceRows = await transactionQueries.getBalancesAt(userId, accountIds, dateStr, last.created_at, last.id);
+  const balanceRows = await transactionQueries.getBalancesAt(accountIds, dateStr, last.created_at, last.id);
   const balanceMap = new Map(balanceRows.map(r => [r.id, r.balance]));
 
   const withBalances = [];
@@ -180,20 +188,30 @@ export const createTransaction = async (userId: number, input: CreateInput) => {
 };
 
 export const updateTransaction = async (id: number, userId: number, input: UpdateInput) => {
-  const existing = await transactionQueries.getTransactionById(id, userId);
+  const existing = await transactionQueries.getTransactionById(id);
   if (!existing) {
     throw { statusCode: 404, message: 'Transaction not found' };
   }
+
+  // Write access on the accounts the transaction touches TODAY. The accounts
+  // it will touch after the update are checked by validateTransactionInput ->
+  // loadAccount below. Both matter: without the first check a transaction
+  // could be moved off an account the user cannot write to.
+  await requireLevelOnAll(
+    [existing.debit_account_id, existing.credit_account_id],
+    userId,
+    LEVEL.WRITE
+  );
 
   // existing.debit/credit are stored in cents; input.debit/credit (when
   // provided) arrive as decimal from the API. Convert existing to decimal
   // using its own accounts' scales so the merged object is consistently
   // decimal before re-validation converts it back to cents.
   const existingDebitAccount = existing.debit_account_id != null
-    ? await accountQueries.getAccountById(existing.debit_account_id, userId)
+    ? await accountQueries.getAccountById(existing.debit_account_id)
     : null;
   const existingCreditAccount = existing.credit_account_id != null
-    ? await accountQueries.getAccountById(existing.credit_account_id, userId)
+    ? await accountQueries.getAccountById(existing.credit_account_id)
     : null;
   const existingScale = existingDebitAccount?.scale ?? existingCreditAccount?.scale ?? 2;
 
@@ -211,16 +229,21 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
   };
 
   await validateTransactionInput(merged, userId);
-  const transaction = await transactionQueries.updateTransaction(id, userId, merged);
+  const transaction = await transactionQueries.updateTransaction(id, merged);
   return transaction ? toDecimalTransactionDTO(transaction) : transaction;
 };
 
 export const deleteTransaction = async (id: number, userId: number): Promise<void> => {
-  const existing = await transactionQueries.getTransactionById(id, userId);
+  const existing = await transactionQueries.getTransactionById(id);
   if (!existing) {
     throw { statusCode: 404, message: 'Transaction not found' };
   }
-  await transactionQueries.deleteTransaction(id, userId);
+  await requireLevelOnAll(
+    [existing.debit_account_id, existing.credit_account_id],
+    userId,
+    LEVEL.WRITE
+  );
+  await transactionQueries.deleteTransaction(id);
 };
 
 export const getAccountBalances = async (
