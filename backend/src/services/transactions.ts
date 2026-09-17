@@ -143,17 +143,21 @@ export const getTransactions = async (
   const transactions = await transactionQueries.getTransactions(accountIds, { ...filters, account: undefined });
   const sequential = !filters.details && !filters.category?.length && !filters.type;
   const result = sequential && transactions.length > 0
-    ? await attachRunningBalances(transactions)
+    ? await attachRunningBalances(transactions, accessibleIds)
     : transactions;
   return result.map(toDecimalTransactionDTO);
 };
 
 async function attachRunningBalances(
-  transactions: import('../types').TransactionDTO[]
+  transactions: import('../types').TransactionDTO[],
+  accessibleIds: number[]
 ) {
+  // A cross-boundary transfer's counterparty account may appear on the DTO
+  // (its name is not secret) but its balance must not be computed or
+  // returned unless the caller can also reach that account.
   const accountIds = [...new Set(
     transactions.flatMap(t => [t.debit_account?.id, t.credit_account?.id].filter((id): id is number => id != null))
-  )];
+  )].filter(id => accessibleIds.includes(id));
 
   // transactions are ordered newest-first (date DESC, created_at DESC, id
   // DESC); anchor the seed balance strictly before the oldest transaction
@@ -170,8 +174,15 @@ async function attachRunningBalances(
   const withBalances = [];
   for (let i = transactions.length - 1; i >= 0; i--) {
     const t = transactions[i];
-    if (t.debit_account) balanceMap.set(t.debit_account.id, (balanceMap.get(t.debit_account.id) ?? 0) - Number(t.debit));
-    if (t.credit_account) balanceMap.set(t.credit_account.id, (balanceMap.get(t.credit_account.id) ?? 0) + Number(t.credit));
+    // Only accumulate for accounts seeded above (i.e. accessible to the
+    // caller); an excluded account must never gain an entry via `?? 0`,
+    // which would fabricate a balance from this page alone.
+    if (t.debit_account && balanceMap.has(t.debit_account.id)) {
+      balanceMap.set(t.debit_account.id, balanceMap.get(t.debit_account.id)! - Number(t.debit));
+    }
+    if (t.credit_account && balanceMap.has(t.credit_account.id)) {
+      balanceMap.set(t.credit_account.id, balanceMap.get(t.credit_account.id)! + Number(t.credit));
+    }
     withBalances[i] = {
       ...t,
       debit_account: t.debit_account ? { ...t.debit_account, balance: balanceMap.get(t.debit_account.id) } : null,
