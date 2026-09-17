@@ -3,6 +3,7 @@ import * as userQueries from '../db/queries/users';
 import { getAccountBalances } from '../db/queries/transactions';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
+import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel } from './access';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -13,8 +14,8 @@ function toDecimalDTO(account: Account, userScale: number): Account {
   };
 }
 
-async function withBalances(userId: number, accounts: Account[]): Promise<Account[]> {
-  const rows = await getAccountBalances(userId, accounts.map(a => a.id));
+async function withBalances(accounts: Account[]): Promise<Account[]> {
+  const rows = await getAccountBalances(accounts.map(a => a.id));
   return accounts.map(account => {
     let balance = Number(account.start_balance);
     for (const row of rows) {
@@ -44,8 +45,10 @@ async function withConvertedBalances(user: User, accounts: Account[]): Promise<A
 
 export const getAccounts = async (userId: number) => {
   const user = await getUserOrThrow(userId);
-  const accounts = await accountQueries.getAccountsByUserId(userId);
-  const withBal = await withBalances(userId, accounts);
+  const accessMap = await getAccessMap(userId);
+  const accounts = await accountQueries.getAccountsByIds([...accessMap.keys()]);
+  const withLevel = accounts.map(a => ({ ...a, access_level: accessMap.get(a.id)! }));
+  const withBal = await withBalances(withLevel);
   const converted = await withConvertedBalances(user, withBal);
   return converted.map(a => toDecimalDTO(a, user.currency_scale));
 };
@@ -77,10 +80,11 @@ export const updateAccount = async (
     settings: Record<string, unknown>;
   }
 ) => {
-  const existing = await accountQueries.getAccountById(id, userId);
+  const existing = await accountQueries.getAccountById(id);
   if (!existing) {
     throw { statusCode: 404, message: 'Account not found' };
   }
+  await requireLevel(id, userId, LEVEL.ADMIN);
   if (existing.deleted) {
     throw { statusCode: 404, message: 'Account is deleted' };
   }
@@ -88,8 +92,8 @@ export const updateAccount = async (
   const startBalance = data.startBalance != null
     ? toCents(data.startBalance, data.scale ?? existing.scale)
     : undefined;
-  const account = await accountQueries.updateAccount(id, userId, { ...data, startBalance });
-  const [withBal] = await withBalances(userId, [account!]);
+  const account = await accountQueries.updateAccount(id, { ...data, startBalance });
+  const [withBal] = await withBalances([account!]);
   const [converted] = await withConvertedBalances(user, [withBal]);
   return toDecimalDTO(converted, user.currency_scale);
 };
@@ -113,6 +117,9 @@ export const updateAccount = async (
  *
  * Returns one of: { kind: 'hard-deleted' }, { kind: 'soft-deleted' },
  * or throws an HttpError with statusCode: 409 / 404.
+ *
+ * Deleting requires OWNER: an admin-level grantee can edit the account but
+ * not destroy it (see docs/superpowers/specs/2026-09-17-account-sharing-design.md).
  */
 export const deleteAccount = async (
   id: number,
@@ -120,10 +127,11 @@ export const deleteAccount = async (
 ): Promise<{ kind: 'hard-deleted' | 'soft-deleted' }> => {
   // Include-deleted lookup so an already-deleted account reports 404
   // rather than being silently re-soft-deleted.
-  const existing = await accountQueries.getAccountById(id, userId);
+  const existing = await accountQueries.getAccountById(id);
   if (!existing) {
     throw { statusCode: 404, message: 'Account not found' };
   }
+  await requireLevel(id, userId, LEVEL.OWNER);
   if (existing.deleted) {
     throw { statusCode: 404, message: 'Account is deleted' };
   }
@@ -135,7 +143,7 @@ export const deleteAccount = async (
     // use ON DELETE RESTRICT, migration 004) guarantee that an account
     // with zero transactions can be hard-deleted without affecting any
     // history.
-    const ok = await accountQueries.hardDeleteAccount(id, userId);
+    const ok = await accountQueries.hardDeleteAccount(id);
     if (!ok) {
       throw { statusCode: 404, message: 'Account not found' };
     }
@@ -143,7 +151,7 @@ export const deleteAccount = async (
   }
 
   // Transactions exist — check balance.
-  const [accountWithBalance] = await withBalances(userId, [existing]);
+  const [accountWithBalance] = await withBalances([existing]);
   const balance = accountWithBalance.balance;
 
   if (balance !== 0) {
@@ -154,7 +162,7 @@ export const deleteAccount = async (
   }
 
   // Balance is zero — soft delete.
-  const ok = await accountQueries.softDeleteAccount(id, userId);
+  const ok = await accountQueries.softDeleteAccount(id);
   if (!ok) {
     throw { statusCode: 404, message: 'Account not found' };
   }
