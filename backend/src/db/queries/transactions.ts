@@ -1,6 +1,7 @@
 import { query, queryOne, execute } from '../index';
 import { Transaction, TransactionDTO } from '../../types';
 
+/** What the client may ask for. `account` is an optional narrowing filter. */
 export interface TransactionFilters {
   from?: string;
   to?: string;
@@ -11,6 +12,16 @@ export interface TransactionFilters {
   offset?: number;
   limit?: number;
 }
+
+/**
+ * What the query actually runs with. `account` is REQUIRED here and carries
+ * the accounts the caller may reach — it is the access gate, not a filter.
+ * The service builds it by intersecting any client-supplied `account` with
+ * the caller's accessible set, so it can only ever narrow.
+ */
+export type TransactionQueryFilters = Omit<TransactionFilters, 'account'> & {
+  account: number[];
+};
 
 export interface CreateTransactionData {
   categoryId?: number;
@@ -87,17 +98,26 @@ export const getTransactionDTOById = async (id: number): Promise<TransactionDTO 
 };
 
 export const getTransactions = async (
-  accountIds: number[],
-  filters: TransactionFilters
+  filters: TransactionQueryFilters
 ): Promise<TransactionDTO[]> => {
-  if (accountIds.length === 0) return [];
+  // An empty account list means "nothing is reachable", so nothing matches.
+  // This guard is load-bearing: without it the predicate below would be
+  // `= ANY('{}')`, which matches no rows only by accident of SQL semantics,
+  // and any future refactor that made the predicate conditional would turn
+  // an empty list into "no filter at all" — i.e. every transaction in the
+  // database. Keep the guard even if the predicate looks sufficient.
+  if (filters.account.length === 0) return [];
 
   // A transaction is visible when the user can reach at least one of its
   // accounts. t.user_id records who entered it and is NOT an access filter.
+  //
+  // This predicate is UNCONDITIONAL — it is the access gate. `filters.account`
+  // has already been intersected with the caller's accessible set by the
+  // service, so it can only narrow, never widen. Do not make it conditional.
   const conditions: string[] = [
     '(t.debit_account_id = ANY($1::int[]) OR t.credit_account_id = ANY($1::int[]))',
   ];
-  const params: unknown[] = [accountIds];
+  const params: unknown[] = [filters.account];
   let paramIndex = 2;
 
   if (filters.from) {
@@ -113,12 +133,6 @@ export const getTransactions = async (
   if (filters.category?.length) {
     conditions.push(`t.category_id = ANY($${paramIndex++}::int[])`);
     params.push(filters.category);
-  }
-
-  if (filters.account?.length) {
-    const idx = paramIndex++;
-    conditions.push(`(t.debit_account_id = ANY($${idx}::int[]) OR t.credit_account_id = ANY($${idx}::int[]))`);
-    params.push(filters.account);
   }
 
   if (filters.details) {

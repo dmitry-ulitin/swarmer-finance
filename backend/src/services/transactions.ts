@@ -141,12 +141,13 @@ export const getTransactions = async (
 ) => {
   const accessibleIds = await getAccessibleAccountIds(userId);
   // A supplied `account` filter is intersected with what the user may see,
-  // never trusted on its own.
+  // never trusted on its own. The result replaces `account` wholesale, so the
+  // query receives one list that is both the access gate and the filter.
   const accountIds = filters.account?.length
     ? filters.account.filter(id => accessibleIds.includes(id))
     : accessibleIds;
 
-  const transactions = await transactionQueries.getTransactions(accountIds, { ...filters, account: undefined });
+  const transactions = await transactionQueries.getTransactions({ ...filters, account: accountIds });
   const sequential = !filters.details && !filters.category?.length && !filters.type;
   const result = sequential && transactions.length > 0
     ? await attachRunningBalances(transactions, accessibleIds)

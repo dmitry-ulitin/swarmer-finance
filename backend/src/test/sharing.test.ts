@@ -103,6 +103,46 @@ describe('Account sharing', () => {
       await grant(a1, userBId, LEVEL.READ);
     });
 
+    it('returns nothing when the account filter names only unreachable accounts', async () => {
+      // a2 is A's and was never shared. Asking for it explicitly must yield an
+      // empty result — never an unfiltered one. This pins the empty-intersection
+      // guard: the access list and the client filter are the same parameter, so
+      // an empty intersection must mean "nothing", not "no filter".
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 900, 900, '2026-03-01', 'On a2')`,
+        [userAId, expenseCategoryA, a2]
+      );
+
+      const res = await request(app)
+        .get(`/api/transactions?account=${a2}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([]);
+    });
+
+    it('drops unreachable ids from a mixed account filter', async () => {
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 100, 100, '2026-03-01', 'On a1')`,
+        [userAId, expenseCategoryA, a1]
+      );
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 200, 200, '2026-03-01', 'On a2')`,
+        [userAId, expenseCategoryA, a2]
+      );
+
+      const res = await request(app)
+        .get(`/api/transactions?account=${a1}&account=${a2}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+
+      const descriptions = res.body.data.map((t: { description: string }) => t.description);
+      expect(descriptions).toContain('On a1');
+      expect(descriptions).not.toContain('On a2');
+    });
+
     it('shows the shared account to B with its level and owner name', async () => {
       const res = await request(app).get('/api/accounts').set({ Authorization: `Bearer ${tokenB}` });
 
