@@ -224,8 +224,7 @@ export const deleteTransaction = async (id: number, userId: number): Promise<voi
 };
 
 export const getAccountBalances = async (
-  userId: number,
   accountIds: number[]
 ): Promise<transactionQueries.AccountBalance[]> => {
-  return transactionQueries.getAccountBalances(userId, accountIds);
+  return transactionQueries.getAccountBalances(accountIds);
 };

@@ -34,6 +34,10 @@ export interface Account {
   deleted?: boolean;
   type: AccountType;
   settings: Record<string, unknown>;
+  /** The requesting user's level on this account; set by services/accounts.ts. */
+  access_level?: 1 | 2 | 3 | 4;
+  /** Display name of the account's owner; set by the accounts query. */
+  owner_name?: string;
 }
 
 export interface Transaction {

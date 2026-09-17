@@ -1,17 +1,28 @@
 import { query, queryOne, execute } from '../index';
 import { Account, AccountType } from '../../types';
 
-export const getAccountsByUserId = async (userId: number): Promise<Account[]> => {
+export const getAccountsByIds = async (accountIds: number[]): Promise<Account[]> => {
+  if (accountIds.length === 0) return [];
   return query<Account>(
-    'SELECT * FROM accounts WHERE user_id = $1 ORDER BY name',
-    [userId]
+    `SELECT a.*, u.name AS owner_name
+     FROM accounts a
+     JOIN users u ON u.id = a.user_id
+     WHERE a.id = ANY($1::int[])
+     ORDER BY a.name`,
+    [accountIds]
   );
 };
 
-export const getAccountById = async (id: number, userId: number): Promise<Account | null> => {
+// Access is checked by the service layer, so this looks up by id alone.
+// That also lets the service tell "no such account" (404) apart from
+// "no access" (403).
+export const getAccountById = async (id: number): Promise<Account | null> => {
   return queryOne<Account>(
-    'SELECT * FROM accounts WHERE id = $1 AND user_id = $2',
-    [id, userId]
+    `SELECT a.*, u.name AS owner_name
+     FROM accounts a
+     JOIN users u ON u.id = a.user_id
+     WHERE a.id = $1`,
+    [id]
   );
 };
 
@@ -34,7 +45,6 @@ export const createAccount = async (
 
 export const updateAccount = async (
   id: number,
-  userId: number,
   data: {
     name?: string;
     currency?: string;
@@ -46,6 +56,10 @@ export const updateAccount = async (
 ): Promise<Account | null> => {
   // `type` and `settings` are written unconditionally, not COALESCEd:
   // changing an account's type must drop the previous type's fields.
+  //
+  // No user_id predicate: permission is checked in services/accounts.ts.
+  // Keeping one here would be worse than redundant — for an admin who is
+  // not the owner it is false, and the update would silently affect no rows.
   const result = await query<Account>(
     `UPDATE accounts
      SET name = COALESCE($1, name),
@@ -54,7 +68,7 @@ export const updateAccount = async (
          scale = COALESCE($4, scale),
          type = $5,
          settings = $6
-     WHERE id = $7 AND user_id = $8 AND deleted = false RETURNING *`,
+     WHERE id = $7 AND deleted = false RETURNING *`,
     [
       data.name ?? null,
       data.currency ?? null,
@@ -63,7 +77,6 @@ export const updateAccount = async (
       data.type,
       JSON.stringify(data.settings),
       id,
-      userId,
     ]
   );
   return result[0] || null;
@@ -85,18 +98,18 @@ export const hasTransactions = async (accountId: number): Promise<boolean> => {
   return result ? parseInt(result.count, 10) > 0 : false;
 };
 
-export const softDeleteAccount = async (id: number, userId: number): Promise<boolean> => {
+export const softDeleteAccount = async (id: number): Promise<boolean> => {
   const count = await execute(
-    'UPDATE accounts SET deleted = true WHERE id = $1 AND user_id = $2 AND deleted = false',
-    [id, userId]
+    'UPDATE accounts SET deleted = true WHERE id = $1 AND deleted = false',
+    [id]
   );
   return count > 0;
 };
 
-export const hardDeleteAccount = async (id: number, userId: number): Promise<boolean> => {
+export const hardDeleteAccount = async (id: number): Promise<boolean> => {
   const count = await execute(
-    'DELETE FROM accounts WHERE id = $1 AND user_id = $2 AND deleted = false',
-    [id, userId]
+    'DELETE FROM accounts WHERE id = $1 AND deleted = false',
+    [id]
   );
   return count > 0;
 };

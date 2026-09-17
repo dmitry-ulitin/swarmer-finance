@@ -269,9 +269,13 @@ export interface AccountBalance {
 }
 
 export const getAccountBalances = async (
-  userId: number,
   accountIds: number[]
 ): Promise<AccountBalance[]> => {
+  // An empty list means no accounts, so no balances. The previous
+  // `array_length(...) IS NULL` branch meant "all of this user's
+  // transactions"; with user_id gone it would mean every transaction in the
+  // database, so it is removed and callers always pass an explicit list.
+  if (accountIds.length === 0) return [];
   const rows = await query<Omit<AccountBalance, 'debit' | 'credit'> & { debit: string; credit: string }>(
     `SELECT
        debit_account_id,
@@ -280,13 +284,11 @@ export const getAccountBalances = async (
        SUM(credit) AS credit,
        MAX(date) AS last_date
      FROM transactions
-     WHERE user_id = $1
-       AND (array_length($2::int[], 1) IS NULL
-            OR debit_account_id = ANY($2::int[])
-            OR credit_account_id = ANY($2::int[]))
+     WHERE debit_account_id = ANY($1::int[])
+        OR credit_account_id = ANY($1::int[])
      GROUP BY debit_account_id, credit_account_id
      ORDER BY last_date DESC`,
-    [userId, accountIds]
+    [accountIds]
   );
   return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
 };
