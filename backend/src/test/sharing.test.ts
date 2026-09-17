@@ -153,4 +153,95 @@ describe('Account sharing', () => {
       expect(balA).toBe(-25);
     });
   });
+
+  describe('level boundaries', () => {
+    const expensePayload = () => ({
+      debitAccountId: a1,
+      categoryId: expenseCategoryB,
+      debit: 10,
+      credit: 10,
+      date: '2026-03-02',
+      description: 'By B',
+    });
+
+    const accountPayload = () => ({ name: 'Renamed', type: 'cash' as const, settings: {} });
+
+    it('level 1 cannot create, update, or delete transactions', async () => {
+      await grant(a1, userBId, LEVEL.READ);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(expensePayload());
+      expect(created.status).toBe(403);
+
+      const existing = await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 500, 500, '2026-03-02') RETURNING id`,
+        [userAId, expenseCategoryA, a1]
+      );
+      const txId = existing.rows[0].id;
+
+      const updated = await request(app)
+        .put(`/api/transactions/${txId}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ description: 'hacked' });
+      expect(updated.status).toBe(403);
+
+      const deleted = await request(app)
+        .delete(`/api/transactions/${txId}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(deleted.status).toBe(403);
+    });
+
+    it('level 2 can manage transactions but not edit the account', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(expensePayload());
+      expect(created.status).toBe(200);
+      expect(created.body.data.id).toBeDefined();
+
+      const deleted = await request(app)
+        .delete(`/api/transactions/${created.body.data.id}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(deleted.status).toBe(200);
+
+      const edited = await request(app)
+        .put(`/api/accounts/${a1}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(accountPayload());
+      expect(edited.status).toBe(403);
+    });
+
+    it('level 3 can edit the account but not delete it', async () => {
+      await grant(a1, userBId, LEVEL.ADMIN);
+
+      const edited = await request(app)
+        .put(`/api/accounts/${a1}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(accountPayload());
+      expect(edited.status).toBe(200);
+      expect(edited.body.data.name).toBe('Renamed');
+
+      const removed = await request(app)
+        .delete(`/api/accounts/${a1}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(removed.status).toBe(403);
+
+      // restore the name for the remaining tests
+      await pool.query('UPDATE accounts SET name = $1 WHERE id = $2', ['A One', a1]);
+    });
+
+    it('the owner can delete their own account', async () => {
+      const throwaway = await makeAccount(userAId, 'Throwaway');
+      const removed = await request(app)
+        .delete(`/api/accounts/${throwaway}`)
+        .set({ Authorization: `Bearer ${tokenA}` });
+      expect(removed.status).toBe(200);
+      expect(removed.body.data.kind).toBe('hard-deleted');
+    });
+  });
 });
