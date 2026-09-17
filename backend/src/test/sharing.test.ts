@@ -244,4 +244,139 @@ describe('Account sharing', () => {
       expect(removed.body.data.kind).toBe('hard-deleted');
     });
   });
+
+  describe('transfers across an access boundary', () => {
+    const transfer = () => ({
+      debitAccountId: a1,
+      creditAccountId: b1,
+      debit: 30,
+      credit: 30,
+      date: '2026-03-03',
+      description: 'A1 to B1',
+    });
+
+    it('allows the transfer with write access on both accounts and shows it to both users', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(transfer());
+      expect(created.status).toBe(200);
+
+      const seenByA = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenA}` });
+      const rowA = seenByA.body.data.find((t: { description: string }) => t.description === 'A1 to B1');
+      expect(rowA).toBeDefined();
+      // A sees the far side in full, including B's private account name.
+      expect(rowA.credit_account.name).toBe('B One');
+
+      const seenByB = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenB}` });
+      expect(seenByB.body.data.map((t: { description: string }) => t.description)).toContain('A1 to B1');
+    });
+
+    it('rejects the transfer when write access is missing on one side', async () => {
+      await grant(a1, userBId, LEVEL.READ);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(transfer());
+      expect(created.status).toBe(403);
+    });
+
+    it('rejects moving a transaction onto an account the user cannot reach', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({
+          debitAccountId: a1,
+          categoryId: expenseCategoryB,
+          debit: 10,
+          credit: 10,
+          date: '2026-03-04',
+        });
+      expect(created.status).toBe(200);
+
+      const moved = await request(app)
+        .put(`/api/transactions/${created.body.data.id}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ debitAccountId: a2 });
+      expect(moved.status).toBe(403);
+    });
+
+    it('does not expose the balance of a counterparty account the viewer cannot reach', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send(transfer());
+      expect(created.status).toBe(200);
+
+      // A owns a1 but cannot reach b1.
+      const seenByA = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenA}` });
+      const row = seenByA.body.data.find((t: { description: string }) => t.description === 'A1 to B1');
+      expect(row).toBeDefined();
+      expect(row.credit_account.name).toBe('B One');        // name is visible by design
+      expect(row.credit_account.balance).toBeUndefined();   // balance must NOT be
+      expect(typeof row.debit_account.balance).toBe('number'); // own side still has one
+    });
+  });
+
+  describe('revocation', () => {
+    it('hides the account and its transactions, but keeps shared transfers visible through the user\'s own side', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 700, 700, '2026-03-05', 'A only')`,
+        [userAId, expenseCategoryA, a1]
+      );
+      const transferRes = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({
+          debitAccountId: a1,
+          creditAccountId: b1,
+          debit: 30,
+          credit: 30,
+          date: '2026-03-06',
+          description: 'Shared transfer',
+        });
+      expect(transferRes.status).toBe(200);
+
+      await revoke(a1, userBId);
+
+      const accounts = await request(app).get('/api/accounts').set({ Authorization: `Bearer ${tokenB}` });
+      expect(accounts.body.data.find((a: { id: number }) => a.id === a1)).toBeUndefined();
+
+      const txs = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenB}` });
+      const descriptions = txs.body.data.map((t: { description: string }) => t.description);
+      expect(descriptions).not.toContain('A only');
+      // The transfer still touches B's own account, so it stays visible.
+      expect(descriptions).toContain('Shared transfer');
+
+      const seenByA = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenA}` });
+      expect(seenByA.body.data.map((t: { description: string }) => t.description)).toContain('Shared transfer');
+    });
+
+    it('stops a revoked user from writing to the account', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+      await revoke(a1, userBId);
+
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({
+          debitAccountId: a1,
+          categoryId: expenseCategoryB,
+          debit: 10,
+          credit: 10,
+          date: '2026-03-07',
+        });
+      expect(created.status).toBe(403);
+    });
+  });
 });
