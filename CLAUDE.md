@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A personal finance management web app: multi-user, private per-user data (no
-sharing/invites yet — deferred, not built). Core scope for now: income/expense
-transactions with hierarchical categories, multi-currency accounts, manual
-entry (CSV bank-statement import planned, not built). Investments/assets and
+A personal finance management web app: multi-user, with per-account sharing
+(read / write / admin) between users; permissions are granted by direct SQL
+for now, with no UI. Core scope for now: income/expense transactions with
+hierarchical categories, multi-currency accounts, manual entry (CSV
+bank-statement import planned, not built). Investments/assets and
 analytics/reports are deferred to later phases.
 
 Local-only deployment for now; no hosted/prod environment exists.## Commands
@@ -70,6 +71,10 @@ All API responses use this envelope format consistently.
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
 - Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
+- `account_shares` added in migration 009: `(account_id, user_id, level)`,
+  level 1 = read, 2 = transactions, 3 = admin. The owner is **not** stored
+  there — `accounts.user_id` is the only source of ownership, and
+  `services/access.ts` synthesises level 4 (owner) for owned accounts.
 
 #### Transactions — single table, double-entry style
 
@@ -86,6 +91,13 @@ income are always denominated in the account's own currency (`debit` and `credit
 between accounts of different currencies simply carry two amounts
 (`debit`, `credit`) — the implied rate is never persisted separately;
 `debit` and `credit` amounts must be positive.
+
+Visibility follows accounts, not `transactions.user_id`: a transaction is
+visible when the user can reach at least one of its accounts.
+`transactions.user_id` records who entered the row and must never be used as
+an access filter. Permission checks live in the service layer via
+`requireLevel` / `requireLevelOnAll`; `db/queries/*` filter by account id
+only.
 
 ### Environment Variables
 Copy `.env.example` → `.env`:
