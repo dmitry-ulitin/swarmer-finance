@@ -204,6 +204,13 @@ describe('Account sharing', () => {
       expect(created.status).toBe(200);
       expect(created.body.data.id).toBeDefined();
 
+      const updated = await request(app)
+        .put(`/api/transactions/${created.body.data.id}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ description: 'Edited by B' });
+      expect(updated.status).toBe(200);
+      expect(updated.body.data.description).toBe('Edited by B');
+
       const deleted = await request(app)
         .delete(`/api/transactions/${created.body.data.id}`)
         .set({ Authorization: `Bearer ${tokenB}` });
@@ -219,20 +226,22 @@ describe('Account sharing', () => {
     it('level 3 can edit the account but not delete it', async () => {
       await grant(a1, userBId, LEVEL.ADMIN);
 
-      const edited = await request(app)
-        .put(`/api/accounts/${a1}`)
-        .set({ Authorization: `Bearer ${tokenB}` })
-        .send(accountPayload());
-      expect(edited.status).toBe(200);
-      expect(edited.body.data.name).toBe('Renamed');
+      try {
+        const edited = await request(app)
+          .put(`/api/accounts/${a1}`)
+          .set({ Authorization: `Bearer ${tokenB}` })
+          .send(accountPayload());
+        expect(edited.status).toBe(200);
+        expect(edited.body.data.name).toBe('Renamed');
 
-      const removed = await request(app)
-        .delete(`/api/accounts/${a1}`)
-        .set({ Authorization: `Bearer ${tokenB}` });
-      expect(removed.status).toBe(403);
-
-      // restore the name for the remaining tests
-      await pool.query('UPDATE accounts SET name = $1 WHERE id = $2', ['A One', a1]);
+        const removed = await request(app)
+          .delete(`/api/accounts/${a1}`)
+          .set({ Authorization: `Bearer ${tokenB}` });
+        expect(removed.status).toBe(403);
+      } finally {
+        // restore the name for the remaining tests, even if an assertion above threw
+        await pool.query('UPDATE accounts SET name = $1 WHERE id = $2', ['A One', a1]);
+      }
     });
 
     it('the owner can delete their own account', async () => {
