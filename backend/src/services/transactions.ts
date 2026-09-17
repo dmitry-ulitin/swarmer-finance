@@ -54,7 +54,7 @@ async function validateCategory(categoryId: number, userId: number): Promise<voi
   }
 }
 
-async function validateTransactionInput(input: CreateInput, userId: number): Promise<void> {
+async function validateTransactionInput(input: CreateInput, userId: number, categoryOwnerId: number): Promise<void> {
   const hasDebit = input.debitAccountId != null;
   const hasCredit = input.creditAccountId != null;
 
@@ -94,7 +94,11 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.categoryId == null) {
       input.categoryId = UNCATEGORIZED_EXPENSE_CATEGORY_ID;
     }
-    await validateCategory(input.categoryId, userId);
+    // The category must belong to the transaction's owner, not whoever is
+    // editing: categories are per-user with no sharing, and user_id is
+    // preserved across updates, so an owner-authored transaction's category
+    // is always validated against the owner.
+    await validateCategory(input.categoryId, categoryOwnerId);
   } else {
     // Income
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
@@ -109,7 +113,9 @@ async function validateTransactionInput(input: CreateInput, userId: number): Pro
     if (input.categoryId == null) {
       input.categoryId = UNCATEGORIZED_INCOME_CATEGORY_ID;
     }
-    await validateCategory(input.categoryId, userId);
+    // See comment above: category ownership is checked against the
+    // transaction's owner, not the editing user.
+    await validateCategory(input.categoryId, categoryOwnerId);
   }
 }
 
@@ -193,7 +199,7 @@ async function attachRunningBalances(
 }
 
 export const createTransaction = async (userId: number, input: CreateInput) => {
-  await validateTransactionInput(input, userId);
+  await validateTransactionInput(input, userId, userId);
   const transaction = await transactionQueries.createTransaction(userId, input);
   return toDecimalTransactionDTO(transaction);
 };
@@ -239,7 +245,7 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };
 
-  await validateTransactionInput(merged, userId);
+  await validateTransactionInput(merged, userId, existing.user_id);
   const transaction = await transactionQueries.updateTransaction(id, merged);
   return transaction ? toDecimalTransactionDTO(transaction) : transaction;
 };

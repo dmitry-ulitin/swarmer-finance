@@ -223,6 +223,31 @@ describe('Account sharing', () => {
       expect(edited.status).toBe(403);
     });
 
+    it('level 2 can edit a transaction the owner authored', async () => {
+      await grant(a1, userBId, LEVEL.WRITE);
+
+      const existing = await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date, description)
+         VALUES ($1, $2, $3, 500, 500, '2026-03-02', 'Original') RETURNING id`,
+        [userAId, expenseCategoryA, a1]
+      );
+      const txId = existing.rows[0].id;
+
+      const updated = await request(app)
+        .put(`/api/transactions/${txId}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ description: 'Edited by B' });
+      expect(updated.status).toBe(200);
+      expect(updated.body.data.description).toBe('Edited by B');
+
+      // B must still not be able to attach B's own category to A's transaction.
+      const recategorized = await request(app)
+        .put(`/api/transactions/${txId}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ categoryId: expenseCategoryB });
+      expect(recategorized.status).toBe(403);
+    });
+
     it('level 3 can edit the account but not delete it', async () => {
       await grant(a1, userBId, LEVEL.ADMIN);
 
