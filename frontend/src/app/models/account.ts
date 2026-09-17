@@ -17,6 +17,14 @@ interface AccountBase {
   user_balance: number | null;
   deleted: boolean;
   created_at: string;
+  /**
+   * The signed-in user's access level on this account:
+   * 1 read, 2 transactions, 3 admin, 4 owner. Optional so existing
+   * fixtures and forms need not supply it.
+   */
+  access_level?: 1 | 2 | 3 | 4;
+  /** Display name of the account's owner. */
+  owner_name?: string;
 }
 
 // A union over type, so `@if (account.type === 'crypto')` narrows

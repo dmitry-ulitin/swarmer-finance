@@ -78,23 +78,26 @@ const WITH_DETAILS_SQL = `
   LEFT JOIN accounts ca ON t.credit_account_id = ca.id
 `;
 
-export const getTransactionDTOById = async (
-  id: number,
-  userId: number
-): Promise<TransactionDTO | null> => {
+export const getTransactionDTOById = async (id: number): Promise<TransactionDTO | null> => {
   const row = await queryOne<TransactionRow>(
-    `${WITH_DETAILS_SQL} WHERE t.id = $1 AND t.user_id = $2`,
-    [id, userId]
+    `${WITH_DETAILS_SQL} WHERE t.id = $1`,
+    [id]
   );
   return row ? toDTO(row) : null;
 };
 
-export const getTransactionsByUserId = async (
-  userId: number,
+export const getTransactions = async (
+  accountIds: number[],
   filters: TransactionFilters
 ): Promise<TransactionDTO[]> => {
-  const conditions: string[] = ['t.user_id = $1'];
-  const params: unknown[] = [userId];
+  if (accountIds.length === 0) return [];
+
+  // A transaction is visible when the user can reach at least one of its
+  // accounts. t.user_id records who entered it and is NOT an access filter.
+  const conditions: string[] = [
+    '(t.debit_account_id = ANY($1::int[]) OR t.credit_account_id = ANY($1::int[]))',
+  ];
+  const params: unknown[] = [accountIds];
   let paramIndex = 2;
 
   if (filters.from) {
@@ -147,14 +150,8 @@ export const getTransactionsByUserId = async (
   return rows.map(toDTO);
 };
 
-export const getTransactionById = async (
-  id: number,
-  userId: number
-): Promise<Transaction | null> => {
-  return queryOne<Transaction>(
-    'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
-    [id, userId]
-  );
+export const getTransactionById = async (id: number): Promise<Transaction | null> => {
+  return queryOne<Transaction>('SELECT * FROM transactions WHERE id = $1', [id]);
 };
 
 export const createTransaction = async (
@@ -177,12 +174,11 @@ export const createTransaction = async (
       data.payee ?? null,
     ]
   );
-  return (await getTransactionDTOById(result[0].id, userId))!;
+  return (await getTransactionDTOById(result[0].id))!;
 };
 
 export const updateTransaction = async (
   id: number,
-  userId: number,
   data: UpdateTransactionData
 ): Promise<TransactionDTO | null> => {
   const count = await execute(
@@ -195,7 +191,7 @@ export const updateTransaction = async (
          date = $6,
          description = $7,
          payee = $8
-     WHERE id = $9 AND user_id = $10`,
+     WHERE id = $9`,
     [
       data.categoryId ?? null,
       data.debitAccountId ?? null,
@@ -206,21 +202,14 @@ export const updateTransaction = async (
       data.description ?? null,
       data.payee ?? null,
       id,
-      userId,
     ]
   );
   if (count === 0) return null;
-  return getTransactionDTOById(id, userId);
+  return getTransactionDTOById(id);
 };
 
-export const deleteTransaction = async (
-  id: number,
-  userId: number
-): Promise<boolean> => {
-  const count = await execute(
-    'DELETE FROM transactions WHERE id = $1 AND user_id = $2',
-    [id, userId]
-  );
+export const deleteTransaction = async (id: number): Promise<boolean> => {
+  const count = await execute('DELETE FROM transactions WHERE id = $1', [id]);
   return count > 0;
 };
 
@@ -235,12 +224,12 @@ export interface AccountBalanceAt {
 // the transactions already summed on earlier pages, even when several
 // transactions share the same date and created_at.
 export const getBalancesAt = async (
-  userId: number,
   accountIds: number[],
   date: string,
   createdAt: Date,
   id: number
 ): Promise<AccountBalanceAt[]> => {
+  if (accountIds.length === 0) return [];
   const rows = await query<{ id: number; balance: string }>(
     `SELECT a.id,
             (a.start_balance
@@ -250,12 +239,10 @@ export const getBalancesAt = async (
      FROM accounts a
      LEFT JOIN transactions t
             ON (t.credit_account_id = a.id OR t.debit_account_id = a.id)
-           AND t.user_id = $1
-           AND (t.date, t.created_at, t.id) < ($2::date, $3::timestamptz, $4::int)
-     WHERE a.id = ANY($5::int[])
-       AND a.user_id = $1
+           AND (t.date, t.created_at, t.id) < ($1::date, $2::timestamptz, $3::int)
+     WHERE a.id = ANY($4::int[])
      GROUP BY a.id, a.start_balance`,
-    [userId, date, createdAt, id, accountIds]
+    [date, createdAt, id, accountIds]
   );
   return rows.map(r => ({ id: r.id, balance: Number(r.balance) }));
 };
@@ -269,9 +256,13 @@ export interface AccountBalance {
 }
 
 export const getAccountBalances = async (
-  userId: number,
   accountIds: number[]
 ): Promise<AccountBalance[]> => {
+  // An empty list means no accounts, so no balances. The previous
+  // `array_length(...) IS NULL` branch meant "all of this user's
+  // transactions"; with user_id gone it would mean every transaction in the
+  // database, so it is removed and callers always pass an explicit list.
+  if (accountIds.length === 0) return [];
   const rows = await query<Omit<AccountBalance, 'debit' | 'credit'> & { debit: string; credit: string }>(
     `SELECT
        debit_account_id,
@@ -280,13 +271,11 @@ export const getAccountBalances = async (
        SUM(credit) AS credit,
        MAX(date) AS last_date
      FROM transactions
-     WHERE user_id = $1
-       AND (array_length($2::int[], 1) IS NULL
-            OR debit_account_id = ANY($2::int[])
-            OR credit_account_id = ANY($2::int[]))
+     WHERE debit_account_id = ANY($1::int[])
+        OR credit_account_id = ANY($1::int[])
      GROUP BY debit_account_id, credit_account_id
      ORDER BY last_date DESC`,
-    [userId, accountIds]
+    [accountIds]
   );
   return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
 };
