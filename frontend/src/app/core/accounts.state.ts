@@ -33,6 +33,12 @@ export interface AccountGroupItem {
 
 export type AccountTreeItem = AccountLeafItem | AccountGroupItem;
 
+/** The root items reachable on one access level, rendered as one block. */
+export interface AccountSection {
+  access_level: 1 | 2 | 3 | 4;
+  items: AccountTreeItem[];
+}
+
 // An account the backend did not label is one the user owns outright.
 const levelOf = (item: AccountTreeItem): number =>
   item.kind === 'account' ? item.account.access_level ?? 4 : item.access_level;
@@ -172,6 +178,22 @@ export function buildAccountTree(accounts: Account[]): AccountTreeItem[] {
   return collapseSingleChildGroups(roots).map(withOwnerSuffix);
 }
 
+/**
+ * Splits the root items into one section per access level, dropping empty
+ * ones. The tree is already sorted by level descending, so sections come out
+ * 4, 3, 2, 1 in that order without re-sorting.
+ */
+export function groupIntoSections(items: AccountTreeItem[]): AccountSection[] {
+  const sections: AccountSection[] = [];
+  for (const item of items) {
+    const level = levelOf(item) as 1 | 2 | 3 | 4;
+    const last = sections[sections.length - 1];
+    if (last?.access_level === level) last.items.push(item);
+    else sections.push({ access_level: level, items: [item] });
+  }
+  return sections;
+}
+
 export function collectAccountIds(group: AccountGroupItem): number[] {
   const ids: number[] = [];
   for (const item of group.children) {
@@ -219,6 +241,7 @@ export class AccountsState {
   // (e.g. editing an existing transaction that references one).
   readonly visibleAccounts = computed(() => this.accounts().filter(a => !a.deleted));
   readonly groupedAccounts = computed<AccountTreeItem[]>(() => buildAccountTree(this.visibleAccounts()));
+  readonly accountSections = computed<AccountSection[]>(() => groupIntoSections(this.groupedAccounts()));
   readonly summary = computed<BalanceSummary | null>(() => {
     const user = this.auth.user();
     if (!user) return null;

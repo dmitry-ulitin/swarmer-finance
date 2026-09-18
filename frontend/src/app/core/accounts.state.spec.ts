@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccountTree, collectAccountIds, collectUserBalance, AccountGroupItem } from './accounts.state';
+import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, AccountGroupItem } from './accounts.state';
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
@@ -277,6 +277,35 @@ describe('buildAccountTree', () => {
         expect(tree[0]).toMatchObject({ kind: 'account', account: { displayName: 'Wallet' } });
       });
     });
+  });
+});
+
+describe('groupIntoSections', () => {
+  it('returns no sections for an empty tree', () => {
+    expect(groupIntoSections([])).toEqual([]);
+  });
+
+  it('splits the tree into one section per level, highest first', () => {
+    const sections = groupIntoSections(buildAccountTree([
+      makeSharedAccount(1, 'Read', 1, 'Bob'),
+      makeAccount(2, 'Mine'),
+      makeSharedAccount(3, 'Write', 2, 'Bob'),
+      makeSharedAccount(4, 'Co-owned', 3, 'Bob'),
+    ]));
+    expect(sections.map(s => s.access_level)).toEqual([4, 3, 2, 1]);
+    expect(sections.map(s => s.items.map(itemName))).toEqual([
+      ['Mine'], ['Co-owned'], ['Write (Bob)'], ['Read (Bob)'],
+    ]);
+  });
+
+  it('keeps every item of one level in a single section', () => {
+    const sections = groupIntoSections(buildAccountTree([
+      makeAccount(1, 'Zebra'),
+      makeAccount(2, 'Apple'),
+      makeSharedAccount(3, 'Shared', 1, 'Bob'),
+    ]));
+    expect(sections).toHaveLength(2);
+    expect(sections[0].items.map(itemName)).toEqual(['Apple', 'Zebra']);
   });
 });
 

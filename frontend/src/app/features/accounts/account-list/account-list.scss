@@ -10,6 +10,31 @@
   flex-direction: column;
 }
 
+// One block per access level. The tint is the only thing telling them apart,
+// so each level gets a distinct pale status colour, all of which the Taiga
+// theme redefines for dark mode.
+.section {
+  padding: 0 0.5rem 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--tui-radius-l);
+
+  &[data-level="4"] {
+    background: var(--tui-status-info-pale);
+  }
+
+  &[data-level="3"] {
+    background: var(--tui-status-negative-pale);
+  }
+
+  &[data-level="2"] {
+    background: var(--tui-status-warning-pale);
+  }
+
+  &[data-level="1"] {
+    background: var(--tui-background-neutral-1);
+  }
+}
+
 .all-row-header {
   display: flex;
   align-items: center;
@@ -35,7 +60,6 @@
   }
 
   &.active {
-    background: var(--tui-background-base-alt);
     font-weight: 500;
   }
 }

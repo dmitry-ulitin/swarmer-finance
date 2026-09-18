@@ -39,6 +39,6 @@ export class AccountTreeNode {
   }
 
   protected get indent(): string {
-    return `calc(0.75rem + ${this.depth()}rem)`;
+    return `calc(0.25rem + ${this.depth()}rem)`;
   }
 }

@@ -11,7 +11,11 @@
     }
   </div>
 
-  @for (item of state.groupedAccounts(); track item.kind === 'account' ? item.account.id : item.key) {
-    <app-account-tree-node [item]="item" />
+  @for (section of state.accountSections(); track section.access_level) {
+    <div class="section" [attr.data-level]="section.access_level">
+      @for (item of section.items; track item.kind === 'account' ? item.account.id : item.key) {
+        <app-account-tree-node [item]="item" />
+      }
+    </div>
   }
 </nav>
