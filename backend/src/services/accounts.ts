@@ -118,8 +118,8 @@ export const updateAccount = async (
  * Returns one of: { kind: 'hard-deleted' }, { kind: 'soft-deleted' },
  * or throws an HttpError with statusCode: 409 / 404.
  *
- * Deleting requires OWNER: an admin-level grantee can edit the account but
- * not destroy it (see docs/superpowers/specs/2026-09-17-account-sharing-design.md).
+ * Deleting requires ADMIN: co-owners of a shared account have equal rights,
+ * and deletion is a rare, non-critical clean-up of old empty accounts.
  */
 export const deleteAccount = async (
   id: number,
@@ -131,7 +131,7 @@ export const deleteAccount = async (
   if (!existing) {
     throw { statusCode: 404, message: 'Account not found' };
   }
-  await requireLevel(id, userId, LEVEL.OWNER);
+  await requireLevel(id, userId, LEVEL.ADMIN);
   if (existing.deleted) {
     throw { statusCode: 404, message: 'Account is deleted' };
   }

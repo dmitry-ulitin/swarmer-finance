@@ -75,6 +75,8 @@ All API responses use this envelope format consistently.
   level 1 = read, 2 = transactions, 3 = admin. The owner is **not** stored
   there — `accounts.user_id` is the only source of ownership, and
   `services/access.ts` synthesises level 4 (owner) for owned accounts.
+  Granting someone level 3 makes the account co-owned: it then resolves to
+  level 3 for its owner too, so level 4 means "personal account".
 
 #### Transactions — single table, double-entry style
 

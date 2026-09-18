@@ -52,6 +52,26 @@ describe('access resolver', () => {
     expect(map.get(otherAccountId)).toBe(LEVEL.OWNER);
   });
 
+  it('downgrades the owner to ADMIN on an account shared at ADMIN', async () => {
+    await pool.query(
+      'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',
+      [ownedAccountId, granteeId, LEVEL.ADMIN]
+    );
+    const map = await getAccessMap(ownerId);
+    expect(map.get(ownedAccountId)).toBe(LEVEL.ADMIN);
+    // an unshared account of the same owner stays personal
+    expect(map.get(otherAccountId)).toBe(LEVEL.OWNER);
+  });
+
+  it('keeps the owner at OWNER when the share is below ADMIN', async () => {
+    await pool.query(
+      'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',
+      [ownedAccountId, granteeId, LEVEL.WRITE]
+    );
+    const map = await getAccessMap(ownerId);
+    expect(map.get(ownedAccountId)).toBe(LEVEL.OWNER);
+  });
+
   it('resolves a grant to its stored level', async () => {
     await pool.query(
       'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',

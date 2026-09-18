@@ -85,15 +85,18 @@ import as ordinary categories of their respective owners.
 `canUserAccessCategory`, the category tree, and the frontend are untouched by
 this feature.
 
-### Admin cannot delete the account or manage permissions
+### Admins are co-owners, and OWNER means "personal account"
 
-The previous system's admin level could do everything except transfer
-ownership. This design narrows it: level 3 can edit the account, but deleting it
-and managing its permissions require ownership.
+Granting someone level 3 turns the account from a personal one into a shared
+one. All of its admins — the user in `accounts.user_id` included — then hold it
+at level 3 and have equal rights over it, so the resolver reports the owner at
+ADMIN rather than OWNER on such an account. OWNER therefore marks an account
+that is the user's alone.
 
-This is a deliberate narrowing, not an oversight. It was confirmed as
-unnecessary for correct import, and it costs one condition rather than a data
-migration to widen later.
+Deleting the account requires level 3, not ownership: it is a rare,
+non-critical clean-up of old empty accounts (the balance rules below still
+apply), and withholding it from a co-owner buys nothing. Managing permissions
+stays with the owner, and has no API yet.
 
 ### Owner is not stored in `account_shares`
 
@@ -136,7 +139,7 @@ levels.
 export const LEVEL = { READ: 1, WRITE: 2, ADMIN: 3, OWNER: 4 } as const;
 export type AccessLevel = 1 | 2 | 3 | 4;
 
-// accountId -> level, including the user's own accounts at OWNER
+// accountId -> level, including the user's own personal accounts at OWNER
 export async function getAccessMap(userId: number): Promise<Map<number, AccessLevel>>;
 
 // Level on one account, or null when there is no access
@@ -149,14 +152,20 @@ export async function requireLevel(accountId: number, userId: number, min: Acces
 `getAccessMap` is a single query:
 
 ```sql
-SELECT id AS account_id, 4 AS level FROM accounts WHERE user_id = $1
+SELECT a.id AS account_id,
+       CASE WHEN EXISTS (
+         SELECT 1 FROM account_shares s
+         WHERE s.account_id = a.id AND s.level = 3
+       ) THEN 3 ELSE 4 END AS level
+  FROM accounts a WHERE a.user_id = $1
 UNION ALL
 SELECT account_id, level FROM account_shares WHERE user_id = $1
 ```
 
 `OWNER = 4` sits above the three stored levels so every check is a plain
-`level >= required`, and "admin but not owner" is `level >= 3` versus
-`level === OWNER` with no special cases.
+`level >= required`. The `CASE` is what makes an owner a co-owner: an owned
+account that someone else holds at level 3 resolves to 3 for the owner too, so
+"personal account" is `level === OWNER` with no special cases.
 
 Permission checks are called **only from the service layer** — not from queries,
 not from routes. The services already work this way: `loadAccount` and
@@ -170,7 +179,7 @@ not from routes. The services already work this way: `loadAccount` and
 | See an account's transactions | ≥ 1 |
 | Create / update / delete a transaction touching an account | ≥ 2 on **every** account it touches |
 | Update the account itself (`PUT`) | ≥ 3 |
-| Delete the account (`DELETE`) | OWNER |
+| Delete the account (`DELETE`) | ≥ 3 |
 | Manage permissions | OWNER (no API yet) |
 
 **"Every account it touches"** — a transfer between accounts A and B requires
@@ -180,7 +189,7 @@ the transaction's **current** accounts and its **new** accounts are checked;
 without that, a transaction could be moved off an account the user cannot write
 to.
 
-**Deleting a transaction** requires ≥ 2 on its accounts, not OWNER. This follows
+**Deleting a transaction** requires ≥ 2 on its accounts, not ≥ 3. This follows
 from the definition of level 2.
 
 ## Query and Service Changes
@@ -227,7 +236,7 @@ means no results, and callers always pass an explicit list.
 - `getAccounts` — resolver → `getAccountsByIds`. Accounts in the response carry
   `access_level` and `owner_name`.
 - `updateAccount` — `requireLevel(id, userId, ADMIN)`.
-- `deleteAccount` — `requireLevel(id, userId, OWNER)`.
+- `deleteAccount` — `requireLevel(id, userId, ADMIN)`.
 - `withBalances` / `withConvertedBalances` — lose `userId` where it was a
   filter. Conversion to the user's display currency still uses the **requesting**
   user's currency, not the owner's.
@@ -293,15 +302,17 @@ To revisit when permission-management UI is built:
 
 ## Testing
 
-Backend Jest tests. Existing tests must pass **unchanged** — the owner resolves
-to `OWNER` and single-user behavior is identical. A regression in the
-single-user path means the resolver is wrong.
+Backend Jest tests. Existing tests must pass **unchanged** — an unshared
+account resolves to `OWNER` and single-user behavior is identical. A regression
+in the single-user path means the resolver is wrong.
 
 New file `backend/src/test/sharing.test.ts`. Fixture: user A owns account `A1`
 (and `A2`), user B owns private account `B1`; grants on `A1` to B vary by test.
 
-**Resolver** — owner resolves to OWNER; a grant resolves to its stored level; a
-missing row means no access; deleting the row removes access immediately.
+**Resolver** — owner resolves to OWNER on an unshared account and on one shared
+below level 3, and to ADMIN once someone holds level 3 on it; a grant resolves
+to its stored level; a missing row means no access; deleting the row removes
+access immediately.
 
 **Visibility (level 1)** — B sees `A1` in `GET /accounts` with `access_level: 1`
 and `owner_name`; B sees `A1`'s transactions in `GET /transactions`; the balance
@@ -309,7 +320,7 @@ B sees for `A1` equals the balance A sees; B does not see `A2`.
 
 **Level boundaries**, cell by cell against the permission table — level 1:
 transaction POST/PUT/DELETE all 403; level 2: transactions succeed, account PUT
-403; level 3: account PUT succeeds, account DELETE 403; owner: everything
+and DELETE 403; level 3: account PUT and DELETE succeed; owner: everything
 succeeds.
 
 **Cross-boundary transfer** — B (level 2 on `A1`) transfers `A1 → B1`. The

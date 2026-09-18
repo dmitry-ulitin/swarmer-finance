@@ -288,7 +288,7 @@ describe('Account sharing', () => {
       expect(recategorized.status).toBe(403);
     });
 
-    it('level 3 can edit the account but not delete it', async () => {
+    it('level 3 can edit the account', async () => {
       await grant(a1, userBId, LEVEL.ADMIN);
 
       try {
@@ -298,15 +298,39 @@ describe('Account sharing', () => {
           .send(accountPayload());
         expect(edited.status).toBe(200);
         expect(edited.body.data.name).toBe('Renamed');
-
-        const removed = await request(app)
-          .delete(`/api/accounts/${a1}`)
-          .set({ Authorization: `Bearer ${tokenB}` });
-        expect(removed.status).toBe(403);
       } finally {
         // restore the name for the remaining tests, even if an assertion above threw
         await pool.query('UPDATE accounts SET name = $1 WHERE id = $2', ['A One', a1]);
       }
+    });
+
+    it('level 3 can delete the account, being a co-owner', async () => {
+      const throwaway = await makeAccount(userAId, 'Throwaway admin');
+      await grant(throwaway, userBId, LEVEL.ADMIN);
+
+      const removed = await request(app)
+        .delete(`/api/accounts/${throwaway}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(removed.status).toBe(200);
+    });
+
+    it('level 2 cannot delete the account', async () => {
+      const throwaway = await makeAccount(userAId, 'Throwaway write');
+      await grant(throwaway, userBId, LEVEL.WRITE);
+
+      const removed = await request(app)
+        .delete(`/api/accounts/${throwaway}`)
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(removed.status).toBe(403);
+    });
+
+    it('reports an own account shared at ADMIN as level 3, not OWNER', async () => {
+      const coowned = await makeAccount(userAId, 'Co-owned');
+      await grant(coowned, userBId, LEVEL.ADMIN);
+
+      const res = await request(app).get('/api/accounts').set({ Authorization: `Bearer ${tokenA}` });
+      const account = res.body.data.find((a: { id: number }) => a.id === coowned);
+      expect(account.access_level).toBe(LEVEL.ADMIN);
     });
 
     it('the owner can delete their own account', async () => {

@@ -2,9 +2,10 @@ import { getAccessRows } from '../db/queries/accountShares';
 
 /**
  * Access levels. 1-3 are stored in account_shares; OWNER is synthesised by
- * the resolver for accounts the user owns, so every check is a plain
- * `level >= required` and "admin but not owner" is `level === LEVEL.OWNER`
- * without a special case.
+ * the resolver for accounts the user owns alone, so every check is a plain
+ * `level >= required`. An owned account that is shared with someone at ADMIN
+ * is co-owned, and the owner holds it at ADMIN too — OWNER then means
+ * "personal account".
  */
 export const LEVEL = { READ: 1, WRITE: 2, ADMIN: 3, OWNER: 4 } as const;
 export type AccessLevel = 1 | 2 | 3 | 4;
