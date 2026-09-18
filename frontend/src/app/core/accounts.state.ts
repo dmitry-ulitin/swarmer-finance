@@ -20,17 +20,33 @@ export interface AccountGroupItem {
   kind: 'group';
   displayName: string;
   fullPath: string;
+  /**
+   * Identifies the group, where `fullPath` only names it: two groups can share
+   * a path and differ in level or owner. Use this for expand state and @for
+   * tracking, never for deriving account names.
+   */
+  key: string;
+  /** Shared by every account in the group — it is part of the grouping key. */
+  access_level: 1 | 2 | 3 | 4;
   children: AccountTreeItem[];
 }
 
 export type AccountTreeItem = AccountLeafItem | AccountGroupItem;
 
+// An account the backend did not label is one the user owns outright.
+const levelOf = (item: AccountTreeItem): number =>
+  item.kind === 'account' ? item.account.access_level ?? 4 : item.access_level;
+
 function itemName(item: AccountTreeItem): string {
   return item.kind === 'account' ? item.account.displayName : item.displayName;
 }
 
+function compareByName(a: AccountTreeItem, b: AccountTreeItem): number {
+  return itemName(a).localeCompare(itemName(b), undefined, { sensitivity: 'base' });
+}
+
 function sortItems(items: AccountTreeItem[]): void {
-  items.sort((a, b) => itemName(a).localeCompare(itemName(b), undefined, { sensitivity: 'base' }));
+  items.sort(compareByName);
   for (const item of items) {
     if (item.kind === 'group') sortItems(item.children);
   }
@@ -50,9 +66,11 @@ function collapseSingleChildGroups(items: AccountTreeItem[], ancestorPath?: stri
     let children = item.children;
     let displayName = item.displayName;
     let fullPath = item.fullPath;
+    let key = item.key;
     while (children.length === 1 && children[0].kind === 'group') {
       displayName = `${displayName}/${children[0].displayName}`;
       fullPath = children[0].fullPath;
+      key = children[0].key;
       children = children[0].children;
     }
     if (children.length === 1 && children[0].kind === 'account') {
@@ -62,23 +80,73 @@ function collapseSingleChildGroups(items: AccountTreeItem[], ancestorPath?: stri
         : leaf.account.name.slice(ancestorPath.length + 1);
       return { kind: 'account', account: { ...leaf.account, displayName: accountDisplayName } };
     }
-    return { kind: 'group', displayName, fullPath, children: collapseSingleChildGroups(children, fullPath) };
+    return {
+      kind: 'group',
+      displayName,
+      fullPath,
+      key,
+      access_level: item.access_level,
+      children: collapseSingleChildGroups(children, fullPath),
+    };
   });
+}
+
+// Groups are keyed by access level and owner as well as by name, so accounts
+// the user reaches on different terms never merge into one group: a personal
+// "Bank" and a "Bank" shared by Bob stay two rows with one path between them.
+// The separator is a NUL so no owner name or path can contain it and make two
+// different groups collide on one key.
+const groupKey = (level: number, owner: string, path: string) =>
+  `${level}\u0000${owner}\u0000${path}`;
+
+/**
+ * Labels an item with its owner, for the top level only: below level 3 an
+ * account is someone else's, and the row has to say whose. Nested rows inherit
+ * the label from the group heading them, so repeating it there adds noise.
+ */
+function withOwnerSuffix(item: AccountTreeItem): AccountTreeItem {
+  if (levelOf(item) >= 3) return item;
+  if (item.kind === 'group') {
+    const owner = ownerOf(item);
+    return owner ? { ...item, displayName: `${item.displayName} (${owner})` } : item;
+  }
+  const owner = item.account.owner_name;
+  return owner
+    ? { ...item, account: { ...item.account, displayName: `${item.account.displayName} (${owner})` } }
+    : item;
+}
+
+// Every account under a group shares one owner — it is part of the group key.
+function ownerOf(group: AccountGroupItem): string | undefined {
+  for (const child of group.children) {
+    if (child.kind === 'account') return child.account.owner_name;
+    const owner = ownerOf(child);
+    if (owner !== undefined) return owner;
+  }
+  return undefined;
 }
 
 export function buildAccountTree(accounts: Account[]): AccountTreeItem[] {
   const groupMap = new Map<string, AccountGroupItem>();
   const roots: AccountTreeItem[] = [];
 
-  function getOrCreateGroup(segments: string[]): AccountGroupItem {
+  function getOrCreateGroup(segments: string[], level: 1 | 2 | 3 | 4, owner: string): AccountGroupItem {
     const path = segments.join('/');
-    if (groupMap.has(path)) return groupMap.get(path)!;
-    const group: AccountGroupItem = { kind: 'group', displayName: segments[segments.length - 1], fullPath: path, children: [] };
-    groupMap.set(path, group);
+    const key = groupKey(level, owner, path);
+    if (groupMap.has(key)) return groupMap.get(key)!;
+    const group: AccountGroupItem = {
+      kind: 'group',
+      displayName: segments[segments.length - 1],
+      fullPath: path,
+      key,
+      access_level: level,
+      children: [],
+    };
+    groupMap.set(key, group);
     if (segments.length === 1) {
       roots.push(group);
     } else {
-      getOrCreateGroup(segments.slice(0, -1)).children.push(group);
+      getOrCreateGroup(segments.slice(0, -1), level, owner).children.push(group);
     }
     return group;
   }
@@ -92,12 +160,16 @@ export function buildAccountTree(accounts: Account[]): AccountTreeItem[] {
     if (groupSegments.length === 0) {
       roots.push(leaf);
     } else {
-      getOrCreateGroup(groupSegments).children.push(leaf);
+      getOrCreateGroup(groupSegments, account.access_level ?? 4, account.owner_name ?? '').children.push(leaf);
     }
   }
 
   sortItems(roots);
-  return collapseSingleChildGroups(roots);
+  // Own accounts first, then by name. Only the root is ranked by level: within
+  // a group every account already shares one.
+  roots.sort((a, b) => levelOf(b) - levelOf(a) || compareByName(a, b));
+  // After collapsing, so an account lifted to the top level is labelled too.
+  return collapseSingleChildGroups(roots).map(withOwnerSuffix);
 }
 
 export function collectAccountIds(group: AccountGroupItem): number[] {
