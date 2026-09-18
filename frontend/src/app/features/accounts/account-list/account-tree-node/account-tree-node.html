@@ -16,7 +16,7 @@
     @let group = asGroup(it);
     <div class="row-header" [style.padding-left]="indent">
       <button
-        class="row-name uppercase"
+        class="row-name"
         type="button"
         [class.active]="nodeAccountIds().every(id => transactions.selectedAccountIds().includes(id))"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccounts(nodeAccountIds()) : transactions.selectAccounts(nodeAccountIds())"
