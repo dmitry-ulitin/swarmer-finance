@@ -8,6 +8,7 @@ const COIN_IDS: Record<string, string> = {
   ETH: 'ethereum',
   USDT: 'tether',
   USDC: 'usd-coin',
+  SOL: 'solana',
 };
 
 // Fiat (and metal) codes CoinGecko accepts as `vs_currencies`, from
