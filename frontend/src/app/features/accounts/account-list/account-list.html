@@ -7,7 +7,7 @@
       (click)="transactions.selectAllAccounts()"
     >All accounts</button>
     @if (state.summary() && !state.summary()?.incomplete) {
-      <span class="all-row-balance">{{ state.summary()?.total  | currency: state.summary()?.currency : 'symbol' : '1.'+state.summary()?.scale+'-'+state.summary()?.scale }}</span>
+      <span class="all-row-balance">{{ state.summary()?.total  | money: state.summary()?.currency : state.summary()?.scale }}</span>
     }
   </div>
 

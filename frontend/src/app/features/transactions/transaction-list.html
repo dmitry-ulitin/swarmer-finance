@@ -19,10 +19,10 @@
             <span class="amount">
                 @if (t.type === TransactionType.Income) { + }
                 @if (t.type === TransactionType.Expense) { − }
-                {{ t.amount | currency: t.amountCurrency : 'symbol' : '1.'+t.amountScale+'-'+t.amountScale }}
+                {{ t.amount | money: t.amountCurrency : t.amountScale }}
             </span>
             @if (t.balance !== null) {
-                <span class="balance">{{ t.balance | currency: t.balanceCurrency : 'symbol' : '1.'+t.balanceScale+'-'+t.balanceScale }}</span>
+                <span class="balance">{{ t.balance | money: t.balanceCurrency : t.balanceScale }}</span>
             }
         </div>
     </div>

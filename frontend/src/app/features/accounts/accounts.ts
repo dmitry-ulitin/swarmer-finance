@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { MoneyPipe } from '../../core/money.pipe';
 import { AccountsState } from '../../core/accounts.state';
 import { Account } from '../../models/account';
 import { AuthService } from '../../core/auth.service';
@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-accounts',
-  imports: [TuiButton, TuiLoader, CurrencyPipe],
+  imports: [TuiButton, TuiLoader, MoneyPipe],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

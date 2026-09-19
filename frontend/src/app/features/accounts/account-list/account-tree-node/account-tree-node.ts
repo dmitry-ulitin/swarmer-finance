@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { MoneyPipe } from '../../../../core/money.pipe';
 import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectUserBalance } from '../../../../core/accounts.state';
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
@@ -8,7 +8,7 @@ import { TuiExpand } from '@taiga-ui/core/components/expand';
 
 @Component({
   selector: 'app-account-tree-node',
-  imports: [AccountTreeNode, CurrencyPipe, TuiExpand],
+  imports: [AccountTreeNode, MoneyPipe, TuiExpand],
   templateUrl: './account-tree-node.html',
   styleUrl: './account-tree-node.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

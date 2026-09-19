@@ -9,7 +9,7 @@
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
       >{{ account.displayName }}</button>
       @if (account.balance !== null) {
-        <span class="row-balance">{{ account.balance | currency: account.currency : 'symbol' : '1.'+account.scale+'-'+account.scale }}</span>
+        <span class="row-balance">{{ account.balance | money: account.currency : account.scale }}</span>
       }
     </div>
   } @else {
@@ -29,7 +29,7 @@
         (click)="store.toggleExpanded(group.key)"
       >›</button>
       @if (groupBalance() !== null && auth.user(); as user) {
-        <span class="row-balance">{{ groupBalance() | currency: user.currency : 'symbol' : '1.'+user.currency_scale+'-'+user.currency_scale }}</span>
+        <span class="row-balance">{{ groupBalance() | money: user.currency : user.currency_scale }}</span>
       }
     </div>
     <tui-expand [expanded]="store.isExpanded(group.key)">

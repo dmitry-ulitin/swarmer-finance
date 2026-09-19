@@ -3,11 +3,11 @@ import { AccountsState } from '../../../core/accounts.state';
 import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';
 import { TransactionsState } from '../../../core/transactions.state';
-import { CurrencyPipe } from '@angular/common';
+import { MoneyPipe } from '../../../core/money.pipe';
 
 @Component({
   selector: 'app-account-list',
-  imports: [AccountTreeNode, CurrencyPipe],
+  imports: [AccountTreeNode, MoneyPipe],
   providers: [AccountListStore],
   templateUrl: './account-list.html',
   styleUrl: './account-list.scss',
