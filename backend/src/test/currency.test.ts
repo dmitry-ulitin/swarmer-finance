@@ -134,8 +134,8 @@ describe('CoinGecko fallback', () => {
     global.fetch = originalFetch;
     await pool.query(
       `DELETE FROM exchange_rates
-       WHERE from_currency IN ('BTC','USDT','RUB','EUR','ZZZ')
-          OR to_currency IN ('BTC','USDT','RUB','ZZZ')`
+       WHERE from_currency IN ('BTC','ETH','SOL','TON','TRX','USDT','RUB','EUR','ZZZ')
+          OR to_currency IN ('BTC','ETH','SOL','TON','TRX','USDT','RUB','ZZZ')`
     );
   });
 
@@ -216,6 +216,88 @@ describe('CoinGecko fallback', () => {
     const rate = await getOrRefreshRate('BTC', 'EUR');
 
     expect(rate).toBe(71000);
+  });
+
+  it('collapses a parallel fan-out into one CoinGecko request', async () => {
+    // The 429 bug: getRatesTo refreshed every uncached currency in parallel,
+    // one request per pair, blowing the rate limit on a cold cache.
+    let coingeckoCalls = 0;
+    global.fetch = jest.fn(async (url: string) => {
+      if (!url.includes('coingecko')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      coingeckoCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          bitcoin: { eur: 70000 },
+          ethereum: { eur: 2300 },
+          solana: { eur: 97 },
+          'the-open-network': { eur: 1.19 },
+          tron: { eur: 0.29 },
+        }),
+      };
+    }) as unknown as typeof fetch;
+
+    const rates = await getRatesTo('EUR', ['BTC', 'ETH', 'SOL', 'TON', 'TRX']);
+
+    expect(rates.get('BTC')).toBe(70000);
+    expect(rates.get('TRX')).toBeCloseTo(0.29, 10);
+    expect([...rates.values()].filter((r) => r === null)).toHaveLength(0);
+    expect(coingeckoCalls).toBe(1);
+  });
+
+  it('retries a 429 from CoinGecko and succeeds on the retry', async () => {
+    let coingeckoCalls = 0;
+    global.fetch = jest.fn(async (url: string) => {
+      if (!url.includes('coingecko')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      coingeckoCalls += 1;
+      if (coingeckoCalls === 1) {
+        return { ok: false, status: 429, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => ({ bitcoin: { eur: 70000 } }) };
+    }) as unknown as typeof fetch;
+
+    const rate = await getOrRefreshRate('BTC', 'EUR');
+
+    expect(rate).toBe(70000);
+    expect(coingeckoCalls).toBe(2);
+  });
+
+  it('gives up after exhausting retries on a persistent 429', async () => {
+    let coingeckoCalls = 0;
+    global.fetch = jest.fn(async (url: string) => {
+      if (!url.includes('coingecko')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      coingeckoCalls += 1;
+      return { ok: false, status: 429, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+
+    const rate = await getOrRefreshRate('BTC', 'EUR');
+
+    expect(rate).toBeNull();
+    // Initial attempt plus the retries, not an unbounded loop.
+    expect(coingeckoCalls).toBe(3);
+  });
+
+  it('does not retry a non-429 CoinGecko failure', async () => {
+    let coingeckoCalls = 0;
+    global.fetch = jest.fn(async (url: string) => {
+      if (!url.includes('coingecko')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      coingeckoCalls += 1;
+      return { ok: false, status: 500, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+
+    const rate = await getOrRefreshRate('BTC', 'EUR');
+
+    expect(rate).toBeNull();
+    expect(coingeckoCalls).toBe(1);
   });
 
   it('returns null when neither provider knows the currency', async () => {

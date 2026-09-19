@@ -36,11 +36,17 @@ async function refreshRate(from: string, to: string): Promise<void> {
 // than by pulling as_of into JS and comparing, since pg returns DATE columns
 // as Date objects that shift with the local timezone, not the plain date
 // string they were stored as.
-async function getRateInternal(from: string, to: string): Promise<number | null> {
+async function getCachedRate(from: string, to: string): Promise<number | null> {
   if (await exchangeRateQueries.hasRateSince(from, to, today())) {
     const latest = await exchangeRateQueries.getLatestRate(from, to);
     if (latest) return Number(latest.rate);
   }
+  return null;
+}
+
+async function getRateInternal(from: string, to: string): Promise<number | null> {
+  const cached = await getCachedRate(from, to);
+  if (cached !== null) return cached;
 
   await refreshRate(from, to);
 
@@ -63,10 +69,25 @@ export async function getRatesTo(
 ): Promise<Map<string, number | null>> {
   const distinct = [...new Set(fromCurrencies)];
 
-  const entries = await Promise.all(
+  // Every cache lookup finishes before any refresh starts. Interleaving them
+  // would stagger the provider calls by a DB round-trip each, which stops
+  // concurrent lookups sharing one upstream request and — for a cold cache
+  // with several crypto accounts — trips CoinGecko's rate limit.
+  const cached = await Promise.all(
     distinct.map(async (from): Promise<[string, number | null]> => {
       if (from === targetCurrency) return [from, 1];
-      return [from, await getRateInternal(from, targetCurrency)];
+      return [from, await getCachedRate(from, targetCurrency)];
+    })
+  );
+
+  const entries = await Promise.all(
+    cached.map(async ([from, rate]): Promise<[string, number | null]> => {
+      if (rate !== null) return [from, rate];
+      // Straight to the providers — the cache was just checked above, and a
+      // second lookup here would re-stagger the calls we are coalescing.
+      await refreshRate(from, targetCurrency);
+      const fresh = await exchangeRateQueries.getLatestRate(from, targetCurrency);
+      return [from, fresh ? Number(fresh.rate) : null];
     })
   );
 
