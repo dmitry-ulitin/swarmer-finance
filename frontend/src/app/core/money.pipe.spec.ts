@@ -42,8 +42,7 @@ describe('MoneyPipe', () => {
 
   it('honours the scale argument', () => {
     expect(pipe().transform(1234.5, 'USD', 0)).toBe('$1,235');
-    // Intl separates a code-only "symbol" from the number with a NBSP.
-    expect(pipe().transform(1234.5678, 'BTC', 4)).toBe('BTC 1,234.5678');
+    expect(pipe().transform(1234.5678, 'BTC', 4)).toBe('₿1,234.5678');
   });
 
   it('falls back to a scale of 2 when none is given', () => {
@@ -59,6 +58,37 @@ describe('MoneyPipe', () => {
   it('returns an empty string for a missing amount', () => {
     expect(pipe().transform(null, 'USD', 2)).toBe('');
     expect(pipe().transform(undefined, 'USD', 2)).toBe('');
+  });
+
+  describe('currencies Intl does not know', () => {
+    it('gives the known crypto symbols', () => {
+      // USDT is not ISO 4217 at all; BTC and ETH are well-formed but have no
+      // symbol in CLDR, so Intl renders them as bare letters.
+      expect(pipe().transform(1234.5, 'USDT', 2)).toBe('₮1,234.50');
+      expect(pipe().transform(1234.5, 'BTC', 2)).toBe('₿1,234.50');
+      expect(pipe().transform(1234.5, 'ETH', 2)).toBe('Ξ1,234.50');
+    });
+
+    it('formats an unknown code with the locale grouping, not as a raw number', () => {
+      // A 4-letter code makes Intl throw, but the amount must still read as
+      // money — with a space, since a letter code is not a symbol.
+      expect(pipe().transform(1234.5, 'USDC', 2)).toBe('USDC 1,234.50');
+    });
+
+    it('leaves an ambiguous code as letters rather than reusing a symbol', () => {
+      // ₮ already stands for USDT here, so USDC must not get it too.
+      expect(pipe().transform(1234.5, 'USDC', 2)).not.toContain('₮');
+    });
+
+    it('applies crypto symbols under any locale', () => {
+      // ru groups with a NBSP and puts the symbol last, after another NBSP.
+      expect(pipeFor('ru').transform(1234.5, 'USDT', 2)).toBe('1\u00a0234,50\u00a0₮');
+      expect(pipeFor('ru').transform(1234.5, 'USDC', 2)).toBe('1\u00a0234,50\u00a0USDC');
+    });
+
+    it('honours the scale for crypto amounts', () => {
+      expect(pipe().transform(1.23456789, 'BTC', 8)).toBe('₿1.23456789');
+    });
   });
 
   describe('LOCALE_ID', () => {
