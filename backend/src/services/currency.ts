@@ -1,33 +1,40 @@
 import * as exchangeRateQueries from '../db/queries/exchangeRates';
+import * as frankfurter from './rates/frankfurter';
+import * as coingecko from './rates/coingecko';
 
-const FRANKFURTER_BASE_URL = process.env.FRANKFURTER_BASE_URL || 'https://api.frankfurter.dev/v1';
-const FRANKFURTER_TIMEOUT_MS = 5000;
+// Tried in order. Frankfurter (ECB rates) is authoritative for the fiat it
+// covers; CoinGecko picks up what it does not know — crypto, and fiat such
+// as RUB. A provider returning null means "I do not cover this pair", so
+// the next one is tried; throwing means the pair looks supported but the
+// call failed, which is logged and likewise falls through.
+const PROVIDERS = [frankfurter, coingecko];
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function refreshRatesForBase(from: string, toCurrencies: string[]): Promise<void> {
-  if (toCurrencies.length === 0) return;
-  const symbols = toCurrencies.join(',');
-  const res = await fetch(`${FRANKFURTER_BASE_URL}/latest?base=${from}&symbols=${symbols}`, {
-    signal: AbortSignal.timeout(FRANKFURTER_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw { statusCode: 502, message: `Frankfurter request failed: ${res.status}` };
-  }
-  const body = (await res.json()) as { date: string; rates: Record<string, number> };
-  for (const [to, rate] of Object.entries(body.rates)) {
-    await exchangeRateQueries.upsertRate(from, to, rate, body.date);
+async function refreshRate(from: string, to: string): Promise<void> {
+  for (const provider of PROVIDERS) {
+    try {
+      const result = await provider.fetchRate(from, to);
+      if (result) {
+        await exchangeRateQueries.upsertRate(from, to, result.rate, result.asOf);
+        return;
+      }
+    } catch (error: unknown) {
+      const message =
+        error && typeof error === 'object' && 'message' in error ? error.message : String(error);
+      console.error(`Failed to refresh exchange rate ${from}->${to}:`, message);
+    }
   }
 }
 
 // Shared cache/refresh/fallback policy for a single currency pair:
 // use the latest cached rate if any row is dated today or later -> otherwise
-// refresh via Frankfurter -> re-check the latest cache -> null if nothing
-// exists. The freshness check is done in SQL (hasRateSince) rather than by
-// pulling as_of into JS and comparing, since pg returns DATE columns as
-// Date objects that shift with the local timezone, not the plain date
+// refresh via the provider chain -> re-check the latest cache -> null if
+// nothing exists. The freshness check is done in SQL (hasRateSince) rather
+// than by pulling as_of into JS and comparing, since pg returns DATE columns
+// as Date objects that shift with the local timezone, not the plain date
 // string they were stored as.
 async function getRateInternal(from: string, to: string): Promise<number | null> {
   if (await exchangeRateQueries.hasRateSince(from, to, today())) {
@@ -35,15 +42,7 @@ async function getRateInternal(from: string, to: string): Promise<number | null>
     if (latest) return Number(latest.rate);
   }
 
-  try {
-    await refreshRatesForBase(from, [to]);
-  } catch (error: unknown) {
-    // Network/API failure — log for visibility, then fall through to
-    // stale-cache fallback below.
-    const message =
-      error && typeof error === 'object' && 'message' in error ? error.message : String(error);
-    console.error(`Failed to refresh exchange rate ${from}->${to}:`, message);
-  }
+  await refreshRate(from, to);
 
   const fresh = await exchangeRateQueries.getLatestRate(from, to);
   return fresh ? Number(fresh.rate) : null;
@@ -55,8 +54,9 @@ export async function getOrRefreshRate(from: string, to: string): Promise<number
 }
 
 // Batched: resolves all distinct source currencies in parallel (one cache
-// lookup and, on a cache miss, one Frankfurter call per distinct source
-// currency not already cached for today); returns a Map<fromCurrency, rate|null>.
+// lookup and, on a cache miss, one provider-chain refresh per distinct
+// source currency not already cached for today); returns a
+// Map<fromCurrency, rate|null>.
 export async function getRatesTo(
   targetCurrency: string,
   fromCurrencies: string[]
