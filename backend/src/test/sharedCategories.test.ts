@@ -313,6 +313,103 @@ describe('Shared categories', () => {
     });
   });
 
+  describe('creating a category under a foreign parent', () => {
+    it("copies the parent path into my tree and creates the child there", async () => {
+      const stamp = Date.now();
+      const parentName = `TheirParent-${stamp}`;
+      const cParent = await makeCategory(userCId, parentName, 2);
+
+      // The merged tree shows C's row for this path, so that is the id the
+      // client sends as parentId.
+      const created = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({ name: `MyChild-${stamp}`, parentId: cParent });
+
+      expect(created.status).toBe(200);
+      expect(created.body.data.user_id).toBe(userAId);
+      expect(created.body.data.fullName).toBe(`${parentName} / MyChild-${stamp}`);
+
+      // A copy of the parent now exists under A, and the child hangs off it.
+      const myParent = await pool.query(
+        'SELECT id FROM categories WHERE user_id = $1 AND name = $2',
+        [userAId, parentName]
+      );
+      expect(myParent.rows).toHaveLength(1);
+      expect(created.body.data.parent_id).toBe(myParent.rows[0].id);
+      // C's row is untouched.
+      const theirChildren = await pool.query(
+        'SELECT id FROM categories WHERE parent_id = $1',
+        [cParent]
+      );
+      expect(theirChildren.rows).toHaveLength(0);
+    });
+
+    it('reuses my existing category for that path instead of duplicating it', async () => {
+      const stamp = Date.now();
+      const parentName = `SharedParent-${stamp}`;
+      const cParent = await makeCategory(userCId, parentName, 2);
+      const aParent = await makeCategory(userAId, parentName, 2);
+
+      const created = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({ name: `Child-${stamp}`, parentId: cParent });
+
+      expect(created.status).toBe(200);
+      expect(created.body.data.parent_id).toBe(aParent);
+
+      const copies = await pool.query(
+        'SELECT id FROM categories WHERE user_id = $1 AND name = $2',
+        [userAId, parentName]
+      );
+      expect(copies.rows).toHaveLength(1);
+    });
+
+    it('still creates directly under a system root', async () => {
+      const created = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({ name: `TopLevel-${Date.now()}`, parentId: 2 });
+
+      expect(created.status).toBe(200);
+      expect(created.body.data.parent_id).toBe(2);
+      expect(created.body.data.user_id).toBe(userAId);
+    });
+
+    it("refuses a parent belonging to an unrelated user", async () => {
+      const stamp = Date.now();
+      const stranger = await register(`shcat-z-${stamp}@example.com`);
+      const strangerParent = await makeCategory(stranger.id, `Z-${stamp}`, 2);
+
+      const created = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({ name: `Nope-${stamp}`, parentId: strangerParent });
+
+      expect(created.status).toBe(403);
+
+      await pool.query('DELETE FROM categories WHERE user_id = $1', [stranger.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [stranger.id]);
+    });
+
+    it('rejects a duplicate sibling after the parent is resolved', async () => {
+      const stamp = Date.now();
+      const parentName = `DupParent-${stamp}`;
+      const childName = `DupChild-${stamp}`;
+      const cParent = await makeCategory(userCId, parentName, 2);
+      const aParent = await makeCategory(userAId, parentName, 2);
+      await makeCategory(userAId, childName, aParent);
+
+      const created = await request(app)
+        .post('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({ name: childName, parentId: cParent });
+
+      expect(created.status).toBe(409);
+    });
+  });
+
   describe('transaction DTO category shape', () => {
     it('carries every category field except children, plus fullName and root_id', async () => {
       const parent = await makeCategory(userAId, `Parent-${Date.now()}`, 2);

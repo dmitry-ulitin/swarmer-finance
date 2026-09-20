@@ -138,13 +138,15 @@ export const createCategory = async (
   if (!parentCategory) {
     throw { statusCode: 404, message: 'Parent category not found' };
   }
-  
-  if (parentCategory.user_id !== null && parentCategory.user_id !== userId) {
-    throw { statusCode: 403, message: 'Cannot create category under this parent' };
-  }
+
+  // The tree shows one node per path, so the chosen parent may be a
+  // co-owner's row. Reproduce its path under this user and create the child
+  // there, rather than refusing or hanging a category off someone else's
+  // row. A parent from an unrelated user is still rejected.
+  const resolvedParentId = await resolveCategoryForOwner(parentId, userId, userId);
 
   try {
-    return await categoryQueries.createCategory(userId, name, parentId, color, icon);
+    return await categoryQueries.createCategory(userId, name, resolvedParentId, color, icon);
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw {
