@@ -1,4 +1,5 @@
 import * as categoryQueries from '../db/queries/categories';
+import { getRelatedUserIds } from '../db/queries/accountShares';
 import { Category } from '../types';
 
 /**
@@ -16,14 +17,18 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 export const getCategoryTree = async (userId: number): Promise<Category[]> => {
-  const allCategories = await categoryQueries.getCategoriesByUserId(userId);
-  
+  // The tree spans everyone whose categories can appear in transactions this
+  // user can see, so a transaction authored by a co-owner resolves to a real
+  // node instead of nothing. Each node carries owner_name, which is how the
+  // client tells a foreign category apart from its own.
+  const relatedUserIds = await getRelatedUserIds(userId);
+  const allCategories = await categoryQueries.getCategoriesByUserIds(relatedUserIds);
+
   const systemRoots = allCategories.filter(c => c.user_id === null && c.parent_id === null);
-  const treeCategories = allCategories.filter(c => c.user_id === userId || c.user_id === null);
 
   return systemRoots.map(root => ({
     ...root,
-    children: buildTree(treeCategories, root.id),
+    children: buildTree(allCategories, root.id),
   }));
 };
 
@@ -35,6 +40,45 @@ const buildTree = (categories: Category[], parentId: number): Category[] => {
       children: buildTree(categories, c.id),
     }))
     .sort((a, b) => a.user_id === null ? -1 : (b.user_id === null ? 1 : a.name.localeCompare(b.name)));
+};
+
+/**
+ * The category a transaction owned by `ownerId` should actually store when
+ * the client sends `categoryId`.
+ *
+ * Categories are per-user, but the client is shown a tree spanning everyone
+ * it shares accounts with, so `categoryId` may name a category someone else
+ * owns. Rather than storing a foreign id, the same path is reproduced under
+ * `ownerId` — found if it already exists, created otherwise. System
+ * categories belong to everybody and pass through unchanged.
+ *
+ * Throws 403 when the category does not exist or belongs to a user the
+ * caller shares nothing with.
+ */
+export const resolveCategoryForOwner = async (
+  categoryId: number,
+  ownerId: number,
+  requestingUserId: number
+): Promise<number> => {
+  const category = await categoryQueries.getCategoryById(categoryId);
+  if (!category) {
+    throw { statusCode: 403, message: 'Cannot use this category' };
+  }
+  // System categories (user_id IS NULL) are shared by everyone, and a
+  // category the owner already holds needs no copy.
+  if (category.user_id === null || category.user_id === ownerId) {
+    return categoryId;
+  }
+
+  // A category may only be borrowed from someone the requesting user
+  // actually shares accounts with.
+  const relatedUserIds = await getRelatedUserIds(requestingUserId);
+  if (!relatedUserIds.includes(category.user_id)) {
+    throw { statusCode: 403, message: 'Cannot use this category' };
+  }
+
+  const path = await categoryQueries.getCategoryPath(categoryId);
+  return categoryQueries.findOrCreateCategoryPath(ownerId, path);
 };
 
 export const createCategory = async (

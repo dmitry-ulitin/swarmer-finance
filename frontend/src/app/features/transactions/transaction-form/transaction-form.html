@@ -65,6 +65,9 @@
         <button new tuiOption type="button" [value]="item" class="tree-option">
             <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />
             {{ item.name }}
+            @if (isForeign(item)) {
+                <span class="owner-badge">{{ item.owner_name }}</span>
+            }
         </button>
     </ng-template>
     }

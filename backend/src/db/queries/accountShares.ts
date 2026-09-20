@@ -15,6 +15,33 @@ export interface AccessRow {
  * than personal, so every admin holds it at level 3 and all co-owners have
  * equal rights.
  */
+/**
+ * Everyone whose categories can show up in transactions this user can see,
+ * including the user themselves.
+ *
+ * Both share directions matter. Owners of accounts shared *with* me author
+ * transactions I can see; and someone I shared *my* account with authors
+ * transactions on it with their own categories, which I can also see — so
+ * neither direction alone is the full set.
+ */
+export const getRelatedUserIds = async (userId: number): Promise<number[]> => {
+  const rows = await query<{ user_id: number }>(
+    `SELECT $1::int AS user_id
+     UNION
+     -- owners of accounts shared with me
+     SELECT a.user_id FROM accounts a
+       JOIN account_shares s ON s.account_id = a.id
+      WHERE s.user_id = $1
+     UNION
+     -- users I shared one of my accounts with
+     SELECT s.user_id FROM account_shares s
+       JOIN accounts a ON a.id = s.account_id
+      WHERE a.user_id = $1`,
+    [userId]
+  );
+  return rows.map(r => r.user_id);
+};
+
 export const getAccessRows = async (userId: number): Promise<AccessRow[]> => {
   return query<AccessRow>(
     `SELECT a.id AS account_id,

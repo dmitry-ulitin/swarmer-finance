@@ -280,12 +280,18 @@ describe('Account sharing', () => {
       expect(updated.status).toBe(200);
       expect(updated.body.data.description).toBe('Edited by B');
 
-      // B must still not be able to attach B's own category to A's transaction.
+      // B may pick B's own category, but A's transaction must not end up
+      // storing a category B owns: the path is copied into A's tree.
       const recategorized = await request(app)
         .put(`/api/transactions/${txId}`)
         .set({ Authorization: `Bearer ${tokenB}` })
         .send({ categoryId: expenseCategoryB });
-      expect(recategorized.status).toBe(403);
+      expect(recategorized.status).toBe(200);
+      expect(recategorized.body.data.category.id).not.toBe(expenseCategoryB);
+      expect(recategorized.body.data.category.user_id).toBe(userAId);
+
+      const sourceName = await pool.query('SELECT name FROM categories WHERE id = $1', [expenseCategoryB]);
+      expect(recategorized.body.data.category.name).toBe(sourceName.rows[0].name);
     });
 
     it('level 3 can edit the account', async () => {

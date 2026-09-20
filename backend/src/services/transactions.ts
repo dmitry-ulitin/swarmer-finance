@@ -1,6 +1,6 @@
 import * as transactionQueries from '../db/queries/transactions';
-import * as categoryQueries from '../db/queries/categories';
 import * as accountQueries from '../db/queries/accounts';
+import { resolveCategoryForOwner } from './categories';
 import { toDecimal, toCents } from './currency';
 import { Account, TransactionDTO } from '../types';
 import { LEVEL, getAccessibleAccountIds, requireLevelOnAll } from './access';
@@ -47,13 +47,6 @@ async function loadAccount(accountId: number, userId: number, label: string): Pr
   return account;
 }
 
-async function validateCategory(categoryId: number, userId: number): Promise<void> {
-  const hasAccess = await categoryQueries.canUserAccessCategory(categoryId, userId);
-  if (!hasAccess) {
-    throw { statusCode: 403, message: 'Cannot use this category' };
-  }
-}
-
 async function validateTransactionInput(input: CreateInput, userId: number, categoryOwnerId: number): Promise<void> {
   const hasDebit = input.debitAccountId != null;
   const hasCredit = input.creditAccountId != null;
@@ -94,11 +87,12 @@ async function validateTransactionInput(input: CreateInput, userId: number, cate
     if (input.categoryId == null) {
       input.categoryId = UNCATEGORIZED_EXPENSE_CATEGORY_ID;
     }
-    // The category must belong to the transaction's owner, not whoever is
-    // editing: categories are per-user with no sharing, and user_id is
-    // preserved across updates, so an owner-authored transaction's category
-    // is always validated against the owner.
-    await validateCategory(input.categoryId, categoryOwnerId);
+    // The stored category must belong to the transaction's owner, not
+    // whoever is editing: user_id is preserved across updates, so an
+    // owner-authored transaction keeps a category from the owner's own
+    // tree. Picking someone else's category copies its path across rather
+    // than storing their id.
+    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId, userId);
   } else {
     // Income
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
@@ -113,9 +107,9 @@ async function validateTransactionInput(input: CreateInput, userId: number, cate
     if (input.categoryId == null) {
       input.categoryId = UNCATEGORIZED_INCOME_CATEGORY_ID;
     }
-    // See comment above: category ownership is checked against the
+    // See comment above: the category is resolved against the
     // transaction's owner, not the editing user.
-    await validateCategory(input.categoryId, categoryOwnerId);
+    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId, userId);
   }
 }
 

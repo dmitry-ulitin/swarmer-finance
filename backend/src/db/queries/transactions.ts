@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from '../index';
 import { Transaction, TransactionDTO } from '../../types';
+import { CATEGORY_PATHS_CTE } from './categories';
 
 /** What the client may ask for. `account` is an optional narrowing filter. */
 export interface TransactionFilters {
@@ -48,6 +49,13 @@ export interface UpdateTransactionData {
 interface TransactionRow extends Transaction {
   category_name: string | null;
   category_color: string | null;
+  category_user_id: number | null;
+  category_parent_id: number | null;
+  category_icon: string | null;
+  category_created_at: Date | null;
+  category_owner_name: string | null;
+  category_full_name: string | null;
+  category_root_id: number | null;
   debit_account_name: string | null;
   debit_account_currency: string | null;
   debit_account_scale: number | null;
@@ -61,7 +69,18 @@ function toDTO(row: TransactionRow): TransactionDTO {
     id: row.id,
     user_id: row.user_id,
     category: row.category_id != null
-      ? { id: row.category_id, name: row.category_name!, color: row.category_color! }
+      ? {
+          id: row.category_id,
+          user_id: row.category_user_id,
+          name: row.category_name!,
+          parent_id: row.category_parent_id,
+          color: row.category_color!,
+          icon: row.category_icon!,
+          created_at: row.category_created_at!,
+          owner_name: row.category_owner_name,
+          fullName: row.category_full_name!,
+          root_id: row.category_root_id!,
+        }
       : null,
     debit_account: row.debit_account_id != null
       ? { id: row.debit_account_id, name: row.debit_account_name!, currency: row.debit_account_currency!, scale: row.debit_account_scale! }
@@ -79,12 +98,19 @@ function toDTO(row: TransactionRow): TransactionDTO {
 }
 
 const WITH_DETAILS_SQL = `
+  ${CATEGORY_PATHS_CTE}
   SELECT t.*,
          c.name as category_name, c.color as category_color,
+         c.user_id as category_user_id, c.parent_id as category_parent_id,
+         c.icon as category_icon, c.created_at as category_created_at,
+         cu.name as category_owner_name,
+         cp.full_name as category_full_name, cp.root_id as category_root_id,
          da.name as debit_account_name, da.currency as debit_account_currency, da.scale as debit_account_scale,
          ca.name as credit_account_name, ca.currency as credit_account_currency, ca.scale as credit_account_scale
   FROM transactions t
   LEFT JOIN categories c ON t.category_id = c.id
+  LEFT JOIN users cu ON cu.id = c.user_id
+  LEFT JOIN category_paths cp ON cp.id = c.id
   LEFT JOIN accounts da ON t.debit_account_id = da.id
   LEFT JOIN accounts ca ON t.credit_account_id = ca.id
 `;

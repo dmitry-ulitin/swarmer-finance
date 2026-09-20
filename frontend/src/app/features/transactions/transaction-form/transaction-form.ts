@@ -11,12 +11,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
-import { findCategoryById } from '../../../models/category';
-import { TransactionType, type Transaction, type TransactionAccount, type TransactionCategory } from '../../../models/transaction';
+import { TransactionType, type Transaction, type TransactionAccount } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
+import { AuthService } from '../../../core/auth.service';
 
 @Component({
   selector: 'app-transaction-form',
@@ -44,9 +44,18 @@ import { NotificationService } from '../../../core/notification.service';
 export class TransactionForm {
   private readonly context = inject<TuiDialogContext<TransactionRequest | null, Partial<Transaction>>>(POLYMORPHEUS_CONTEXT);
   private readonly notifications = inject(NotificationService);
+  private readonly auth = inject(AuthService);
   private readonly transactionsState = inject(TransactionsState);
   protected readonly categoriesState = inject(CategoriesState);
   readonly accountsState = inject(AccountsState);
+
+  /**
+   * A category owned by someone else — shown because a shared account's
+   * transactions carry their author's categories. Picking one is allowed:
+   * the server copies the path into this transaction's owner's own tree.
+   */
+  readonly isForeign = (c: Category): boolean =>
+    c.user_id !== null && c.user_id !== this.auth.user()?.id;
 
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
@@ -65,7 +74,15 @@ export class TransactionForm {
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
-    category: new FormControl<Category | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.visibleCategories()[0], {nonNullable: true}),
+    // The transaction's own category is the starting value, falling back to
+    // the tree only to pick a default for a brand-new transaction. It may
+    // belong to another user (a shared account's transaction), in which case
+    // it is not in this user's own branch of the tree — using it directly
+    // keeps it visible instead of silently resetting to the first category.
+    category: new FormControl<Category | null>(
+      this.context.data.category ?? this.visibleCategories()[0],
+      { nonNullable: true }
+    ),
     debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit : null),
     creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),

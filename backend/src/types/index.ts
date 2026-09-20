@@ -16,6 +16,13 @@ export interface Category {
   color: string;
   icon: string;
   created_at: Date;
+  /** Display name of the category's owner; null for system categories. */
+  owner_name?: string | null;
+  /** Ancestor path below the system root, e.g. "Food / Groceries". */
+  fullName: string;
+  /** The Income (1) / Expenses (2) root this category descends from. */
+  root_id: number;
+  /** Absent when the category travels alone, e.g. on a transaction. */
   children?: Category[];
 }
 
@@ -54,12 +61,6 @@ export interface Transaction {
   created_at: Date;
 }
 
-export interface TransactionCategory {
-  id: number;
-  name: string;
-  color: string;
-}
-
 export interface TransactionAccount {
   id: number;
   name: string;
@@ -71,7 +72,7 @@ export interface TransactionAccount {
 export interface TransactionDTO {
   id: number;
   user_id: number;
-  category: TransactionCategory | null;
+  category: Category | null;
   debit_account: TransactionAccount | null;
   credit_account: TransactionAccount | null;
   debit: number;

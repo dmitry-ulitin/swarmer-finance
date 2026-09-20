@@ -1,8 +1,4 @@
-export interface TransactionCategory {
-    id: number;
-    name: string;
-    color: string;
-}
+import type { Category } from './category';
 
 export interface TransactionAccount {
     id: number;
@@ -15,7 +11,7 @@ export interface TransactionAccount {
 export interface Transaction {
     id: number;
     user_id: number;
-    category: TransactionCategory | null;
+    category: Category | null;
     debit_account: TransactionAccount | null;
     credit_account: TransactionAccount | null;
     debit: number;
