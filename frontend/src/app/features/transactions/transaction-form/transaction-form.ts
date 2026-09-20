@@ -12,7 +12,7 @@ import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
 import { findCategoryById } from '../../../models/category';
-import type { Transaction, TransactionAccount, TransactionCategory } from '../../../models/transaction';
+import { TransactionType, type Transaction, type TransactionAccount, type TransactionCategory } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
@@ -65,7 +65,7 @@ export class TransactionForm {
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
-    category: new FormControl<TransactionCategory | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.context.data.category ?? this.visibleCategories()[0], {nonNullable: true}),
+    category: new FormControl<Category | null>(findCategoryById(this.context.data.category?.id, this.categoriesState.categories()) ?? this.visibleCategories()[0], {nonNullable: true}),
     debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit : null),
     creditAmount: new FormControl<number | null>(this.context.data.credit ? this.context.data.credit : null),
     description: new FormControl<string>(this.context.data.description ?? '', { nonNullable: true }),
@@ -97,15 +97,20 @@ export class TransactionForm {
       untracked(() => {
         let fromAccount = this.form.controls.fromAccount.value;
         let toAccount = this.form.controls.toAccount.value;
+        let category = this.form.controls.category.value;
         if (index === 0) {
-          this.form.controls.category.setValue(this.visibleCategories()[0]);
+          if (category?.root_id !== TransactionType.Expense) {
+            this.form.controls.category.setValue(this.visibleCategories()[0]);
+          }
           this.form.controls.toAccount.setValue(null);
           this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value);
           if (!fromAccount) {
             this.form.controls.fromAccount.setValue(toAccount);
           }
         } else if (index === 1) {
-          this.form.controls.category.setValue(this.visibleCategories()[0]);
+          if (category?.root_id !== TransactionType.Income) {
+            this.form.controls.category.setValue(this.visibleCategories()[0]);
+          } 
           this.form.controls.fromAccount.setValue(null);
           this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value);
           if (!toAccount) {
