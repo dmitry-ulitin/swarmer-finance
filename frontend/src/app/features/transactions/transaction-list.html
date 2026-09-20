@@ -9,11 +9,11 @@
     >
         <span class="date">{{ t.date | date:'dd MMM' }}</span>
         <span class="info">
-            <span class="description">{{ t.description || t.payee || '—' }}</span>
             <span class="meta">
                 {{ t.accountName }}
                 @if (t.category) { · {{ t.category.name }} }
             </span>
+            <span class="description">{{ t.description || t.payee || '—' }}</span>
         </span>
         <div class="amounts">
             <span class="amount">
