@@ -116,6 +116,30 @@ describe('TransactionForm category initialisation', () => {
     expect(form.form.controls.category.value?.id).toBe(myCategory.id);
   });
 
+  it('matches a category to its tree node by path, not by id', () => {
+    const form = configure({ debit_account: { id: 1, name: 'Mine', currency: 'USD', scale: 2 } });
+
+    // The tree shows one node per path, so a transaction can reference a
+    // row that lost the dedupe. Same path, different id: still the same
+    // category as far as the dropdown is concerned.
+    const lostDedupe = makeCategory({
+      id: 77,
+      name: myCategory.name,
+      user_id: OTHER,
+      owner_name: 'Other User',
+    });
+
+    expect(form.categoryMatcher(lostDedupe, myCategory)).toBe(true);
+  });
+
+  it('does not match identical paths under different roots', () => {
+    const form = configure({ debit_account: { id: 1, name: 'Mine', currency: 'USD', scale: 2 } });
+
+    const sameNameIncome = makeCategory({ id: 78, name: myCategory.name, root_id: 1 });
+
+    expect(form.categoryMatcher(sameNameIncome, myCategory)).toBe(false);
+  });
+
   it('flags a foreign category and leaves the user’s own unflagged', () => {
     const form = configure({ debit_account: { id: 1, name: 'Mine', currency: 'USD', scale: 2 } });
 

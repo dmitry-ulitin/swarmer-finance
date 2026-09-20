@@ -28,18 +28,60 @@ export const getCategoryTree = async (userId: number): Promise<Category[]> => {
 
   return systemRoots.map(root => ({
     ...root,
-    children: buildTree(allCategories, root.id),
+    children: buildTree(allCategories, root.id, userId),
   }));
 };
 
-const buildTree = (categories: Category[], parentId: number): Category[] => {
-  return categories
-    .filter(c => c.parent_id === parentId)
-    .map(c => ({
-      ...c,
-      children: buildTree(categories, c.id),
-    }))
-    .sort((a, b) => a.user_id === null ? -1 : (b.user_id === null ? 1 : a.name.localeCompare(b.name)));
+/** The key a category is identified by in the tree: its root and its path. */
+const pathKey = (rootId: number, fullName: string): string => `${rootId}\u0000${fullName}`;
+
+/** The path a category's parent occupies, or '' when it sits under the root. */
+const parentPath = (fullName: string): string => {
+  const cut = fullName.lastIndexOf(' / ');
+  return cut === -1 ? '' : fullName.slice(0, cut);
+};
+
+/**
+ * The categories below one system root, keyed by path rather than by row.
+ *
+ * Several users can own the same path — each keeps their own row, since
+ * categories are per-user — but the tree shows one node per path. The
+ * user's own row wins, otherwise the first the query returned (ordered by
+ * id, so the oldest). Nesting follows the path too: a node hangs off the
+ * group whose path is its own minus the last segment, which is what lets
+ * one user's child sit under another user's parent row.
+ */
+const buildTree = (categories: Category[], rootId: number, userId: number): Category[] => {
+  const winners = new Map<string, Category>();
+  for (const category of categories) {
+    if (category.parent_id === null || category.root_id !== rootId) continue;
+    const key = pathKey(category.root_id, category.fullName);
+    const current = winners.get(key);
+    // Ownership outranks list order; among equals the first one stays.
+    if (!current || (current.user_id !== userId && category.user_id === userId)) {
+      winners.set(key, category);
+    }
+  }
+
+  const childrenByParent = new Map<string, Category[]>();
+  for (const category of winners.values()) {
+    let parent = parentPath(category.fullName);
+    // A path whose parent has no row of its own would otherwise strand its
+    // whole subtree; hang it off the root so nothing vanishes from the tree.
+    if (parent !== '' && !winners.has(pathKey(rootId, parent))) {
+      parent = '';
+    }
+    const siblings = childrenByParent.get(parent);
+    if (siblings) siblings.push(category);
+    else childrenByParent.set(parent, [category]);
+  }
+
+  const attach = (path: string): Category[] =>
+    (childrenByParent.get(path) ?? [])
+      .map(c => ({ ...c, children: attach(c.fullName) }))
+      .sort((a, b) => a.user_id === null ? -1 : (b.user_id === null ? 1 : a.name.localeCompare(b.name)));
+
+  return attach('');
 };
 
 /**

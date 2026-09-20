@@ -60,7 +60,11 @@ export class TransactionForm {
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
   readonly stringifyCategory: TuiStringHandler<Category | null> = c => c?.fullName ?? c?.name ?? 'Uncategorized';
-  readonly categoryMatcher = (a: Category | null, b: Category | null): boolean => a?.id === b?.id;
+  // The tree holds one node per path, so a transaction may reference a row
+  // that lost the dedupe to an equivalent one. Identity is the path, not
+  // the id, or such a category would not highlight in the dropdown.
+  readonly categoryMatcher = (a: Category | null, b: Category | null): boolean =>
+    a?.root_id === b?.root_id && a?.fullName === b?.fullName;
   readonly activeTypeIndex = signal(this.context.data.debit_account && this.context.data.credit_account ? 2 : (this.context.data.debit_account ? 0 : 1));
   readonly isExpense = computed(() => this.activeTypeIndex() === 0);
   readonly isIncome = computed(() => this.activeTypeIndex() === 1);

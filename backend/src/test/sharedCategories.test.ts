@@ -190,6 +190,116 @@ describe('Shared categories', () => {
       expect(created.body.data.category.root_id).toBe(fromTree.root_id);
     });
 
+    it('collapses the same path from two users into one node, preferring mine', async () => {
+      const name = `Dup-${Date.now()}`;
+      // C's copy is created first, so it wins on id order — ownership must
+      // outrank list order.
+      const cDup = await makeCategory(userCId, name, 2);
+      const aDup = await makeCategory(userAId, name, 2);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      const matches = expenses.children.filter((c: any) => c.fullName === name);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].id).toBe(aDup);
+      expect(matches[0].user_id).toBe(userAId);
+      expect(findInTree(res.body.data, cDup)).toBeNull();
+    });
+
+    it('keeps a path only a co-owner has, represented by their category', async () => {
+      const name = `OnlyTheirs-${Date.now()}`;
+      const cOnly = await makeCategory(userCId, name, 2);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      const node = findInTree(res.body.data, cOnly);
+      expect(node).not.toBeNull();
+      expect(node.user_id).toBe(userCId);
+    });
+
+    it('picks the first by id when nobody owning the path is me', async () => {
+      const name = `TwoForeign-${Date.now()}`;
+      const bDup = await makeCategory(userBId, name, 2);
+      const cDup = await makeCategory(userCId, name, 2);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      const matches = expenses.children.filter((c: any) => c.fullName === name);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].id).toBe(Math.min(bDup, cDup));
+    });
+
+    it('nests children by path, merging under one parent node', async () => {
+      const stamp = Date.now();
+      const parentName = `MergeP-${stamp}`;
+      const childName = `MergeC-${stamp}`;
+
+      // Both users have the same two-level path, via different parent rows.
+      const aParent = await makeCategory(userAId, parentName, 2);
+      const aChild = await makeCategory(userAId, childName, aParent);
+      const cParent = await makeCategory(userCId, parentName, 2);
+      const cChild = await makeCategory(userCId, childName, cParent);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      const parents = expenses.children.filter((c: any) => c.fullName === parentName);
+      expect(parents).toHaveLength(1);
+      expect(parents[0].id).toBe(aParent);
+
+      const children = parents[0].children.filter(
+        (c: any) => c.fullName === `${parentName} / ${childName}`
+      );
+      expect(children).toHaveLength(1);
+      expect(children[0].id).toBe(aChild);
+      expect(findInTree(res.body.data, cParent)).toBeNull();
+      expect(findInTree(res.body.data, cChild)).toBeNull();
+    });
+
+    it("nests a co-owner's child under my parent when only they have the child", async () => {
+      const stamp = Date.now();
+      const parentName = `MixedP-${stamp}`;
+      const childName = `MixedC-${stamp}`;
+
+      const aParent = await makeCategory(userAId, parentName, 2);
+      const cParent = await makeCategory(userCId, parentName, 2);
+      const cChild = await makeCategory(userCId, childName, cParent);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      const parent = expenses.children.find((c: any) => c.fullName === parentName);
+      // My parent row won, and their child hangs off it by path even though
+      // its parent_id points at their row.
+      expect(parent.id).toBe(aParent);
+      expect(parent.children.map((c: any) => c.id)).toContain(cChild);
+    });
+
+    it('keeps Income and Expenses separate when the paths are identical', async () => {
+      const name = `BothRoots-${Date.now()}`;
+      const income = await makeCategory(userAId, name, 1);
+      const expense = await makeCategory(userAId, name, 2);
+
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      expect(findInTree(res.body.data, income)).not.toBeNull();
+      expect(findInTree(res.body.data, expense)).not.toBeNull();
+    });
+
     it('marks each category with its owner so foreign ones are distinguishable', async () => {
       const res = await request(app)
         .get('/api/categories')

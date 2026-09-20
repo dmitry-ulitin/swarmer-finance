@@ -7,6 +7,7 @@ import { TuiButton, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { TransactionType } from '../../models/transaction';
 import { CategoryDialogService } from './category-dialog.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-categories',
@@ -18,11 +19,12 @@ import { CategoryDialogService } from './category-dialog.service';
 export class Categories {
   readonly categoriesState = inject(CategoriesState);
   private readonly categoryDialogs = inject(CategoryDialogService);
+  private readonly auth = inject(AuthService);
 
   protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children ?? [];
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
-    const newCategories = this.categoriesState.categories().map(c => ({ ...c, children: c.children?.filter(child => child.user_id !== null)}));
+    const newCategories = this.categoriesState.categories().map(c => ({ ...c }));
     const expandedIds = new Set<number>();
     this.map.forEach((expanded, category) => {
       if (expanded) expandedIds.add(category.id);
@@ -44,13 +46,22 @@ export class Categories {
     ancestors?.forEach(ancestor => this.map.set(ancestor, true));
     return findCategoryById(selectedId, categories);
   });
+  /**
+   * The tree shows one node per path, spanning everyone the user shares
+   * accounts with, so a row here may belong to a co-owner. Only the user's
+   * own categories can be changed — the backend refuses the rest anyway.
+   */
+  private readonly isOwn = (category: Category): boolean =>
+    category.user_id !== null && category.user_id === this.auth.user()?.id;
+
   readonly isEditable = computed(() => {
     const selectedCategory = this.selectedCategory();
-    return selectedCategory != null && selectedCategory.parent_id !== null;
+    return selectedCategory != null && selectedCategory.parent_id !== null && this.isOwn(selectedCategory);
   });
   readonly isDeletable = computed(() => {
     const category = this.selectedCategory();
-    return category != null && category.parent_id !== null && (category.children?.length ?? 0) === 0;
+    return category != null && category.parent_id !== null && this.isOwn(category)
+      && (category.children?.length ?? 0) === 0;
   });
 
   setAsSelected(node: Category) {
