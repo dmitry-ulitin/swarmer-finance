@@ -16,7 +16,7 @@ export const withComputedFields = (categories: Category[], ancestorPath = '', ro
     const currentRootId = isRoot ? category.id : root_id;
     const fullName = isRoot
       ? category.name
-      : ancestorPath ? `${ancestorPath}/${category.name}` : category.name;
+      : ancestorPath ? `${ancestorPath} / ${category.name.trim()}` : category.name.trim();
     const nextPath = isRoot ? '' : fullName;
     return {
       ...category,
