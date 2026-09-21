@@ -2,6 +2,7 @@ import request from 'supertest';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
 import { LEVEL, AccessLevel } from '../services/access';
+import { getTransactions } from '../services/transactions';
 
 const app = createTestApp();
 
@@ -464,6 +465,17 @@ describe('Account sharing', () => {
 
       const seenByA = await request(app).get('/api/transactions').set({ Authorization: `Bearer ${tokenA}` });
       expect(seenByA.body.data.map((t: { description: string }) => t.description)).toContain('Shared transfer');
+
+      // The counterparty account is named on the DTO but carries no balance:
+      // B can no longer reach a1. Checked on the service result rather than
+      // the HTTP body, because JSON.stringify drops an undefined value and
+      // would hide the difference between an absent key and an explicit one.
+      const dtos = await getTransactions(userBId, {});
+      const transfer = dtos.find(t => t.description === 'Shared transfer')!;
+      expect(transfer.debit_account!.id).toBe(a1);
+      expect(Object.keys(transfer.debit_account!)).not.toContain('balance');
+      // B's own side still carries one.
+      expect(transfer.credit_account!.balance).toBeDefined();
     });
 
     it('stops a revoked user from writing to the account', async () => {

@@ -6,16 +6,6 @@ export interface AccessRow {
 }
 
 /**
- * Every account the user can reach, with the level they hold on it.
- *
- * An owned account is reported at level 4 (OWNER in services/access.ts),
- * above the three levels that account_shares can store, so all permission
- * checks reduce to `level >= required` — unless the owner has granted
- * someone else admin (level 3) on it. Such an account is co-owned rather
- * than personal, so every admin holds it at level 3 and all co-owners have
- * equal rights.
- */
-/**
  * Everyone whose categories can show up in transactions this user can see,
  * including the user themselves.
  *
@@ -42,6 +32,16 @@ export const getRelatedUserIds = async (userId: number): Promise<number[]> => {
   return rows.map(r => r.user_id);
 };
 
+/**
+ * Every account the user can reach, with the level they hold on it.
+ *
+ * An owned account is reported at level 4 (OWNER in services/access.ts),
+ * above the three levels that account_shares can store, so all permission
+ * checks reduce to `level >= required` — unless the owner has granted
+ * someone else admin (level 3) on it. Such an account is co-owned rather
+ * than personal, so every admin holds it at level 3 and all co-owners have
+ * equal rights.
+ */
 export const getAccessRows = async (userId: number): Promise<AccessRow[]> => {
   return query<AccessRow>(
     `SELECT a.id AS account_id,

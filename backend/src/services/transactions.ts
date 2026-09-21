@@ -185,6 +185,15 @@ export const getTransactions = async (
   return result.map(toDecimalTransactionDTO);
 };
 
+/** The account with its running balance, or unchanged when it has none. */
+function withBalance(
+  account: import('../types').TransactionAccount,
+  balances: Map<number, number>
+): import('../types').TransactionAccount {
+  const balance = balances.get(account.id);
+  return balance === undefined ? account : { ...account, balance };
+}
+
 async function attachRunningBalances(
   transactions: import('../types').TransactionDTO[],
   accessibleIds: number[]
@@ -220,10 +229,14 @@ async function attachRunningBalances(
     if (t.credit_account && balanceMap.has(t.credit_account.id)) {
       balanceMap.set(t.credit_account.id, balanceMap.get(t.credit_account.id)! + Number(t.credit));
     }
+    // An account with no seeded balance is one the caller cannot reach, so
+    // the key is left off entirely rather than set to undefined — the DTO
+    // should not carry a `balance` that only disappears because JSON drops
+    // undefined values.
     withBalances[i] = {
       ...t,
-      debit_account: t.debit_account ? { ...t.debit_account, balance: balanceMap.get(t.debit_account.id) } : null,
-      credit_account: t.credit_account ? { ...t.credit_account, balance: balanceMap.get(t.credit_account.id) } : null,
+      debit_account: t.debit_account ? withBalance(t.debit_account, balanceMap) : null,
+      credit_account: t.credit_account ? withBalance(t.credit_account, balanceMap) : null,
     };
   }
   return withBalances;
