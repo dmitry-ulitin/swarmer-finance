@@ -13,7 +13,19 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Fetch and cache `from`->`to`, trying each provider in turn.
+ *
+ * A refresh that produces nothing has two quite different causes, and the
+ * providers already distinguish them: returning null means "I do not cover
+ * this pair", throwing means the pair looks supported but the call failed.
+ * Flattening both into silence makes a total upstream outage look exactly
+ * like an exotic currency, so each is logged differently — the callers can
+ * only fall back to whatever is cached either way, and that fallback is
+ * deliberate.
+ */
 async function refreshRate(from: string, to: string): Promise<void> {
+  let failures = 0;
   for (const provider of PROVIDERS) {
     try {
       const result = await provider.fetchRate(from, to);
@@ -22,10 +34,23 @@ async function refreshRate(from: string, to: string): Promise<void> {
         return;
       }
     } catch (error: unknown) {
+      failures++;
       const message =
         error && typeof error === 'object' && 'message' in error ? error.message : String(error);
       console.error(`Failed to refresh exchange rate ${from}->${to}:`, message);
     }
+  }
+
+  if (failures === PROVIDERS.length) {
+    // Nothing answered. Any rate served for this pair now comes from the
+    // cache and may be arbitrarily old.
+    const latest = await exchangeRateQueries.getLatestRate(from, to);
+    console.error(
+      `All rate providers failed for ${from}->${to}; ` +
+        (latest ? `serving cached rate as of ${latest.as_of}` : 'no cached rate available')
+    );
+  } else if (failures === 0) {
+    console.warn(`No rate provider covers ${from}->${to}`);
   }
 }
 

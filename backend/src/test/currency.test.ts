@@ -45,6 +45,62 @@ describe('getOrRefreshRate', () => {
     expect(rate).toBe(1.17);
   });
 
+  // A refresh that yields nothing has two causes that callers cannot tell
+  // apart — both leave them with whatever is cached — so the log has to.
+  it('reports a total provider outage distinctly from an uncovered pair', async () => {
+    await pool.query(
+      `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)
+       VALUES ('GBP', 'EUR', 1.17, '2020-01-01')
+       ON CONFLICT (from_currency, to_currency, as_of) DO UPDATE SET rate = EXCLUDED.rate`
+    );
+    const errors: string[] = [];
+    const warns: string[] = [];
+    const origError = console.error;
+    const origWarn = console.warn;
+    console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+    console.warn = (...args: unknown[]) => { warns.push(args.join(' ')); };
+
+    try {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+      const rate = await getOrRefreshRate('GBP', 'EUR');
+      // The stale rate is still served — that fallback is deliberate.
+      expect(rate).toBe(1.17);
+      // ...but the outage is named, and says what is being served instead.
+      expect(errors.some(e => /All rate providers failed for GBP->EUR/.test(e))).toBe(true);
+      expect(errors.some(e => /serving cached rate as of/.test(e))).toBe(true);
+      expect(warns.some(w => /No rate provider covers/.test(w))).toBe(false);
+    } finally {
+      console.error = origError;
+      console.warn = origWarn;
+    }
+  });
+
+  it('reports an uncovered pair as a warning, not as a provider failure', async () => {
+    const errors: string[] = [];
+    const warns: string[] = [];
+    const origError = console.error;
+    const origWarn = console.warn;
+    console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+    console.warn = (...args: unknown[]) => { warns.push(args.join(' ')); };
+
+    try {
+      // Both providers answer cleanly that they do not know the pair.
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ date: '2026-01-01', rates: {} }),
+      });
+      const rate = await getOrRefreshRate('XYZ', 'EUR');
+
+      expect(rate).toBeNull();
+      expect(warns.some(w => /No rate provider covers XYZ->EUR/.test(w))).toBe(true);
+      expect(errors.some(e => /All rate providers failed/.test(e))).toBe(false);
+    } finally {
+      console.error = origError;
+      console.warn = origWarn;
+    }
+  });
+
   it('returns null when unreachable and no cache exists at all', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
     const rate = await getOrRefreshRate('XYZ', 'EUR');
