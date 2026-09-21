@@ -4,11 +4,13 @@ import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, 
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';
-import { TuiExpand } from '@taiga-ui/core/components/expand';
+import { TuiExpand, TuiButton } from '@taiga-ui/core';
+import { TuiHovered } from '@taiga-ui/cdk';
+import { Account } from '../../../../models/account';
 
 @Component({
   selector: 'app-account-tree-node',
-  imports: [AccountTreeNode, MoneyPipe, TuiExpand],
+  imports: [AccountTreeNode, MoneyPipe, TuiExpand, TuiButton, TuiHovered],
   templateUrl: './account-tree-node.html',
   styleUrl: './account-tree-node.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -20,11 +22,13 @@ export class AccountTreeNode {
   protected readonly store = inject(AccountListStore);
   protected readonly transactions = inject(TransactionsState);
   protected readonly auth = inject(AuthService);
+  protected hovered = false;
 
   protected readonly nodeAccountIds = computed(() => {
     const item = this.item();
     return item.kind === 'group' ? collectAccountIds(item) : [item.account.id];
   });
+
   protected readonly groupBalance = computed(() => {
     const item = this.item();
     return item.kind === 'group' ? collectUserBalance(item) : null;
@@ -40,5 +44,13 @@ export class AccountTreeNode {
 
   protected get indent(): string {
     return `calc(0.25rem + ${this.depth()}rem)`;
+  }
+
+  protected onHovered(hovered: boolean): void {
+    this.hovered = hovered;
+  }
+
+  protected onImport(account: Account): void {
+    // TODO: Implement import functionality
   }
 }

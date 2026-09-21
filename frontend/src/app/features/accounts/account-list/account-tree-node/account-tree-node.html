@@ -1,13 +1,26 @@
 @if (item(); as it) {
   @if (it.kind === 'account') {
     @let account = asAccount(it).account;
-    <div class="row-header" [style.padding-left]="indent">
+    <div class="row-header" [style.padding-left]="indent" (tuiHoveredChange)="onHovered($event)">
       <button
         class="row-name"
         type="button"
         [class.active]="transactions.selectedAccountIds().includes(account.id)"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
       >{{ account.displayName }}</button>
+      @if (account.type === 'bank') {
+      <button
+        appearance="gray"
+        class="small"
+        [class.hidden]="!hovered"
+        iconStart="@tui.download"
+        size="xs"
+        tuiIconButton
+        (click)="onImport(account)"
+        type="button">
+        Import
+      </button>
+      }
       @if (account.balance !== null) {
         <span class="row-balance">{{ account.balance | money: account.currency : account.scale }}</span>
       }

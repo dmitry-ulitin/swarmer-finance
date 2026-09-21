@@ -25,6 +25,7 @@
   font-size: 0.8rem;
   color: var(--tui-text-secondary);
   border-radius: var(--tui-radius-m);
+  height: 1.5rem;
 
   &.uppercase {
     text-transform: uppercase;
@@ -61,4 +62,17 @@
   &:hover {
     background: rgb(0 0 0 / 7%);
   }
+}
+
+.hidden {
+    display: none;
+}
+
+.small[tuiAppearance][data-appearance='gray'] {
+    color: var(--tui-text-tertiary);
+    scale: 0.7;
+    &[data-state='hover'],
+    &:hover:not(._no-hover):not(:disabled){
+        color: var(--tui-text-primary);
+    };
 }
