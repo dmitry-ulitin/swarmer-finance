@@ -51,7 +51,13 @@ export const PROFILES: Record<ProfileId, Profile> = {
       payee: 'Sender/receiver name',
     },
     currency: { from: 'column', column: 'Currency' },
-    identity: { kind: 'reference', columns: ['Transaction reference'] },
+    // NOT "Transaction reference": LHV reuses that across every posting in
+    // one batch, so interest and its tax — or a term deposit's close,
+    // interest and tax — share a value and would collapse to one hash,
+    // silently dropping real transactions. "Account servicer reference" is
+    // unique per row (verified across a real 143-row statement: 143 distinct,
+    // none empty).
+    identity: { kind: 'reference', columns: ['Account servicer reference'] },
   },
   boc: {
     id: 'boc',

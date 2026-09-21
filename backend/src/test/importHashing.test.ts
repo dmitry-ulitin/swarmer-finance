@@ -10,6 +10,34 @@ const fixture = (...p: string[]) =>
 const contentProfile: Profile = { ...PROFILES.lhv, identity: { kind: 'content' } };
 
 describe('computeImportHashes', () => {
+  it('gives every row a distinct hash even when the bank reuses a reference', () => {
+    // LHV reuses "Transaction reference" across every posting in one batch:
+    // interest and its tax share one, and a term deposit's close, interest
+    // and tax share another. Identifying rows by that column collapsed seven
+    // real transactions into three hashes on a live statement — four rows,
+    // including a 100,000 EUR deposit close, were silently dropped on import.
+    // "Account servicer reference" is unique per row, which is why the
+    // profile uses it.
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv);
+    const hashes = computeImportHashes(rows, PROFILES.lhv);
+
+    expect(new Set(hashes).size).toBe(rows.length);
+  });
+
+  it('would collapse rows if identity used the batch-level reference', () => {
+    // Guards the reason for the column choice above: this is the same file
+    // read through a profile that identifies rows the way the original one
+    // did, and it must NOT produce a distinct hash per row.
+    const batchRefProfile: Profile = {
+      ...PROFILES.lhv,
+      identity: { kind: 'reference', columns: ['Transaction reference'] },
+    };
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), batchRefProfile);
+    const hashes = computeImportHashes(rows, batchRefProfile);
+
+    expect(new Set(hashes).size).toBeLessThan(rows.length);
+  });
+
   it('is stable across runs over the same file', () => {
     const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv);
     expect(computeImportHashes(rows, PROFILES.lhv))

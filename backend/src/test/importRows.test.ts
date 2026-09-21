@@ -3,8 +3,11 @@ import * as path from 'path';
 import { PROFILES } from '../services/import/profiles';
 import { readStatement } from '../services/import/rows';
 
+// Every column the LHV profile reads, including "Account servicer
+// reference" — the per-row unique id it identifies rows by. ("Transaction
+// reference" is the batch-level one and is deliberately not the identity.)
 const LHV_HEADER =
-  'Date,Sender/receiver name,Debit/Credit (D/C),Amount,Description,Currency,Transaction reference';
+  'Date,Sender/receiver name,Debit/Credit (D/C),Amount,Description,Currency,Transaction reference,Account servicer reference';
 
 const lhvCsv = (...rows: string[]) => [LHV_HEADER, ...rows].join('\n');
 
@@ -36,8 +39,10 @@ describe('readStatement — LHV', () => {
     expect(rows.filter(r => r.amount < 0)).toHaveLength(133);
   });
 
-  it('carries the bank reference for identity', () => {
-    expect(result().rows[0].reference).toBe('1400000000');
+  it('carries the per-row bank reference for identity', () => {
+    // Account servicer reference, not Transaction reference: the latter is
+    // shared across a batch of postings and cannot identify a single row.
+    expect(result().rows[0].reference).toBe('00000000C375F111BB470A0159F9DEBB');
   });
 });
 
@@ -96,20 +101,20 @@ describe('readStatement — Bank of Cyprus', () => {
 
 describe('readStatement — LHV direction-column override', () => {
   it('flips a positive amount negative when D/C says D', () => {
-    const csv = lhvCsv('2026-07-01,MERCHANT 001,D,1305.28,Description 1,EUR,1400000000');
+    const csv = lhvCsv('2026-07-01,MERCHANT 001,D,1305.28,Description 1,EUR,1400000000,ASR0000001');
     const { rows } = readStatement(csv, PROFILES.lhv);
     expect(rows[0].amount).toBe(-1305.28);
   });
 
   it('flips a negative amount positive when D/C says C', () => {
-    const csv = lhvCsv('2026-07-01,MERCHANT 001,C,-1305.28,Description 1,EUR,1400000000');
+    const csv = lhvCsv('2026-07-01,MERCHANT 001,C,-1305.28,Description 1,EUR,1400000000,ASR0000002');
     const { rows } = readStatement(csv, PROFILES.lhv);
     expect(rows[0].amount).toBe(1305.28);
   });
 
   it('preserves the amount sign as-is when no directionColumn is declared', () => {
     const profile = { ...PROFILES.lhv, amount: { kind: 'signed' as const, column: 'Amount' } };
-    const csv = lhvCsv('2026-07-01,MERCHANT 001,D,-1305.28,Description 1,EUR,1400000000');
+    const csv = lhvCsv('2026-07-01,MERCHANT 001,D,-1305.28,Description 1,EUR,1400000000,ASR0000003');
     const { rows } = readStatement(csv, profile);
     expect(rows[0].amount).toBe(-1305.28);
   });
