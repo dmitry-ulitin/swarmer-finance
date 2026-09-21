@@ -40,12 +40,25 @@ function formatDate(date: string | Date): string {
   return `${y}-${m}-${d}`;
 }
 
-async function loadAccount(accountId: number, userId: number, label: string): Promise<Account> {
+/**
+ * The account, provided it exists, is not deleted, and the caller may write
+ * to it. `checkedIds` names accounts whose access was already asserted by the
+ * caller in a single batched check — anything not listed is checked here, so
+ * an omission fails closed.
+ */
+async function loadAccount(
+  accountId: number,
+  userId: number,
+  label: string,
+  checkedIds: number[] = []
+): Promise<Account> {
   const account = await accountQueries.getAccountById(accountId);
   if (!account || account.deleted) {
     throw { statusCode: 403, message: `Cannot use this ${label} account` };
   }
-  await requireLevelOnAll([accountId], userId, LEVEL.WRITE);
+  if (!checkedIds.includes(accountId)) {
+    await requireLevelOnAll([accountId], userId, LEVEL.WRITE);
+  }
   return account;
 }
 
@@ -62,8 +75,12 @@ async function validateTransactionInput(input: CreateInput, userId: number, cate
     if (input.categoryId != null) {
       throw { statusCode: 400, message: 'Transfers must not have a category' };
     }
-    const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit');
-    const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
+    // Both sides in one access check: two loadAccount calls would each
+    // resolve the caller's access map separately.
+    const both = [input.debitAccountId!, input.creditAccountId!];
+    await requireLevelOnAll(both, userId, LEVEL.WRITE);
+    const debitAccount = await loadAccount(input.debitAccountId!, userId, 'debit', both);
+    const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit', both);
     input.debit = toCents(input.debit, debitAccount.scale);
     input.credit = toCents(input.credit, creditAccount.scale);
     // When both accounts share a currency, debit and credit must be equal —

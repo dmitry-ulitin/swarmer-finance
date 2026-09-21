@@ -38,16 +38,19 @@ export const getAccountLevel = async (
   return map.get(accountId) ?? null;
 };
 
+function assertLevel(level: AccessLevel | null | undefined, min: AccessLevel): void {
+  if (level == null || level < min) {
+    throw { statusCode: 403, message: 'Insufficient permissions for this account' };
+  }
+}
+
 /** Throws 403 when the user's level on the account is below `min`. */
 export const requireLevel = async (
   accountId: number,
   userId: number,
   min: AccessLevel
 ): Promise<void> => {
-  const level = await getAccountLevel(accountId, userId);
-  if (level === null || level < min) {
-    throw { statusCode: 403, message: 'Insufficient permissions for this account' };
-  }
+  assertLevel(await getAccountLevel(accountId, userId), min);
 };
 
 /**
@@ -62,7 +65,11 @@ export const requireLevelOnAll = async (
   min: AccessLevel
 ): Promise<void> => {
   const ids = [...new Set(accountIds.filter((id): id is number => id != null))];
+  if (ids.length === 0) return;
+  // One map for the whole set: checking each id through requireLevel would
+  // re-run the access query per account.
+  const map = await getAccessMap(userId);
   for (const id of ids) {
-    await requireLevel(id, userId, min);
+    assertLevel(map.get(id), min);
   }
 };
