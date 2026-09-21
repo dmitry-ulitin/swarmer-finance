@@ -4,6 +4,7 @@ import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';
 import { TransactionsState } from '../../../core/transactions.state';
 import { MoneyPipe } from '../../../core/money.pipe';
+import { AccountDialogService } from '../account-dialog.service';
 
 @Component({
   selector: 'app-account-list',
@@ -16,4 +17,9 @@ import { MoneyPipe } from '../../../core/money.pipe';
 export class AccountList {
   protected readonly state = inject(AccountsState);
   protected readonly transactions = inject(TransactionsState);
+  private readonly accountDialogs = inject(AccountDialogService);
+
+  protected openCreateDialog(): void {
+    this.accountDialogs.openCreate();
+  }
 }

@@ -6,9 +6,13 @@
       type="button"
       (click)="transactions.selectAllAccounts()"
     >All accounts</button>
-    @if (state.summary() && !state.summary()?.incomplete) {
-      <span class="all-row-balance">{{ state.summary()?.total  | money: state.summary()?.currency : state.summary()?.scale }}</span>
-    }
+    <button
+      class="add-account"
+      type="button"
+      aria-label="Add account"
+      title="Add account"
+      (click)="openCreateDialog()"
+    >+</button>
   </div>
 
   @for (section of state.accountSections(); track section.access_level) {
@@ -16,6 +20,12 @@
       @for (item of section.items; track item.kind === 'account' ? item.account.id : item.key) {
         <app-account-tree-node [item]="item" />
       }
+    </div>
+  }
+
+  @if (state.accountSections().length > 0 && state.summary() && !state.summary()?.incomplete) {
+    <div class="summary-row">
+      <span class="summary-balance">{{ state.summary()?.total  | money: state.summary()?.currency : state.summary()?.scale }}</span>
     </div>
   }
 </nav>
