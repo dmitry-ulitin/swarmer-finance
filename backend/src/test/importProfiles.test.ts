@@ -28,8 +28,23 @@ describe('profiles', () => {
   });
 
   it('every profile declares a header signature that fits its own columns', () => {
+    const fixturePaths: Record<string, string[]> = {
+      lhv: ['lhv', 'statement.csv'],
+      boc: ['bank_of_cyprus', 'statement.csv'],
+    };
+
     for (const profile of Object.values(PROFILES)) {
-      expect(profile.headerSignature.length).toBeGreaterThan(0);
+      const fixturePath = fixturePaths[profile.id];
+      expect(fixturePath).toBeDefined();
+
+      const grid = parseCsv(fixture(...fixturePath));
+      const header = grid[profile.skipLines];
+      expect(header).toBeDefined();
+
+      for (const col of profile.headerSignature) {
+        expect(header.includes(col)).toBe(true);
+      }
+
       expect(profile.reader).toBe('csv');
     }
   });
