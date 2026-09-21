@@ -4,16 +4,18 @@ import authRoutes from '../routes/auth';
 import categoryRoutes from '../routes/categories';
 import transactionRoutes from '../routes/transactions';
 import accountRoutes from '../routes/accounts';
+import importRoutes from '../routes/import';
 import { errorHandler } from '../middleware/error';
 
 export function createTestApp() {
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
   app.use('/api/auth', authRoutes);
   app.use('/api/categories', categoryRoutes);
   app.use('/api/transactions', transactionRoutes);
   app.use('/api/accounts', accountRoutes);
+  app.use('/api/import', importRoutes);
   app.use(errorHandler);
   return app;
 }
