@@ -26,13 +26,15 @@ export type TransactionQueryFilters = Omit<TransactionFilters, 'account'> & {
 
 export interface CreateTransactionData {
   categoryId?: number;
-  debitAccountId?: number;
-  creditAccountId?: number;
+  debitAccountId?: number | null;
+  creditAccountId?: number | null;
   debit: number;
   credit: number;
   date: string;
   description?: string;
-  payee?: string;
+  payee?: string | null;
+  /** Set only by the import flow; NULL for hand-entered transactions. */
+  importHash?: string | null;
 }
 
 export interface UpdateTransactionData {
@@ -200,8 +202,8 @@ export const createTransaction = async (
 ): Promise<TransactionDTO> => {
   const result = await query<{ id: number }>(
     `INSERT INTO transactions
-       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, payee)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, payee, import_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [
       userId,
       data.categoryId ?? null,
@@ -212,6 +214,7 @@ export const createTransaction = async (
       data.date,
       data.description || '',
       data.payee ?? null,
+      data.importHash ?? null,
     ]
   );
   return (await getTransactionDTOById(result[0].id))!;
@@ -318,4 +321,95 @@ export const getAccountBalances = async (
     [accountIds]
   );
   return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
+};
+
+/**
+ * Which of `hashes` already exist on this account.
+ *
+ * Scoped by account id alone — access is settled in the service layer, and a
+ * hash is only unique within an account anyway.
+ */
+export const findExistingImportHashes = async (
+  accountId: number,
+  hashes: string[]
+): Promise<string[]> => {
+  if (hashes.length === 0) return [];
+  const rows = await query<{ import_hash: string }>(
+    `SELECT DISTINCT import_hash
+     FROM transactions
+     WHERE import_hash = ANY($1::text[])
+       AND (debit_account_id = $2 OR credit_account_id = $2)`,
+    [hashes, accountId]
+  );
+  return rows.map(r => r.import_hash);
+};
+
+/**
+ * Transactions on this account falling on any of `dates`, for the heuristic
+ * duplicate check. Returns amounts in cents; the service matches them.
+ */
+export const findByDates = async (
+  accountId: number,
+  dates: string[]
+): Promise<{ id: number; date: Date; debit: string; credit: string }[]> => {
+  if (dates.length === 0) return [];
+  return query<{ id: number; date: Date; debit: string; credit: string }>(
+    `SELECT id, date, debit, credit
+     FROM transactions
+     WHERE date = ANY($1::date[])
+       AND (debit_account_id = $2 OR credit_account_id = $2)`,
+    [dates, accountId]
+  );
+};
+
+export interface ImportedTransactionData extends CreateTransactionData {
+  importHash: string;
+}
+
+/**
+ * Bulk insert in one statement. ON CONFLICT DO NOTHING against the partial
+ * unique indexes makes a double-submit a no-op rather than a duplicate, so
+ * the count returned is what actually landed.
+ *
+ * Includes `payee` (deviating from the original brief draft, which omitted
+ * it): the single-row createTransaction already stores payee, LHV supplies a
+ * real counterparty name, and dropping it only in the bulk path would make
+ * imported transactions strictly worse than hand-entered ones.
+ */
+export const createImportedTransactions = async (
+  userId: number,
+  rows: ImportedTransactionData[]
+): Promise<number> => {
+  if (rows.length === 0) return 0;
+
+  const values: unknown[] = [];
+  const tuples = rows.map((r, i) => {
+    const b = i * 10;
+    values.push(
+      userId,
+      r.categoryId ?? null,
+      r.debitAccountId ?? null,
+      r.creditAccountId ?? null,
+      r.debit,
+      r.credit,
+      r.date,
+      r.description || '',
+      r.payee ?? null,
+      r.importHash
+    );
+    return `($${b+1}, $${b+2}, $${b+3}, $${b+4}, $${b+5}, $${b+6}, $${b+7}, $${b+8}, $${b+9}, $${b+10})`;
+  });
+
+  // Two partial indexes cover this table, one per account column, so a single
+  // ON CONFLICT target cannot name both; DO NOTHING without a target lets
+  // either index absorb the conflict.
+  const inserted = await query<{ id: number }>(
+    `INSERT INTO transactions
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, payee, import_hash)
+     VALUES ${tuples.join(', ')}
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    values
+  );
+  return inserted.length;
 };
