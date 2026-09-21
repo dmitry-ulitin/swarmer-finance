@@ -6,6 +6,7 @@ import { detectProfile, getProfile, Profile } from './profiles';
 import { readStatement } from './rows';
 import { computeImportHashes } from './hash';
 import { parseCsv } from './csv';
+import { resolveCategoryForOwner } from '../categories';
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate';
 
@@ -42,8 +43,11 @@ function formatDate(date: string | Date): string {
 /** The account, once the caller is known to hold WRITE on it. */
 async function loadWritableAccount(accountId: number, userId: number) {
   const account = await accountQueries.getAccountById(accountId);
+  // Matches transactions.ts's loadAccount: a missing or deleted account
+  // returns 403, not 404, so this endpoint cannot be used to enumerate
+  // account ids that exist but belong to someone else.
   if (!account || account.deleted) {
-    throw { statusCode: 404, message: 'Account not found' };
+    throw { statusCode: 403, message: 'Cannot use this account' };
   }
   await requireLevel(accountId, userId, LEVEL.WRITE);
   return account;
@@ -95,10 +99,18 @@ export const parseStatement = async (
   const byKey = new Map<string, number>();
   for (const t of sameDay) {
     const d = formatDate(t.date);
-    // Income stores the amount in credit, expense in debit; both are equal
-    // for single-account rows, so either side keys the match.
-    byKey.set(`${d}|${t.credit}`, t.id);
-    byKey.set(`${d}|-${t.debit}`, t.id);
+    // Only the side that actually belongs to THIS account is keyed — using
+    // both sides unconditionally made an expense also register an
+    // income-shaped key (and vice versa), matching an imported row of the
+    // opposite sign. Transfers are skipped entirely: an imported row can
+    // never be one, and for cross-currency transfers `credit`/`debit` are in
+    // different accounts' currencies/scales, so keying either side by this
+    // account's cents would be meaningless.
+    if (t.debit_account_id === accountId && t.credit_account_id === null) {
+      byKey.set(`${d}|-${t.debit}`, t.id);
+    } else if (t.credit_account_id === accountId && t.debit_account_id === null) {
+      byKey.set(`${d}|${t.credit}`, t.id);
+    }
   }
 
   const out: ImportRow[] = rows.map((row, i) => {
@@ -204,12 +216,24 @@ export const reconcile = async (
     return true;
   });
 
+  // Resolve each distinct category id against the account owner (not the
+  // caller) before building the payload, exactly like the single-transaction
+  // path (transactions.ts). Done once per distinct id, up front, so a 403
+  // aborts the whole import rather than inserting some rows first.
+  const distinctCategoryIds = [
+    ...new Set(toInsert.map(r => r.categoryId).filter((id): id is number => id != null)),
+  ];
+  const resolvedCategoryIds = new Map<number, number>();
+  for (const id of distinctCategoryIds) {
+    resolvedCategoryIds.set(id, await resolveCategoryForOwner(id, account.user_id));
+  }
+
   const payload = toInsert.map(row => {
     const cents = toCents(Math.abs(row.amount), account.scale);
     const isExpense = row.amount < 0;
     return {
       categoryId:
-        row.categoryId ??
+        (row.categoryId != null ? resolvedCategoryIds.get(row.categoryId) : undefined) ??
         (isExpense ? UNCATEGORIZED_EXPENSE_CATEGORY_ID : UNCATEGORIZED_INCOME_CATEGORY_ID),
       debitAccountId: isExpense ? accountId : undefined,
       creditAccountId: isExpense ? undefined : accountId,

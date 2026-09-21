@@ -9,7 +9,10 @@ const fixtureB64 = (...p: string[]) =>
 describe('reconcile', () => {
   let userId: number;
   let otherUserId: number;
+  let thirdUserId: number;
   let accountId: number;
+  let ownerCategoryId: number;
+  let unrelatedCategoryId: number;
 
   beforeAll(async () => {
     const mk = async (email: string) => {
@@ -22,16 +25,33 @@ describe('reconcile', () => {
     };
     userId = await mk(`rec${Date.now()}@example.com`);
     otherUserId = await mk(`recb${Date.now()}@example.com`);
+    thirdUserId = await mk(`recc${Date.now()}@example.com`);
     const a = await pool.query(
       `INSERT INTO accounts (user_id, name, currency, start_balance)
        VALUES ($1, 'Rec Account', 'EUR', 0) RETURNING id`,
       [userId]
     );
     accountId = a.rows[0].id;
+
+    const ownerCat = await pool.query(
+      `INSERT INTO categories (user_id, name, parent_id, color, icon)
+       VALUES ($1, 'Owner Cat', 2, '#123456', 'tag') RETURNING id`,
+      [userId]
+    );
+    ownerCategoryId = ownerCat.rows[0].id;
+
+    // Owned by thirdUserId, who shares nothing with userId (the account
+    // owner) or otherUserId.
+    const unrelatedCat = await pool.query(
+      `INSERT INTO categories (user_id, name, parent_id, color, icon)
+       VALUES ($1, 'Unrelated Cat', 2, '#123456', 'tag') RETURNING id`,
+      [thirdUserId]
+    );
+    unrelatedCategoryId = unrelatedCat.rows[0].id;
   });
 
   afterAll(async () => {
-    for (const id of [userId, otherUserId]) {
+    for (const id of [userId, otherUserId, thirdUserId]) {
       await pool.query('DELETE FROM transactions WHERE user_id = $1', [id]);
       await pool.query('DELETE FROM accounts WHERE user_id = $1', [id]);
       await pool.query('DELETE FROM categories WHERE user_id = $1', [id]);
@@ -151,5 +171,39 @@ describe('reconcile', () => {
       'SELECT payee FROM transactions WHERE user_id = $1', [userId]
     );
     expect(t.rows[0].payee).toBe('MERCHANT 001');
+  });
+
+  it('imports a row carrying a category the account owner holds', async () => {
+    const { rows } = await parsed();
+    const result = await reconcile(userId, accountId, [
+      { ...rows[0], categoryId: ownerCategoryId },
+    ]);
+    expect(result.created).toBe(1);
+    const t = await pool.query(
+      'SELECT category_id FROM transactions WHERE user_id = $1', [userId]
+    );
+    expect(t.rows[0].category_id).toBe(ownerCategoryId);
+  });
+
+  it('rejects a row carrying a category id owned by an unrelated user, with 403, and creates nothing', async () => {
+    const { rows } = await parsed();
+    await expect(
+      reconcile(userId, accountId, [{ ...rows[0], categoryId: unrelatedCategoryId }])
+    ).rejects.toMatchObject({ statusCode: 403 });
+    const count = await pool.query(
+      'SELECT COUNT(*) FROM transactions WHERE user_id = $1', [userId]
+    );
+    expect(Number(count.rows[0].count)).toBe(0);
+  });
+
+  it('rejects a row carrying a nonexistent category id with 403, not 500', async () => {
+    const { rows } = await parsed();
+    await expect(
+      reconcile(userId, accountId, [{ ...rows[0], categoryId: 999999 }])
+    ).rejects.toMatchObject({ statusCode: 403 });
+    const count = await pool.query(
+      'SELECT COUNT(*) FROM transactions WHERE user_id = $1', [userId]
+    );
+    expect(Number(count.rows[0].count)).toBe(0);
   });
 });

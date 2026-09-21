@@ -41,6 +41,18 @@ describe('readStatement — LHV', () => {
   });
 });
 
+const BOC_PREAMBLE = [
+  'Period:,Last 10 Transactions,,,,,,,,',
+  'Account number:,100000000000,,,,,,,,',
+  'Account name:,ACCOUNT HOLDER,,,,,,,,',
+  'Account type:,Sight Account,,,,,,,,',
+  'Account currency:,EUR,,,,,,,,',
+];
+const BOC_HEADER =
+  'Date,Description,Transaction type,Reference number,Debit,Credit,Indicative balance,Value date,Bank reference number,Branch code';
+
+const bocCsv = (...rows: string[]) => [...BOC_PREAMBLE, BOC_HEADER, ...rows].join('\n');
+
 describe('readStatement — Bank of Cyprus', () => {
   const result = () => readStatement(fixture('bank_of_cyprus', 'statement.csv'), PROFILES.boc);
 
@@ -63,6 +75,22 @@ describe('readStatement — Bank of Cyprus', () => {
 
   it('leaves payee null when the bank has no such column', () => {
     expect(result().rows[0].payee).toBeNull();
+  });
+
+  it('drops a row whose Debit and Credit are both blank (an informational/memo line)', () => {
+    const csv = bocCsv(
+      '21/09/2026,Real purchase,Card Purchase - Foreign,,"6,00",,"39.384,54",21/09/2026,1260000000000FR0000000,0104',
+      '20/09/2026,Memo line with no amount,Info,,,,"39.384,54",20/09/2026,1260000000001FR0000000,0104',
+      '18/09/2026,Another real purchase,Card Purchase - Foreign,,"7,80",,"39.390,54",18/09/2026,1260000000002FR0000000,0104'
+    );
+    const { rows } = readStatement(csv, PROFILES.boc);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(r => r.reference)).toEqual([
+      '1260000000000FR0000000',
+      '1260000000002FR0000000',
+    ]);
+    // index stays contiguous across the dropped row.
+    expect(rows.map(r => r.index)).toEqual([0, 1]);
   });
 });
 

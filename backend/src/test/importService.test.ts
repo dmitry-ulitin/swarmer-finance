@@ -98,6 +98,12 @@ describe('parseStatement', () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
+  it('refuses a nonexistent account with 403, not 404 — matching transactions.ts, so this endpoint cannot be used to enumerate account ids', async () => {
+    await expect(
+      parseStatement(userId, 999999, fixtureB64('lhv', 'statement.csv'))
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it('writes nothing to the database', async () => {
     await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
     const count = await pool.query(
@@ -132,5 +138,19 @@ describe('parseStatement', () => {
     const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
     expect(result.rows[0].status).toBe('possible_duplicate');
     expect(result.rows[0].duplicateOf).toEqual(expect.any(Number));
+  });
+
+  it('does not flag an imported income as possible_duplicate of a hand-entered EXPENSE of the same magnitude and date', async () => {
+    // LHV row 0 is an income of +1305.28 on 2026-07-01. A hand-entered
+    // EXPENSE of the same magnitude on the same date is sign-opposite and
+    // must not match — matching both signs was the bug (Finding 2).
+    await pool.query(
+      `INSERT INTO transactions
+         (user_id, category_id, debit_account_id, debit, credit, date, description)
+       VALUES ($1, 4, $2, 130528, 130528, '2026-07-01', 'hand-entered expense')`,
+      [userId, eurAccountId]
+    );
+    const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+    expect(result.rows[0].status).toBe('new');
   });
 });

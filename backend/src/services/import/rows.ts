@@ -78,7 +78,12 @@ export function readStatement(
   const rows: ParsedRow[] = [];
   const dataRows = grid.slice(profile.skipLines + 1);
 
-  dataRows.forEach((raw, index) => {
+  // index is assigned only to rows that survive the zero-amount filter
+  // below, so it stays contiguous and computeImportHashes (which relies on
+  // index for nothing, but does rely on occurrence order) sees the same set
+  // that is returned.
+  let index = 0;
+  dataRows.forEach(raw => {
     let amount: number;
     if (profile.amount.kind === 'signed') {
       amount = parseAmount(raw[col(profile.amount.column)] ?? '', profile.decimal);
@@ -104,15 +109,23 @@ export function readStatement(
       }
     }
 
+    const rounded = round2(amount);
+    // A zero amount is nothing importable: an empty amount cell, or (Bank of
+    // Cyprus) a row with both Debit and Credit blank — an informational /
+    // memo line real statements carry. Dropped here, before index is
+    // assigned, so index stays contiguous and computeImportHashes' occurrence
+    // counting sees exactly the rows that are returned.
+    if (rounded === 0) return;
+
     const reference =
       profile.identity.kind === 'reference'
         ? profile.identity.columns.map(c => (raw[col(c)] ?? '').trim()).join('|') || null
         : null;
 
     rows.push({
-      index,
+      index: index++,
       date: parseDate(raw[dateIdx] ?? '', profile.dateFormat),
-      amount: round2(amount),
+      amount: rounded,
       description: (raw[descIdx] ?? '').trim(),
       payee: payeeIdx === -1 ? null : (raw[payeeIdx] ?? '').trim() || null,
       reference,

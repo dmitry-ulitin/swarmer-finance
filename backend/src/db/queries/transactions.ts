@@ -351,10 +351,24 @@ export const findExistingImportHashes = async (
 export const findByDates = async (
   accountId: number,
   dates: string[]
-): Promise<{ id: number; date: Date; debit: string; credit: string }[]> => {
+): Promise<{
+  id: number;
+  date: Date;
+  debit: string;
+  credit: string;
+  debit_account_id: number | null;
+  credit_account_id: number | null;
+}[]> => {
   if (dates.length === 0) return [];
-  return query<{ id: number; date: Date; debit: string; credit: string }>(
-    `SELECT id, date, debit, credit
+  return query<{
+    id: number;
+    date: Date;
+    debit: string;
+    credit: string;
+    debit_account_id: number | null;
+    credit_account_id: number | null;
+  }>(
+    `SELECT id, date, debit, credit, debit_account_id, credit_account_id
      FROM transactions
      WHERE date = ANY($1::date[])
        AND (debit_account_id = $2 OR credit_account_id = $2)`,

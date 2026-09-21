@@ -27,5 +27,11 @@ export function parseCsv(text: string, delimiter = ','): string[][] {
   if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
 
   // A trailing newline leaves a [''] row; so does a blank separator line.
+  // This filter is position-destructive: it drops blank rows ANYWHERE in the
+  // grid, not just trailing ones. profiles.ts (skipLines, currency.line) and
+  // rows.ts index the returned grid by absolute position, so those offsets
+  // are measured against this FILTERED grid, not the raw file. A future
+  // bank whose preamble contains a blank separator line would silently
+  // mis-index its header and currency rather than erroring.
   return rows.filter(r => r.length > 1 || r[0] !== '');
 }

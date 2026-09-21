@@ -29,6 +29,7 @@ export function computeImportHashes(rows: ParsedRow[], profile: Profile): string
       row.date,
       row.amount.toFixed(2),
       normalize(row.description),
+      normalize(row.payee ?? ''),
     ].join('|');
     const occurrence = seen.get(base) ?? 0;
     seen.set(base, occurrence + 1);
