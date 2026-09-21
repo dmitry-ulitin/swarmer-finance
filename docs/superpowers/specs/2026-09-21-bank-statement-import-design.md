@@ -135,9 +135,9 @@ One column, one classification path, no branching in the service.
 ### The occurrence index
 
 A content hash cannot tell two genuinely identical transactions apart,
-and the LHV sample contains exactly that: four `PAY*Sapronov Kutsub`
-rows booked 2026-07-29, each -10.00, sharing one description. They are
-four distinct charges identical in every field the file exposes.
+and the LHV sample contains exactly that: four rows booked 2026-07-29,
+each -10.00, sharing one merchant and one description. They are four
+distinct charges, identical in every field the file exposes.
 
 Within one parsed file the Nth identical row therefore gets a suffix —
 `...|0`, `...|1`, `...|2`. Four identical charges yield four distinct
@@ -280,20 +280,31 @@ a retry after a failure is safe.
 
 ## Testing
 
-Both sample statements are committed in `backend/banks/`, so the parser
-tests assert against real bank output rather than fixtures written from
-the same assumptions as the parser.
+The parser tests run against **redacted copies of real statements**, in
+`backend/src/test/fixtures/banks/`. The originals stay in
+`backend/banks/`, which is gitignored — they carry IBANs, account
+numbers, a name and a full spending history.
+
+Redaction replaced identifying values and preserved every structural
+property the parser depends on: the BOM, preamble line counts, column
+count and order, quoting style (LHV quotes text but leaves date and
+amount bare; BoC quotes only its comma-decimal numerics), date formats,
+decimal and thousands separators, row order, the 10/133 credit-debit
+split, and the run of four identical rows. Verified after generation —
+LHV is 143 rows of 16 columns, BoC 10 rows of 10.
+
+This keeps the tests honest about layout, which is where bank formats
+actually differ, without putting personal finances in git history.
 
 **`csv.ts`** — quoted fields containing commas (LHV descriptions are
 full of them), BOM stripping, CRLF line endings, quoted quotes.
 
 **Profiles** — LHV: 143 data rows, 10 credit and 133 debit, first row
-parses to `2026-07-01 / +1305.28 / 'salary 06 2026' / 'UNLIMITED
-SERVICES OU'`. BoC: 5 preamble lines skipped, `"39.384,54"` reads as
-`39384.54`, `21/09/2026` becomes `2026-09-21`, a `Debit` value becomes
-negative.
+parses to `2026-07-01 / +1305.28 / 'Description 1' / 'MERCHANT 001'`.
+BoC: 5 preamble lines skipped, `"39.384,54"` reads as `39384.54`,
+`21/09/2026` becomes `2026-09-21`, a `Debit` value becomes negative.
 
-**Hashing** — the four `PAY*Sapronov Kutsub` rows booked 2026-07-29
+**Hashing** — the four identical rows booked 2026-07-29, each -10.00,
 produce four distinct hashes; the same file hashed twice produces the
 same values.
 
@@ -306,10 +317,10 @@ twice creates nothing the second time; hash duplicates are skipped;
 sign determines income against expense; access is enforced
 independently of `parse`.
 
-**Round trip** — parse the real LHV file, reconcile it, parse it again:
+**Round trip** — parse the LHV fixture, reconcile it, parse it again:
 all 143 rows come back `duplicate`. This is the property the whole
 design exists to provide, so it is tested end to end against a real
-file.
+statement's structure.
 
 `importRoutes` is registered in both `src/index.ts` and
 `src/test/testApp.ts`.

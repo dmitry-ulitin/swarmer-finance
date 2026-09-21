@@ -9,3 +9,7 @@ dist/
 coverage/
 .playwright-mcp/
 screenshots/
+
+# Real bank statements — contain personal data. Redacted copies for tests
+# live in backend/src/test/fixtures/banks/.
+backend/banks/
