@@ -137,6 +137,45 @@ describe('Shared categories', () => {
       await pool.query('DELETE FROM users WHERE id = $1', [stranger.id]);
     });
 
+    it('hides a category whose mid-path ancestor belongs to an unrelated user', async () => {
+      const stamp = Date.now();
+      // B is the hub: A shares with B, and so does E — but A and E share
+      // nothing. E owns the parent, B owns the child under it, so B sees
+      // the pair nested while A can reach only the child.
+      const e = await register(`shcat-e-${stamp}@example.com`);
+      const accountE = await makeAccount(e.id, 'E account');
+      await grant(accountE, userBId, LEVEL.WRITE);
+
+      const eParent = await makeCategory(e.id, `HubParent-${stamp}`, 2);
+      const bChild = await makeCategory(userBId, `HubChild-${stamp}`, eParent);
+      const bGrandchild = await makeCategory(userBId, `HubDeep-${stamp}`, bChild);
+
+      const asB = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenB}` });
+      expect(asB.status).toBe(200);
+      // B sees the whole chain, nested under C's row.
+      expect(findInTree(asB.body.data, bChild)).not.toBeNull();
+      expect(findInTree(asB.body.data, bGrandchild)).not.toBeNull();
+
+      const asA = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${tokenA}` });
+      expect(asA.status).toBe(200);
+      // A shares nothing with E, so the parent is absent — and rather than
+      // reparenting the child to the root (where it would sit at top level
+      // while still reporting the full path as its name), the child and its
+      // subtree are left out entirely.
+      expect(findInTree(asA.body.data, eParent)).toBeNull();
+      expect(findInTree(asA.body.data, bChild)).toBeNull();
+      expect(findInTree(asA.body.data, bGrandchild)).toBeNull();
+
+      await pool.query('DELETE FROM categories WHERE id = ANY($1::int[])', [[bGrandchild, bChild, eParent]]);
+      await pool.query('DELETE FROM account_shares WHERE account_id = $1', [accountE]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [e.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [e.id]);
+    });
+
     it('carries fullName and root_id on every node of the tree', async () => {
       const stamp = Date.now();
       const parentName = `TreeParent-${stamp}`;

@@ -65,11 +65,26 @@ const buildTree = (categories: Category[], rootId: number, userId: number): Cate
 
   const childrenByParent = new Map<string, Category[]>();
   for (const category of winners.values()) {
-    let parent = parentPath(category.fullName);
-    // A path whose parent has no row of its own would otherwise strand its
-    // whole subtree; hang it off the root so nothing vanishes from the tree.
+    const parent = parentPath(category.fullName);
+    // A path whose parent has no row among the winners is dropped, along
+    // with its subtree — `attach` only descends into paths it has reached.
+    //
+    // This happens when a mid-path category belongs to someone the viewer
+    // shares nothing with: A and C both share with B but not each other, C
+    // owns "Food", B owns "Food / Snacks", so A sees the child and not its
+    // parent. Hanging it off the root instead would show it at top level
+    // while it still reports fullName "Food / Snacks" — a node whose
+    // position contradicts its own label, and picking it as a parent then
+    // rebuilds the full path somewhere the tree never showed it.
+    //
+    // The cost is that a transaction can stay visible while its category is
+    // absent from the tree. The fuller fix is to synthesise placeholder
+    // nodes for the missing ancestors (id: null, not selectable), which
+    // keeps position and fullName in agreement without inventing access —
+    // that needs Category.id to become nullable and both pickers to refuse
+    // a placeholder, so it is left for later.
     if (parent !== '' && !winners.has(pathKey(rootId, parent))) {
-      parent = '';
+      continue;
     }
     const siblings = childrenByParent.get(parent);
     if (siblings) siblings.push(category);
