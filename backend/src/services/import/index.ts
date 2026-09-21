@@ -146,3 +146,82 @@ export const parseStatement = async (
     },
   };
 };
+
+const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
+const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
+
+export interface ReconcileRow {
+  date: string;
+  amount: number;
+  description?: string;
+  payee?: string | null;
+  hash: string;
+  categoryId?: number | null;
+}
+
+/**
+ * Insert the rows the user chose.
+ *
+ * The rows come back from the client, so nothing in them is trusted: access
+ * is re-checked, amounts are re-converted through the account's own scale,
+ * and hashes are re-checked. A client that skips parse entirely and posts
+ * straight here gets the same treatment.
+ *
+ * Only the hash is re-checked. The date-and-amount heuristic is NOT re-run:
+ * a row the user reviewed as possible_duplicate and chose to keep must
+ * import, and re-applying the advisory match here would silently discard
+ * exactly the rows the user made a decision about.
+ */
+export const reconcile = async (
+  userId: number,
+  accountId: number,
+  rows: ReconcileRow[]
+): Promise<{ created: number; skipped: number }> => {
+  const account = await loadWritableAccount(accountId, userId);
+
+  if (rows.length === 0) return { created: 0, skipped: 0 };
+
+  for (const row of rows) {
+    if (!row.hash) {
+      throw { statusCode: 400, message: 'Every row must carry an import hash' };
+    }
+    if (!Number.isFinite(row.amount) || row.amount === 0) {
+      throw { statusCode: 400, message: `Row ${row.date} has no usable amount` };
+    }
+  }
+
+  const hashes = rows.map(r => r.hash);
+  const existing = new Set(
+    await transactionQueries.findExistingImportHashes(accountId, hashes)
+  );
+
+  // Two rows in one payload can share a hash only if the client duplicated
+  // them; keeping the first is consistent with the index rejecting the rest.
+  const seen = new Set<string>();
+  const toInsert = rows.filter(r => {
+    if (existing.has(r.hash) || seen.has(r.hash)) return false;
+    seen.add(r.hash);
+    return true;
+  });
+
+  const payload = toInsert.map(row => {
+    const cents = toCents(Math.abs(row.amount), account.scale);
+    const isExpense = row.amount < 0;
+    return {
+      categoryId:
+        row.categoryId ??
+        (isExpense ? UNCATEGORIZED_EXPENSE_CATEGORY_ID : UNCATEGORIZED_INCOME_CATEGORY_ID),
+      debitAccountId: isExpense ? accountId : undefined,
+      creditAccountId: isExpense ? undefined : accountId,
+      debit: cents,
+      credit: cents,
+      date: row.date,
+      description: row.description ?? '',
+      payee: row.payee ?? null,
+      importHash: row.hash,
+    };
+  });
+
+  const created = await transactionQueries.createImportedTransactions(userId, payload);
+  return { created, skipped: rows.length - created };
+};
