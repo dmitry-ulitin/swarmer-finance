@@ -109,6 +109,44 @@ export const getCategoriesByUserIds = async (userIds: number[]): Promise<Categor
   );
 };
 
+/**
+ * Every category id a filter on `categoryIds` should actually match.
+ *
+ * The tree shows one node per `(root_id, full_name)` path, backed by a
+ * separate row per user, and a node stands for its whole subtree. So
+ * filtering by a category means matching three things at once: the row
+ * itself, co-owners' rows at the same path, and everything below that path
+ * — under any owner. Matching the bare id instead would silently drop a
+ * co-owner's half of the same node.
+ *
+ * Restricted to `userIds` (the caller plus their related users) plus system
+ * categories, so a path name two strangers happen to share does not pull in
+ * rows the caller was never shown.
+ *
+ * Returns [] when nothing matches, which callers must treat as "no
+ * transaction matches" rather than "no filter".
+ */
+export const expandCategoryFilter = async (
+  categoryIds: number[],
+  userIds: number[]
+): Promise<number[]> => {
+  const rows = await query<{ id: number }>(
+    `${CATEGORY_PATHS_CTE}
+     SELECT DISTINCT c.id
+     FROM categories c
+     JOIN category_paths cp ON cp.id = c.id
+     JOIN category_paths target ON target.id = ANY($1::int[])
+     WHERE (c.user_id = ANY($2::int[]) OR c.user_id IS NULL)
+       AND cp.root_id = target.root_id
+       AND (cp.full_name = target.full_name
+            -- starts_with, not LIKE: names are free text, so a category
+            -- named "100% off" or "Take_out" would over-match as a pattern.
+            OR starts_with(cp.full_name, target.full_name || ' / '))`,
+    [categoryIds, userIds]
+  );
+  return rows.map(r => r.id);
+};
+
 export const getCategoryById = async (id: number): Promise<Category | null> => {
   return queryOne<Category>(
     `${CATEGORY_PATHS_CTE}

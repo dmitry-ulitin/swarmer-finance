@@ -1,6 +1,8 @@
 import * as transactionQueries from '../db/queries/transactions';
 import * as accountQueries from '../db/queries/accounts';
 import { resolveCategoryForOwner } from './categories';
+import { expandCategoryFilter } from '../db/queries/categories';
+import { getRelatedUserIds } from '../db/queries/accountShares';
 import { toDecimal, toCents } from './currency';
 import { Account, TransactionDTO } from '../types';
 import { LEVEL, getAccessibleAccountIds, requireLevelOnAll } from './access';
@@ -141,7 +143,24 @@ export const getTransactions = async (
     ? filters.account.filter(id => accessibleIds.includes(id))
     : accessibleIds;
 
-  const transactions = await transactionQueries.getTransactions({ ...filters, account: accountIds });
+  // The tree shows one node per path, backed by a row per user, and a node
+  // stands for its subtree — so a filter on one id must match every row
+  // behind that node. Expanding here keeps the query a plain id match.
+  let categoryIds = filters.category;
+  if (filters.category?.length) {
+    const relatedUserIds = await getRelatedUserIds(userId);
+    categoryIds = await expandCategoryFilter(filters.category, relatedUserIds);
+    // An expansion that matched nothing means no transaction can match. The
+    // query treats an empty list as "no category filter", so returning early
+    // is what keeps that from widening into every transaction.
+    if (categoryIds.length === 0) return [];
+  }
+
+  const transactions = await transactionQueries.getTransactions({
+    ...filters,
+    account: accountIds,
+    category: categoryIds,
+  });
   const sequential = !filters.details && !filters.category?.length && !filters.type;
   const result = sequential && transactions.length > 0
     ? await attachRunningBalances(transactions, accessibleIds)

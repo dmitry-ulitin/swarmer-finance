@@ -662,4 +662,147 @@ describe('Shared categories', () => {
       await pool.query('DELETE FROM users WHERE id = $1', [stranger.id]);
     });
   });
+
+  /**
+   * The tree shows one node per path, but that node is backed by a row per
+   * user and stands for its whole subtree. Filtering by a category therefore
+   * has to match all three: the row itself, co-owners' rows at the same
+   * path, and everything below it.
+   */
+  describe('filtering transactions by category', () => {
+    const txIds: number[] = [];
+
+    const spend = async (token: string, accountId: number, categoryId: number, amount: number) => {
+      const res = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ debitAccountId: accountId, categoryId, debit: amount, credit: amount, date: '2024-05-01' });
+      expect(res.status).toBe(200);
+      txIds.push(res.body.data.id);
+      return res.body.data;
+    };
+
+    const filterBy = async (token: string, categoryId: number) => {
+      const res = await request(app)
+        .get(`/api/transactions?category=${categoryId}`)
+        .set({ Authorization: `Bearer ${token}` });
+      expect(res.status).toBe(200);
+      return res.body.data as any[];
+    };
+
+    afterEach(async () => {
+      if (txIds.length) {
+        await pool.query('DELETE FROM transactions WHERE id = ANY($1::int[])', [txIds]);
+        txIds.length = 0;
+      }
+    });
+
+    it("includes a co-owner's row at the same path", async () => {
+      const stamp = Date.now();
+      const name = `FilterFood-${stamp}`;
+      // A and B each end up with their own row for the same path: A picks
+      // their own, B's pick is copied into B's tree on save.
+      const aCategory = await makeCategory(userAId, name, 2);
+      const aTx = await spend(tokenA, accountA, aCategory, 11);
+      const bTx = await spend(tokenB, accountA, aCategory, 22);
+
+      // Two distinct rows, one node.
+      expect(bTx.category.id).not.toBe(aCategory);
+      expect(bTx.category.user_id).toBe(userBId);
+
+      const filtered = await filterBy(tokenA, aCategory);
+      const ids = filtered.map(t => t.id);
+      expect(ids).toContain(aTx.id);
+      expect(ids).toContain(bTx.id);
+    });
+
+    it('includes descendants of the filtered category', async () => {
+      const stamp = Date.now();
+      const parentName = `FilterParent-${stamp}`;
+      const parent = await makeCategory(userAId, parentName, 2);
+      const child = await makeCategory(userAId, `FilterChild-${stamp}`, parent);
+      const grandchild = await makeCategory(userAId, `FilterGrand-${stamp}`, child);
+
+      const parentTx = await spend(tokenA, accountA, parent, 10);
+      const childTx = await spend(tokenA, accountA, child, 20);
+      const grandTx = await spend(tokenA, accountA, grandchild, 30);
+
+      const ids = (await filterBy(tokenA, parent)).map(t => t.id);
+      expect(ids).toContain(parentTx.id);
+      expect(ids).toContain(childTx.id);
+      expect(ids).toContain(grandTx.id);
+
+      // Filtering the child excludes the parent but keeps the grandchild.
+      const childIds = (await filterBy(tokenA, child)).map(t => t.id);
+      expect(childIds).not.toContain(parentTx.id);
+      expect(childIds).toContain(childTx.id);
+      expect(childIds).toContain(grandTx.id);
+    });
+
+    it("includes a co-owner's descendant of the filtered path", async () => {
+      const stamp = Date.now();
+      const parentName = `CoParent-${stamp}`;
+      const aParent = await makeCategory(userAId, parentName, 2);
+      // B owns a child under the same path that A has no row for.
+      const bParent = await makeCategory(userBId, parentName, 2);
+      const bChild = await makeCategory(userBId, `CoChild-${stamp}`, bParent);
+      const bTx = await spend(tokenB, accountA, bChild, 44);
+
+      const ids = (await filterBy(tokenA, aParent)).map(t => t.id);
+      expect(ids).toContain(bTx.id);
+    });
+
+    it('excludes a sibling whose name merely shares a prefix', async () => {
+      const stamp = Date.now();
+      const food = await makeCategory(userAId, `Food-${stamp}`, 2);
+      const foodie = await makeCategory(userAId, `Food-${stamp}ie`, 2);
+      const foodTx = await spend(tokenA, accountA, food, 10);
+      const foodieTx = await spend(tokenA, accountA, foodie, 20);
+
+      const ids = (await filterBy(tokenA, food)).map(t => t.id);
+      expect(ids).toContain(foodTx.id);
+      expect(ids).not.toContain(foodieTx.id);
+    });
+
+    it('does not match a name-alike path owned by an unrelated user', async () => {
+      const stamp = Date.now();
+      const shared = `Groceries-${stamp}`;
+      const aCategory = await makeCategory(userAId, shared, 2);
+      const aTx = await spend(tokenA, accountA, aCategory, 15);
+
+      // A stranger with the very same path, on their own account.
+      const stranger = await register(`shcat-f-${stamp}@example.com`);
+      const strangerAccount = await makeAccount(stranger.id, 'F account');
+      const strangerCategory = await makeCategory(stranger.id, shared, 2);
+      const strangerTx = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${stranger.token}` })
+        .send({ debitAccountId: strangerAccount, categoryId: strangerCategory, debit: 99, credit: 99, date: '2024-05-01' });
+      expect(strangerTx.status).toBe(200);
+
+      const ids = (await filterBy(tokenA, aCategory)).map(t => t.id);
+      expect(ids).toContain(aTx.id);
+      expect(ids).not.toContain(strangerTx.body.data.id);
+
+      await pool.query('DELETE FROM transactions WHERE id = $1', [strangerTx.body.data.id]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [stranger.id]);
+      await pool.query('DELETE FROM categories WHERE user_id = $1', [stranger.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [stranger.id]);
+    });
+
+    it('returns nothing when the filtered category matches no row', async () => {
+      const aCategory = await makeCategory(userAId, `Lonely-${Date.now()}`, 2);
+      await spend(tokenA, accountA, aCategory, 12);
+
+      // An id that exists for nobody: the expansion is empty, which must
+      // mean "no match", never "no filter".
+      const res = await request(app)
+        .get('/api/transactions?category=99999999')
+        .set({ Authorization: `Bearer ${tokenA}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(0);
+    });
+  });
+
 });
