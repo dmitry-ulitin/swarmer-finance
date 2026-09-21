@@ -1,0 +1,29 @@
+<form [formGroup]="form" class="upload">
+    <p class="target">
+        Importing into <strong>{{ account.name }}</strong> ({{ account.currency }})
+    </p>
+
+    <tui-textfield tuiChevron [stringify]="stringifyFormat">
+        <label tuiLabel>Statement format</label>
+        <input tuiSelect formControlName="format" />
+        <tui-data-list-wrapper *tuiDropdown [items]="formats" [itemContent]="stringifyFormat" />
+    </tui-textfield>
+
+    @if (loading()) {
+        <tui-loader size="l" [textContent]="'Reading statement…'" />
+    } @else {
+        <label tuiInputFiles>
+            <input accept=".csv,text/csv" tuiInputFiles [formControl]="form.controls.file" />
+        </label>
+    }
+
+    @if (error(); as message) {
+        <tui-error [error]="message" />
+    }
+
+    <div class="actions">
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">
+            Cancel
+        </button>
+    </div>
+</form>

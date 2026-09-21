@@ -32,3 +32,19 @@ if (typeof globalThis.localStorage === 'undefined') {
 
   globalThis.localStorage = new MemoryStorage();
 }
+
+// Known issue, pre-existing and not caused by any one spec: with enough specs
+// that instantiate components through TestBed, some runs fail with
+// "The service 'FetchBackend' needs to be compiled using the JIT compiler,
+// but '@angular/compiler' is not available" — and the suite it lands on
+// varies between runs.
+//
+// It reproduces on a clean checkout by duplicating account-form.spec.ts three
+// times, with no other changes, so it is a builder/runner initialization
+// order problem rather than anything in a particular test. Importing
+// '@angular/compiler' here does not fix it: the unit-test builder initializes
+// TestBed before setupFiles run. providersFile and a single-fork vitest
+// config were both tried and did not help either.
+//
+// Every spec passes when run on its own (`ng test --include=<path>`), which
+// is the workaround until the builder is updated.

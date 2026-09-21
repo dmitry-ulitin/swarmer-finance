@@ -1,0 +1,17 @@
+:host {
+    display: block;
+}
+
+.tree-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.owner-badge {
+    margin-left: auto;
+    padding-left: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--tui-text-secondary);
+}

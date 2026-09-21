@@ -50,26 +50,7 @@
     }
     <!-- Category (Expense / Income only) -->
     @if (!isTransfer()) {
-    <tui-textfield tuiChevron [tuiTextfieldCleaner]="true" [stringify]="stringifyCategory"
-        [identityMatcher]="categoryMatcher">
-        <label tuiLabel>Category</label>
-        <input tuiSelect formControlName="category" />
-        <tui-data-list *tuiDropdown>
-            @for (item of visibleCategories(); track item.id) {
-            <tui-tree [childrenHandler]="treeHandler()" [content]="treeNodeContent" [map]="treeMap"
-                [tuiTreeController]="false" [value]="item" />
-            }
-        </tui-data-list>
-    </tui-textfield>
-    <ng-template #treeNodeContent let-item>
-        <button new tuiOption type="button" [value]="item" class="tree-option">
-            <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />
-            {{ item.name }}
-            @if (isForeign(item)) {
-                <span class="owner-badge">{{ item.owner_name }}</span>
-            }
-        </button>
-    </ng-template>
+    <app-category-select [rootId]="categoryRootId()" formControlName="category" />
     }
 
     <!-- Optional fields -->

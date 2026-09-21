@@ -7,6 +7,7 @@ import { AuthService } from '../../../../core/auth.service';
 import { TuiExpand, TuiButton } from '@taiga-ui/core';
 import { TuiHovered } from '@taiga-ui/cdk';
 import { Account } from '../../../../models/account';
+import { ImportDialogService } from '../../../import/import-dialog.service';
 
 @Component({
   selector: 'app-account-tree-node',
@@ -22,6 +23,7 @@ export class AccountTreeNode {
   protected readonly store = inject(AccountListStore);
   protected readonly transactions = inject(TransactionsState);
   protected readonly auth = inject(AuthService);
+  private readonly importDialog = inject(ImportDialogService);
   protected hovered = false;
 
   protected readonly nodeAccountIds = computed(() => {
@@ -51,6 +53,6 @@ export class AccountTreeNode {
   }
 
   protected onImport(account: Account): void {
-    // TODO: Implement import functionality
+    void this.importDialog.open(account);
   }
 }

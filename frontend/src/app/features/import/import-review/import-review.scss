@@ -1,0 +1,123 @@
+.review {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    // The dialog gives the table a bounded height so the header and actions
+    // stay put while a long statement scrolls between them.
+    max-block-size: 70vh;
+}
+
+.summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+}
+
+.counts {
+    color: var(--tui-text-secondary);
+    font-size: 0.875rem;
+}
+
+.scroll {
+    flex: 1;
+    overflow: auto;
+    border: 1px solid var(--tui-border-normal);
+    border-radius: var(--tui-radius-m);
+}
+
+.rows {
+    inline-size: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+        padding: 0.375rem 0.5rem;
+        text-align: left;
+        vertical-align: middle;
+        border-block-end: 1px solid var(--tui-border-normal);
+    }
+
+    th {
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 1;
+        background: var(--tui-background-elevation-1);
+        font-size: 0.75rem;
+        color: var(--tui-text-secondary);
+        font-weight: 500;
+    }
+
+    tbody tr:last-child td {
+        border-block-end: none;
+    }
+}
+
+// An unselected row stays legible but recedes — it is excluded, not invalid.
+.is-excluded {
+    opacity: 0.5;
+}
+
+.col-check {
+    inline-size: 2.5rem;
+}
+
+.col-date {
+    inline-size: 6.5rem;
+    white-space: nowrap;
+}
+
+.col-amount {
+    inline-size: 7rem;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+
+    &.is-income {
+        color: var(--tui-text-positive);
+    }
+}
+
+.col-category {
+    inline-size: 14rem;
+}
+
+.col-status {
+    inline-size: 9rem;
+}
+
+.col-desc {
+    min-inline-size: 12rem;
+}
+
+// A <td> must keep its table display role, so the two lines stack inside it.
+.payee,
+.description {
+    display: block;
+}
+
+.payee {
+    font-size: 0.875rem;
+}
+
+.description {
+    font-size: 0.75rem;
+    color: var(--tui-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-inline-size: 22rem;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.selected-count {
+    margin-inline-end: auto;
+    color: var(--tui-text-secondary);
+    font-size: 0.875rem;
+}

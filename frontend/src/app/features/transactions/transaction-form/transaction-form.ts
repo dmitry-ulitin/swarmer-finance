@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiError, TuiIcon, TuiInput } from '@taiga-ui/core';
-import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea, TuiTree } from '@taiga-ui/kit';
+import { TuiButton, TuiDataList, TuiError, TuiInput } from '@taiga-ui/core';
+import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea } from '@taiga-ui/kit';
 import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TuiAutoFocus, type TuiStringHandler } from '@taiga-ui/cdk';
@@ -17,6 +17,7 @@ import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { AuthService } from '../../../core/auth.service';
+import { CategorySelect } from '../../categories/category-select/category-select';
 
 @Component({
   selector: 'app-transaction-form',
@@ -31,11 +32,10 @@ import { AuthService } from '../../../core/auth.service';
     TuiComboBox,
     TuiDataListWrapper,
     TuiDataList,
-    TuiTree,
-    TuiIcon,
     TuiChevron,
     TuiButton,
-    TuiAutoFocus
+    TuiAutoFocus,
+    CategorySelect
   ],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
@@ -49,30 +49,17 @@ export class TransactionForm {
   protected readonly categoriesState = inject(CategoriesState);
   readonly accountsState = inject(AccountsState);
 
-  /**
-   * A category owned by someone else — shown because a shared account's
-   * transactions carry their author's categories. Picking one is allowed:
-   * the server copies the path into this transaction's owner's own tree.
-   */
-  readonly isForeign = (c: Category): boolean =>
-    c.user_id !== null && c.user_id !== this.auth.user()?.id;
-
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
-  readonly stringifyCategory: TuiStringHandler<Category | null> = c => c?.fullName ?? c?.name ?? 'Uncategorized';
-  // The tree holds one node per path, so a transaction may reference a row
-  // that lost the dedupe to an equivalent one. Identity is the path, not
-  // the id, or such a category would not highlight in the dropdown.
-  readonly categoryMatcher = (a: Category | null, b: Category | null): boolean =>
-    a?.root_id === b?.root_id && a?.fullName === b?.fullName;
   readonly activeTypeIndex = signal(this.context.data.debit_account && this.context.data.credit_account ? 2 : (this.context.data.debit_account ? 0 : 1));
   readonly isExpense = computed(() => this.activeTypeIndex() === 0);
   readonly isIncome = computed(() => this.activeTypeIndex() === 1);
   readonly isTransfer = computed(() => this.activeTypeIndex() === 2);
-  readonly visibleCategories = computed(() => {
-    const rootId = this.isIncome() ? 1 : 2;
-    return this.categoriesState.categories().find(c => c.id === rootId)?.children || [];
-  });
+  /** 1 = Income, 2 = Expenses; drives which branch the picker offers. */
+  readonly categoryRootId = computed(() => (this.isIncome() ? 1 : 2));
+  readonly visibleCategories = computed(
+    () => this.categoriesState.categories().find(c => c.id === this.categoryRootId())?.children || []
+  );
 
   readonly form = new FormGroup({
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
@@ -105,12 +92,6 @@ export class TransactionForm {
 
   readonly debitQuantum = computed(() => 1 / Math.pow(10, this.fromAccountValue()?.scale ?? 2));
   readonly creditQuantum = computed(() => 1 / Math.pow(10, this.toAccountValue()?.scale ?? 2));
-
-  readonly treeMap = new Map<Category, boolean>();
-  readonly treeHandler = computed(() => {
-    return (item: Category): readonly Category[] =>
-      (item.children || []);
-  });
 
   constructor() {
     effect(() => {

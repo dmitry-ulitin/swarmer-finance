@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Category } from '../models/category';
 import { Account, AccountPayload } from '../models/account';
 import { Transaction, TransactionFilters } from '../models/transaction';
+import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -87,4 +88,17 @@ export class ApiService {
     return this.http.delete<ApiResponse<null>>(`/api/transactions/${id}`);
   }
 
+  // Import
+  /** `content` is the statement file base64-encoded; `format` omitted means detect. */
+  parseStatement(accountId: number, content: string, format?: string | null): Observable<ApiResponse<ImportParseResult>> {
+    return this.http.post<ApiResponse<ImportParseResult>>('/api/import/parse', {
+      accountId,
+      content,
+      ...(format ? { format } : {}),
+    });
+  }
+
+  reconcileImport(accountId: number, rows: ImportReconcileRow[]): Observable<ApiResponse<ImportReconcileResult>> {
+    return this.http.post<ApiResponse<ImportReconcileResult>>('/api/import/reconcile', { accountId, rows });
+  }
 }

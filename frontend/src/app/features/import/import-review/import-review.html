@@ -1,0 +1,86 @@
+<div class="review">
+    <header class="summary">
+        <span><strong>{{ summary.total }}</strong> rows · {{ formatName }}</span>
+        <span class="counts">
+            {{ summary.new }} new
+            @if (summary.possibleDuplicate) { · {{ summary.possibleDuplicate }} possible duplicates }
+            @if (summary.duplicate) { · {{ summary.duplicate }} already imported }
+        </span>
+    </header>
+
+    <div class="scroll">
+        <table class="rows">
+            <thead>
+                <tr>
+                    <th class="col-check">
+                        <input
+                            tuiCheckbox
+                            type="checkbox"
+                            aria-label="Select all rows"
+                            [ngModel]="allSelected()"
+                            (ngModelChange)="toggleAll($event)" />
+                    </th>
+                    <th class="col-date">Date</th>
+                    <th class="col-desc">Description</th>
+                    <th class="col-amount">Amount</th>
+                    <th class="col-category">Category</th>
+                    <th class="col-status">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (row of rows(); track row.index) {
+                    <tr [class.is-excluded]="!row.selected">
+                        <td class="col-check">
+                            <input
+                                tuiCheckbox
+                                type="checkbox"
+                                [attr.aria-label]="'Import ' + row.description"
+                                [ngModel]="row.selected"
+                                (ngModelChange)="toggle(row.index, $event)" />
+                        </td>
+                        <td class="col-date">{{ row.date }}</td>
+                        <td class="col-desc">
+                            <span class="payee">{{ row.payee || row.description }}</span>
+                            @if (row.payee && row.description) {
+                                <span class="description">{{ row.description }}</span>
+                            }
+                        </td>
+                        <td class="col-amount" [class.is-income]="row.amount > 0">
+                            {{ row.amount | money: account.currency : account.scale }}
+                        </td>
+                        <td class="col-category">
+                            <app-category-select
+                                [rootId]="rootIdFor(row)"
+                                [label]="''"
+                                [ngModel]="row.category"
+                                (ngModelChange)="setCategory(row.index, $event)" />
+                        </td>
+                        <td class="col-status">
+                            <span tuiBadge size="s" [tuiAppearance]="statusAppearance(row.status)">
+                                {{ statusLabel(row.status) }}
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <footer class="actions">
+        @if (loading()) {
+            <tui-loader size="m" />
+        }
+        <span class="selected-count">{{ selectedCount() }} selected</span>
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">
+            Cancel
+        </button>
+        <button
+            tuiButton
+            size="s"
+            type="button"
+            [disabled]="selectedCount() === 0 || loading()"
+            (click)="submit()">
+            Import {{ selectedCount() }}
+        </button>
+    </footer>
+</div>
