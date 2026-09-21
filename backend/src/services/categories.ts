@@ -121,6 +121,13 @@ export const resolveCategoryForOwner = async (
   }
 
   const path = await categoryQueries.getCategoryPath(categoryId);
+  // getCategoryPath returns [] when the id no longer exists — the category
+  // can be deleted between the lookup above and this read. Treat it the same
+  // as a category that was never there rather than letting the empty path
+  // reach findOrCreateCategoryPath.
+  if (path.length === 0) {
+    throw { statusCode: 403, message: 'Cannot use this category' };
+  }
   return categoryQueries.findOrCreateCategoryPath(ownerId, path);
 };
 
@@ -162,7 +169,7 @@ export const createCategory = async (
 export const updateCategory = async (
   id: number,
   userId: number,
-  name: string,
+  name?: string,
   color?: string,
   icon?: string
 ): Promise<Category> => {

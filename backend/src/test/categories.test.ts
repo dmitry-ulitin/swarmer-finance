@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
+import { findOrCreateCategoryPath } from '../db/queries/categories';
 
 const app = createTestApp();
 
@@ -106,6 +107,17 @@ describe('Categories API', () => {
     });
   });
 
+  describe('findOrCreateCategoryPath', () => {
+    it('rejects an empty path instead of dereferencing path[0]', async () => {
+      // getCategoryPath returns [] for an id that no longer exists, so this
+      // is reachable when a category is deleted mid-request. It must not
+      // surface as a TypeError on path[0].id.
+      await expect(findOrCreateCategoryPath(testUserId, [])).rejects.toThrow(
+        /path is empty/
+      );
+    });
+  });
+
   describe('PUT /api/categories/:id', () => {
     let categoryId: number;
 
@@ -126,6 +138,25 @@ describe('Categories API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.name).toBe('Updated Category');
+    });
+
+    it('keeps the existing name when the update omits it', async () => {
+      const before = await request(app)
+        .put(`/api/categories/${categoryId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Keep Me' });
+      expect(before.status).toBe(200);
+
+      const res = await request(app)
+        .put(`/api/categories/${categoryId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ color: '#abcdef' });
+
+      // name is optional in the schema, so omitting it must leave the stored
+      // name alone rather than writing NULL into a NOT NULL column.
+      expect(res.status).toBe(200);
+      expect(res.body.data.color).toBe('#abcdef');
+      expect(res.body.data.name).toBe('Keep Me');
     });
 
     it('should not allow editing system categories', async () => {

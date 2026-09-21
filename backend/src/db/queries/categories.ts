@@ -64,6 +64,9 @@ export const findOrCreateCategoryPath = async (
   userId: number,
   path: CategoryPathNode[]
 ): Promise<number> => {
+  if (path.length === 0) {
+    throw new Error('findOrCreateCategoryPath: path is empty');
+  }
   return withTransaction(async (tx: Tx) => {
     let parentId = path[0].id; // the system root, shared by all users
     for (const node of path.slice(1)) {
@@ -158,18 +161,6 @@ export const getCategoryById = async (id: number): Promise<Category | null> => {
   );
 };
 
-export const getUserCategories = async (userId: number): Promise<Category[]> => {
-  return query<Category>(
-    `${CATEGORY_PATHS_CTE}
-     SELECT c.*, cp.full_name AS "fullName", cp.root_id
-     FROM categories c
-     JOIN category_paths cp ON cp.id = c.id
-     WHERE c.user_id = $1
-     ORDER BY c.parent_id NULLS FIRST, c.name`,
-    [userId]
-  );
-};
-
 export const createCategory = async (
   userId: number,
   name: string,
@@ -190,14 +181,14 @@ export const createCategory = async (
 export const updateCategory = async (
   id: number,
   userId: number,
-  name: string,
+  name?: string,
   color?: string,
   icon?: string
 ): Promise<Category | null> => {
   // See createCategory: re-read to pick up fullName and root_id, which a
   // rename can change for this category and its descendants.
   const result = await query<{ id: number }>(
-    `UPDATE categories SET name = $1, color = COALESCE($2, color), icon = COALESCE($3, icon)
+    `UPDATE categories SET name = COALESCE($1, name), color = COALESCE($2, color), icon = COALESCE($3, icon)
      WHERE id = $4 AND user_id = $5 AND id NOT IN (1, 2, 3, 4) RETURNING id`,
     [name, color, icon, id, userId]
   );
