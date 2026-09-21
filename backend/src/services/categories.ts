@@ -95,12 +95,11 @@ const buildTree = (categories: Category[], rootId: number, userId: number): Cate
  * categories belong to everybody and pass through unchanged.
  *
  * Throws 403 when the category does not exist or belongs to a user the
- * caller shares nothing with.
+ * owner shares nothing with.
  */
 export const resolveCategoryForOwner = async (
   categoryId: number,
-  ownerId: number,
-  requestingUserId: number
+  ownerId: number
 ): Promise<number> => {
   const category = await categoryQueries.getCategoryById(categoryId);
   if (!category) {
@@ -112,9 +111,11 @@ export const resolveCategoryForOwner = async (
     return categoryId;
   }
 
-  // A category may only be borrowed from someone the requesting user
-  // actually shares accounts with.
-  const relatedUserIds = await getRelatedUserIds(requestingUserId);
+  // The path is reproduced under `ownerId`, so it is the owner's reach that
+  // bounds what may be borrowed — not the editor's. Checking the editor here
+  // would let someone who can write on the owner's account copy a third
+  // party's categories into a tree that never shared anything with them.
+  const relatedUserIds = await getRelatedUserIds(ownerId);
   if (!relatedUserIds.includes(category.user_id)) {
     throw { statusCode: 403, message: 'Cannot use this category' };
   }
@@ -143,7 +144,7 @@ export const createCategory = async (
   // co-owner's row. Reproduce its path under this user and create the child
   // there, rather than refusing or hanging a category off someone else's
   // row. A parent from an unrelated user is still rejected.
-  const resolvedParentId = await resolveCategoryForOwner(parentId, userId, userId);
+  const resolvedParentId = await resolveCategoryForOwner(parentId, userId);
 
   try {
     return await categoryQueries.createCategory(userId, name, resolvedParentId, color, icon);

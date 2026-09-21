@@ -579,6 +579,51 @@ describe('Shared categories', () => {
       expect(updated.body.data.category.id).not.toBe(aCategory);
     });
 
+    it("refuses a category the editor can see but the transaction owner cannot", async () => {
+      const stamp = Date.now();
+      // D is related to B but not to A: D shares an account with B only.
+      const d = await register(`shcat-d-${stamp}@example.com`);
+      const accountD = await makeAccount(d.id, 'D account');
+      await grant(accountD, userBId, LEVEL.WRITE);
+      const dName = `DOwn-${stamp}`;
+      const dCategory = await makeCategory(d.id, dName, 2);
+
+      // A authors a transaction on A's own account, so the transaction's
+      // owner is A and the category would be written into A's tree.
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${tokenA}` })
+        .send({
+          debitAccountId: accountA,
+          debit: 80,
+          credit: 80,
+          date: '2024-03-09',
+        });
+      expect(created.status).toBe(200);
+      expect(created.body.data.user_id).toBe(userAId);
+
+      // B may write on A's account, and D's category is visible to B — but
+      // the copy would land in A's tree, and A shares nothing with D.
+      const updated = await request(app)
+        .put(`/api/transactions/${created.body.data.id}`)
+        .set({ Authorization: `Bearer ${tokenB}` })
+        .send({ categoryId: dCategory });
+
+      expect(updated.status).toBe(403);
+      // The status alone would pass even if the row leaked; this is the
+      // assertion that pins the bug.
+      const leaked = await pool.query(
+        'SELECT id FROM categories WHERE user_id = $1 AND name = $2',
+        [userAId, dName]
+      );
+      expect(leaked.rows).toHaveLength(0);
+
+      await pool.query('DELETE FROM account_shares WHERE account_id = $1', [accountD]);
+      await pool.query('DELETE FROM accounts WHERE user_id = $1', [d.id]);
+      await pool.query('DELETE FROM categories WHERE user_id = $1', [d.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [d.id]);
+    });
+
     it('leaves a system category untouched rather than copying it', async () => {
       const created = await request(app)
         .post('/api/transactions')

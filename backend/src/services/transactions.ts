@@ -92,7 +92,7 @@ async function validateTransactionInput(input: CreateInput, userId: number, cate
     // owner-authored transaction keeps a category from the owner's own
     // tree. Picking someone else's category copies its path across rather
     // than storing their id.
-    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId, userId);
+    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId);
   } else {
     // Income
     const creditAccount = await loadAccount(input.creditAccountId!, userId, 'credit');
@@ -109,7 +109,7 @@ async function validateTransactionInput(input: CreateInput, userId: number, cate
     }
     // See comment above: the category is resolved against the
     // transaction's owner, not the editing user.
-    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId, userId);
+    input.categoryId = await resolveCategoryForOwner(input.categoryId, categoryOwnerId);
   }
 }
 
