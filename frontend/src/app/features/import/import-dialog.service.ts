@@ -7,7 +7,6 @@ import type { ImportParseResult, ImportReconcileResult } from '../../models/impo
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
-import { describeImport } from './import-summary';
 
 /**
  * Runs the import as two dialogs in sequence: upload (which parses) and
@@ -42,7 +41,10 @@ export class ImportDialogService {
     // balances move too, hence both.
     this.transactions.reload();
     this.accounts.reload();
-    this.notifications.showSuccess(describeImport(result));
+    const imported = `${result.created} transaction${result.created === 1 ? '' : 's'} imported`;
+    this.notifications.showSuccess(
+      result.skipped > 0 ? `${imported}, ${result.skipped} already present` : imported
+    );
     return result;
   }
 
