@@ -33,6 +33,7 @@ export class CategorySelect implements ControlValueAccessor {
   readonly rootId = input.required<number>();
   readonly label = input<string>('Category');
   readonly cleaner = input<boolean>(true);
+  readonly size = input<"l" | "m" | "s">('m');
 
   private readonly categoriesState = inject(CategoriesState);
   private readonly auth = inject(AuthService);

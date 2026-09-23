@@ -1,5 +1,5 @@
 <tui-textfield tuiChevron [tuiTextfieldCleaner]="cleaner()" [stringify]="stringify"
-    [identityMatcher]="categoryMatcher">
+    [identityMatcher]="categoryMatcher" [tuiTextfieldSize]="size()">
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
