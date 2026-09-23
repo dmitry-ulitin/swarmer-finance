@@ -1,12 +1,12 @@
-<form [formGroup]="form" class="upload">
+<form [formGroup]="form" class="upload" size="s">
     <p class="target">
         Importing into <strong>{{ account.name }}</strong> ({{ account.currency }})
     </p>
 
-    <tui-textfield tuiChevron [stringify]="stringifyFormat">
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyFormat">
         <label tuiLabel>Statement format</label>
         <input tuiSelect formControlName="format" />
-        <tui-data-list-wrapper *tuiDropdown [items]="formats" [itemContent]="stringifyFormat" />
+        <tui-data-list-wrapper *tuiDropdown [items]="formats" [itemContent]="stringifyFormat | tuiStringifyContent" />
     </tui-textfield>
 
     @if (loading()) {

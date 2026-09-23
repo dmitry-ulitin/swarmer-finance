@@ -51,7 +51,7 @@ export class ImportDialogService {
     return firstValueFrom(
       this.dialogs.open<ImportParseResult | null>(
         new PolymorpheusComponent(ImportUpload, this.injector),
-        { data: account, label: 'Import statement', size: 's' }
+        { data: account, label: 'Import statement', size: 's', dismissible: false }
       ),
       { defaultValue: null }
     );
@@ -62,7 +62,7 @@ export class ImportDialogService {
     return firstValueFrom(
       this.dialogs.open<ImportReconcileResult | null>(
         new PolymorpheusComponent(ImportReview, this.injector),
-        { data: parsed, label: `Import into ${parsed.account.name}`, size: 'l' }
+        { data: parsed, label: `Import into ${parsed.account.name}`, size: null, dismissible: false }
       ),
       { defaultValue: null }
     );

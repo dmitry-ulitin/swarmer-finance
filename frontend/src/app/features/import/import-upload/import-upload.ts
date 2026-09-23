@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { TuiButton, TuiDataList, TuiError, TuiLoader, TuiTextfield } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
-import { TuiChevron, TuiDataListWrapper, TuiFiles, TuiSelect } from '@taiga-ui/kit';
+import { TuiChevron, TuiDataListWrapper, TuiFiles, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -37,6 +37,7 @@ async function toBase64(file: File): Promise<string> {
     TuiButton,
     TuiError,
     TuiLoader,
+    TuiStringifyContentPipe
   ],
   templateUrl: './import-upload.html',
   styleUrl: './import-upload.scss',
