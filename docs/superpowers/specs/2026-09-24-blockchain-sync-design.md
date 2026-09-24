@@ -34,11 +34,13 @@ address (e.g. an exchange balance) behaves like any other account.
 ## Rules
 
 1. A tracked account's `start_balance` is 0 and cannot be changed.
-2. Transactions on a tracked account cannot be created or deleted by hand.
+2. Transactions on a tracked account cannot be created or deleted by hand,
+   and a statement import into a tracked account is refused.
    On an existing one the user may change only:
    - `category_id`, when the row is an expense or income;
    - the other account (null ↔ account), turning expense/income into a
-     transfer and back;
+     transfer and back; the other account must not itself be tracked (a
+     transfer between two tracked accounts is created by sync only);
    - the other side's amount, only when the other account's currency differs
      from the tracked account's; with the same currency it is forced equal to
      the tracked side;
@@ -63,7 +65,7 @@ State transitions of an account:
 ## Architecture
 
 ```
-AccountTreeNode [Sync] → POST /api/accounts/:id/sync (routes/sync.ts)
+AccountTreeNode [Sync] → POST /api/accounts/:id/sync (routes/accounts.ts)
   → services/chainSync.ts  — maps ChainTx → ledger rows, merges, writes
       → services/chain/index.ts   — registry { bitcoin: bitcoinProvider }
       → services/chain/bitcoin.ts — Esplora client, UTXO → ChainTx
@@ -80,9 +82,10 @@ directly.
 interface ChainTx {
   txid: string;
   date: string;       // YYYY-MM-DD, UTC date of the block time
-  fee: bigint;        // paid by this address; 0 when it did not pay
+  fee: number;        // paid by this address; 0 when it did not pay
   // Net movement per counterparty, base units: + received from, − sent to.
-  transfers: { counterparty: string; amount: bigint }[];
+  // Plain numbers: all BTC ever is 2.1e15 sats, inside Number's safe range.
+  transfers: { counterparty: string; amount: number }[];
 }
 
 interface ChainProvider {
@@ -92,8 +95,10 @@ interface ChainProvider {
 }
 ```
 
-The registry also drives validation of `settings.blockchain` and the
-blockchain select in the account form.
+The registry decides whether an account is tracked. `settings.blockchain`
+stays free text in the API: an unsupported value (e.g. `ethereum`) is
+accepted and simply leaves the account untracked. The account form offers a
+select of the supported chains, mirrored in a frontend constant.
 
 ### Bitcoin provider
 
@@ -239,6 +244,10 @@ start balance/currency when tracked; transaction form disables locked fields.
 0.08220906 BTC, second sync reports "Up to date".
 
 ## Out of scope
+
+- More than one tracked peer in a single on-chain transaction: only the
+  first peer becomes a transfer; payments to other tracked wallets in the
+  same tx are filed as the ordinary expense.
 
 - HD wallets / xpub (one account = one address).
 - Chains other than Bitcoin (the interface is ready for them).
