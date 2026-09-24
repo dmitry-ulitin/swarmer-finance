@@ -1,0 +1,14 @@
+{
+  "_note": "Real tx 95333b08…, trimmed: 281 outputs merged into the last one; input, fee and totals unchanged.",
+  "txid": "95333b087645e5fa1c2b64ea5e62f41ac3929a673aa7186697cf3a73916cd51d",
+  "fee": 9214,
+  "status": { "confirmed": true, "block_height": 951534, "block_time": 1780040936 },
+  "vin": [
+    { "prevout": { "scriptpubkey_address": "bc1qda5r9p5l9l74r2gzuz992nvda8d2lezr2wzk56", "value": 238639861 } }
+  ],
+  "vout": [
+    { "scriptpubkey_address": "bc1qy0rlysheyqwrjhs6e8ya82urst9d479wa24mrn", "value": 10000 },
+    { "scriptpubkey_address": "bc1q3yxr3gkes4nmjvtmn5h5qasyh7jzusxzezys75", "value": 146435 },
+    { "scriptpubkey_address": "bc1q9rxk6kyv3lky39mtysl0hjjwvuauzfrt0m2mk7", "value": 238474212 }
+  ]
+}
