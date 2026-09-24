@@ -81,3 +81,34 @@ describe('AccountForm payload', () => {
     expect(form.form.getRawValue().accountNumber).toBe('DE89');
   });
 });
+
+describe('AccountForm tracked wallet', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('locks start balance and currency once address and chain are set', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ name: 'Cold', currency: 'USD', startBalance: 5, type: 'crypto', address: 'bc1qxy2k', blockchain: 'bitcoin' });
+
+    expect(form.tracked()).toBe(true);
+    expect(form.form.controls.startBalance.disabled).toBe(true);
+    expect(form.form.controls.currency.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 0, currency: 'BTC' });
+  });
+
+  it('unlocks when the address is cleared', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ type: 'crypto', address: 'bc1qxy2k', blockchain: 'bitcoin' });
+    form.form.patchValue({ address: '' });
+
+    expect(form.tracked()).toBe(false);
+    expect(form.form.controls.startBalance.enabled).toBe(true);
+    expect(form.form.controls.currency.enabled).toBe(true);
+  });
+
+  it('does not lock for an unsupported chain', () => {
+    const form = createForm({ currency: 'ETH' });
+    form.form.patchValue({ type: 'crypto', address: '0xabc', blockchain: 'ethereum' });
+
+    expect(form.tracked()).toBe(false);
+  });
+});

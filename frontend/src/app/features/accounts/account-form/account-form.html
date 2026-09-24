@@ -36,9 +36,10 @@
             <input tuiInput formControlName="address" placeholder="Wallet address" />
         </tui-textfield>
 
-        <tui-textfield>
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="blockchainLabel">
             <label tuiLabel>Blockchain</label>
-            <input tuiInput formControlName="blockchain" placeholder="e.g. bitcoin, ethereum" />
+            <input tuiSelect formControlName="blockchain" />
+            <tui-data-list-wrapper *tuiDropdown [items]="blockchains" [itemContent]="blockchainLabel | tuiStringifyContent" />
         </tui-textfield>
     }
 

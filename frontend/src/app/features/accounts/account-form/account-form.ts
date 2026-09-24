@@ -1,13 +1,13 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
-import type { Account, AccountPayload, AccountType } from '../../../models/account';
-import { firstValueFrom } from 'rxjs';
+import { SYNCED_CHAINS, type Account, type AccountPayload, type AccountType } from '../../../models/account';
+import { firstValueFrom, merge, startWith } from 'rxjs';
 import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 import { NotificationService } from '../../../core/notification.service';
 
@@ -56,6 +56,11 @@ export class AccountForm {
     initialValue: this.form.controls.type.value,
   });
 
+  readonly blockchains: readonly string[] = ['', ...Object.keys(SYNCED_CHAINS)];
+  readonly blockchainLabel = (chain: string): string => chain || 'None';
+  /** Mirrors backend isTracked: transactions will come from the chain. */
+  readonly tracked = signal(false);
+
   constructor() {
     const data = this.context.data;
     if (data?.type === 'bank') {
@@ -74,6 +79,30 @@ export class AccountForm {
     const currency = this.context.data?.currency;
     if (currency) {
       afterNextRender(() => this.form.controls.currency.setValue(currency));
+    }
+
+    // Applied synchronously with every change to the deciding controls, so a
+    // patchValue and the lock can never disagree. A synced wallet's balance
+    // comes only from the chain: it starts at 0 in the chain's own currency,
+    // and the backend rejects anything else.
+    const c = this.form.controls;
+    merge(c.type.valueChanges, c.address.valueChanges, c.blockchain.valueChanges)
+      .pipe(startWith(null), takeUntilDestroyed())
+      .subscribe(() => this.applyTrackedLock());
+  }
+
+  private applyTrackedLock(): void {
+    const { type, address, blockchain, startBalance, currency } = this.form.controls;
+    const tracked = type.value === 'crypto' && address.value.trim() !== '' && blockchain.value in SYNCED_CHAINS;
+    this.tracked.set(tracked);
+    if (tracked) {
+      startBalance.setValue(0);
+      currency.setValue(SYNCED_CHAINS[blockchain.value]);
+      startBalance.disable();
+      currency.disable();
+    } else {
+      startBalance.enable();
+      currency.enable();
     }
   }
 
