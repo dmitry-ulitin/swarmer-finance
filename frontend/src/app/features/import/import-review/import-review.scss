@@ -86,6 +86,11 @@
     display: flex;
     align-items: center;
     gap: 0.25rem;
+
+    app-category-select {
+        flex: 1;
+        min-inline-size: 0;
+    }
 }
 
 .suggested {
