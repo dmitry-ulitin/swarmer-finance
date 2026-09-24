@@ -1,0 +1,3 @@
+﻿"Kliendi konto","Dokumendi number","Kuupäev","Saaja/maksja konto","Saaja/maksja nimi","Deebet/Kreedit (D/C)","Summa","Viitenumber","Arhiveerimistunnus","Selgitus","Valuuta","Isikukood või registrikood","Saaja/maksja panga BIC","Makse algataja nimi","Kande viide","Konto teenusepakkuja viide"
+"EE001100220033004400","DOC00000000",2026-09-02,"EE998877665544332211","MERCHANT 001","C",3377.58,"","20260000000000","Description 1","EUR","P00000000","BANKEE22XXX","","1500000000","00000000AA11F111BB470A0159F9DEBB"
+"EE001100220033004400","",2026-09-02,"","MERCHANT 002","D",-96.00,"","","Description 2","EUR","","","","1500000001","00000001AA11F111BB470A0159F9DEBB"

@@ -1,5 +1,5 @@
 import { parseCsv } from './csv';
-import { Profile } from './profiles';
+import { headerRow, Profile } from './profiles';
 
 export interface ParsedRow {
   index: number;
@@ -47,7 +47,7 @@ export function readStatement(
   profile: Profile
 ): { rows: ParsedRow[]; currency: string } {
   const grid = parseCsv(text, profile.delimiter);
-  const header = grid[profile.skipLines];
+  const header = headerRow(grid, profile);
   if (!header) {
     throw { statusCode: 400, message: 'Statement has no header row' };
   }

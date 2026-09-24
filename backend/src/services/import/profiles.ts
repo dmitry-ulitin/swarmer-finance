@@ -15,6 +15,12 @@ export interface Profile {
   skipLines: number;
   /** Columns that together identify this format when none was given. */
   headerSignature: string[];
+  /**
+   * Localised header names mapped to the canonical ones used everywhere
+   * else in the profile. Lets one profile (and one hash namespace) cover a
+   * bank that exports the same layout in several languages.
+   */
+  headerAliases?: Record<string, string>;
   dateFormat: 'iso' | 'dd/mm/yyyy';
   /** 'comma' implies '.' groups thousands, as in "39.384,54". */
   decimal: 'dot' | 'comma';
@@ -39,6 +45,42 @@ export const PROFILES: Record<ProfileId, Profile> = {
     delimiter: ',',
     skipLines: 0,
     headerSignature: ['Customer account no', 'Debit/Credit (D/C)', 'Amount'],
+    // The Russian- and Estonian-language exports: same columns, same order,
+    // same values.
+    headerAliases: {
+      'Счёт клиента': 'Customer account no',
+      'Номер документа': 'Document no',
+      'Дата': 'Date',
+      'Счёт плательщика/получателя': 'Sender/receiver account',
+      'Имя плательщика/получателя': 'Sender/receiver name',
+      'Дебет/Кредит (D/C)': 'Debit/Credit (D/C)',
+      'Сумма': 'Amount',
+      'Номер ссылки': 'Reference number',
+      'Признак архивирования': 'Archiving code',
+      'Пояснение': 'Description',
+      'Валюта': 'Currency',
+      'Личный код или регистрационный код': 'Personal code or register code',
+      'BIC банка получателя/плательщика': 'Sender/receiver bank BIC',
+      'Имя инициатора платежа': 'Ultimate debtor name',
+      'Ссылка проводки': 'Transaction reference',
+      'Ссылка поставщика счета': 'Account servicer reference',
+      'Kliendi konto': 'Customer account no',
+      'Dokumendi number': 'Document no',
+      'Kuupäev': 'Date',
+      'Saaja/maksja konto': 'Sender/receiver account',
+      'Saaja/maksja nimi': 'Sender/receiver name',
+      'Deebet/Kreedit (D/C)': 'Debit/Credit (D/C)',
+      'Summa': 'Amount',
+      'Viitenumber': 'Reference number',
+      'Arhiveerimistunnus': 'Archiving code',
+      'Selgitus': 'Description',
+      'Valuuta': 'Currency',
+      'Isikukood või registrikood': 'Personal code or register code',
+      'Saaja/maksja panga BIC': 'Sender/receiver bank BIC',
+      'Makse algataja nimi': 'Ultimate debtor name',
+      'Kande viide': 'Transaction reference',
+      'Konto teenusepakkuja viide': 'Account servicer reference',
+    },
     dateFormat: 'iso',
     decimal: 'dot',
     // LHV's Amount is already signed consistently with its D/C column, but
@@ -78,10 +120,17 @@ export const PROFILES: Record<ProfileId, Profile> = {
   },
 };
 
+/** The profile's header row, with localised names mapped to canonical ones. */
+export function headerRow(grid: string[][], profile: Profile): string[] | undefined {
+  const header = grid[profile.skipLines];
+  const aliases = profile.headerAliases;
+  return header && aliases ? header.map(h => aliases[h] ?? h) : header;
+}
+
 /** The profile whose header signature appears at its declared offset. */
 export function detectProfile(grid: string[][]): Profile | null {
   for (const profile of Object.values(PROFILES)) {
-    const header = grid[profile.skipLines];
+    const header = headerRow(grid, profile);
     if (!header) continue;
     if (profile.headerSignature.every(col => header.includes(col))) return profile;
   }

@@ -119,3 +119,39 @@ describe('readStatement — LHV direction-column override', () => {
     expect(rows[0].amount).toBe(-1305.28);
   });
 });
+
+describe('readStatement — LHV in Russian', () => {
+  const result = () => readStatement(fixture('lhv', 'statement_ru.csv'), PROFILES.lhv);
+
+  it('reads the rows and currency through the Russian headers', () => {
+    const { rows, currency } = result();
+    expect(currency).toBe('USD');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toEqual({
+      index: 1,
+      date: '2025-04-17',
+      amount: -10000,
+      description: 'Description 1',
+      payee: 'MERCHANT 001',
+      reference: '00000001651BF011B464001DD8D11D14',
+    });
+  });
+});
+
+describe('readStatement — LHV in Estonian', () => {
+  const result = () => readStatement(fixture('lhv', 'statement_et.csv'), PROFILES.lhv);
+
+  it('reads the rows and currency through the Estonian headers', () => {
+    const { rows, currency } = result();
+    expect(currency).toBe('EUR');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toEqual({
+      index: 1,
+      date: '2026-09-02',
+      amount: -96,
+      description: 'Description 2',
+      payee: 'MERCHANT 002',
+      reference: '00000001AA11F111BB470A0159F9DEBB',
+    });
+  });
+});

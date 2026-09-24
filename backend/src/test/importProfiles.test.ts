@@ -49,3 +49,10 @@ describe('profiles', () => {
     }
   });
 });
+
+describe('profiles — LHV in other languages', () => {
+  it.each(['statement_ru.csv', 'statement_et.csv'])('detects %s as LHV', file => {
+    const grid = parseCsv(fixture('lhv', file));
+    expect(detectProfile(grid)?.id).toBe('lhv');
+  });
+});
