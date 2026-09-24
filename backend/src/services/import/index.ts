@@ -8,6 +8,7 @@ import { computeImportHashes } from './hash';
 import { suggestCategories, SuggestionSource } from './categorize';
 import { parseCsv } from './csv';
 import { getTreeCategoryIds, resolveCategoryForOwner } from '../categories';
+import { isTracked } from '../chain';
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate';
 
@@ -42,6 +43,9 @@ async function loadWritableAccount(accountId: number, userId: number) {
     throw { statusCode: 403, message: 'Cannot use this account' };
   }
   await requireLevel(accountId, userId, LEVEL.WRITE);
+  if (isTracked(account)) {
+    throw { statusCode: 403, message: 'Transactions of this account are loaded from the blockchain' };
+  }
   return account;
 }
 

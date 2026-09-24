@@ -4,11 +4,62 @@ import { resolveCategoryForOwner } from './categories';
 import { expandCategoryFilter } from '../db/queries/categories';
 import { getRelatedUserIds } from '../db/queries/accountShares';
 import { toDecimal, toCents } from './currency';
-import { Account, TransactionDTO } from '../types';
+import { Account, Transaction, TransactionDTO } from '../types';
+import { isTracked } from './chain';
 import { LEVEL, getAccessibleAccountIds, requireLevelOnAll } from './access';
 
 const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
 const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
+
+const SYNCED_MESSAGE = 'Transactions of this account are loaded from the blockchain';
+
+/** Which of these accounts are synced from a blockchain. */
+async function trackedAmong(accountIds: (number | null | undefined)[]): Promise<Set<number>> {
+  const ids = [...new Set(accountIds.filter((id): id is number => id != null))];
+  const accounts = await accountQueries.getAccountsByIds(ids);
+  return new Set(accounts.filter(isTracked).map(a => a.id));
+}
+
+/**
+ * A transaction on a blockchain-synced account records what the chain says:
+ * the date, the synced side's account and amount, and the payee address are
+ * fixed. The user may still categorise it, point its other side at an
+ * ordinary account (turning it into a transfer or back), set that side's
+ * amount when the currencies differ — validateTransactionInput already
+ * forces it equal otherwise — and edit the description. With both sides
+ * synced, that leaves only the description.
+ *
+ * `next` is the validated update, amounts already in cents. Stored NUMERIC
+ * amounts arrive from pg as strings, hence Number().
+ */
+function assertSyncedEdit(existing: Transaction, next: CreateInput, tracked: Set<number>): void {
+  const debitSynced = existing.debit_account_id != null && tracked.has(existing.debit_account_id);
+  const creditSynced = existing.credit_account_id != null && tracked.has(existing.credit_account_id);
+
+  if (!debitSynced && !creditSynced) {
+    if ([next.debitAccountId, next.creditAccountId].some(id => id != null && tracked.has(id))) {
+      throw { statusCode: 403, message: SYNCED_MESSAGE };
+    }
+    return;
+  }
+
+  const refuse = (what: string) => {
+    throw { statusCode: 400, message: `${SYNCED_MESSAGE}; its ${what} cannot be changed` };
+  };
+  if (next.date !== existing.date) refuse('date');
+  if ((next.payee ?? '') !== (existing.payee ?? '')) refuse('payee');
+  if (debitSynced && (next.debitAccountId !== existing.debit_account_id || next.debit !== Number(existing.debit))) {
+    refuse('account or amount');
+  }
+  if (creditSynced && (next.creditAccountId !== existing.credit_account_id || next.credit !== Number(existing.credit))) {
+    refuse('account or amount');
+  }
+
+  const other = debitSynced && creditSynced ? null : debitSynced ? next.creditAccountId : next.debitAccountId;
+  if (other != null && tracked.has(other)) {
+    throw { statusCode: 400, message: 'A transfer between two synced accounts is created by sync only' };
+  }
+}
 
 type CreateInput = {
   categoryId?: number;
@@ -233,6 +284,9 @@ async function attachRunningBalances(
 }
 
 export const createTransaction = async (userId: number, input: CreateInput) => {
+  if ((await trackedAmong([input.debitAccountId, input.creditAccountId])).size > 0) {
+    throw { statusCode: 403, message: SYNCED_MESSAGE };
+  }
   await validateTransactionInput(input, userId, userId);
   const transaction = await transactionQueries.createTransaction(userId, input);
   return toDecimalTransactionDTO(transaction);
@@ -280,6 +334,11 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
   };
 
   await validateTransactionInput(merged, userId, existing.user_id);
+  assertSyncedEdit(
+    existing,
+    merged,
+    await trackedAmong([existing.debit_account_id, existing.credit_account_id, merged.debitAccountId, merged.creditAccountId])
+  );
   const transaction = await transactionQueries.updateTransaction(id, merged);
   return transaction ? toDecimalTransactionDTO(transaction) : transaction;
 };
@@ -294,6 +353,9 @@ export const deleteTransaction = async (id: number, userId: number): Promise<voi
     userId,
     LEVEL.WRITE
   );
+  if ((await trackedAmong([existing.debit_account_id, existing.credit_account_id])).size > 0) {
+    throw { statusCode: 403, message: SYNCED_MESSAGE };
+  }
   await transactionQueries.deleteTransaction(id);
 };
 
