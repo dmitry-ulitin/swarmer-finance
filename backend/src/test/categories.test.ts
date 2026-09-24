@@ -56,6 +56,15 @@ describe('Categories API', () => {
       expect(expenses.children.some((c: any) => c.id === 4 && c.name === 'Uncategorized')).toBe(true);
     });
 
+    it('seeds Network fees under Expenses', async () => {
+      const res = await request(app)
+        .get('/api/categories')
+        .set({ Authorization: `Bearer ${token}` });
+
+      const expenses = res.body.data.find((c: any) => c.id === 2);
+      expect(expenses.children.some((c: any) => c.id === 5 && c.name === 'Network fees')).toBe(true);
+    });
+
     it('should require authentication', async () => {
       const res = await request(app)
         .get('/api/categories');
@@ -178,6 +187,16 @@ describe('Categories API', () => {
       expect(res.status).toBe(403);
       expect(res.body.error).toContain('Cannot edit system categories');
     });
+
+    it('should not allow editing the Network fees category', async () => {
+      const res = await request(app)
+        .put('/api/categories/5')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Hacked' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Cannot edit system categories');
+    });
   });
 
   describe('Sibling uniqueness (uq_categories_sibling index)', () => {
@@ -288,6 +307,15 @@ describe('Categories API', () => {
     it('should not allow deleting the Uncategorized category', async () => {
       const res = await request(app)
         .delete('/api/categories/3')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Cannot delete system categories');
+    });
+
+    it('should not allow deleting the Network fees category', async () => {
+      const res = await request(app)
+        .delete('/api/categories/5')
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(403);

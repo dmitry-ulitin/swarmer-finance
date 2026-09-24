@@ -216,7 +216,7 @@ export const updateCategory = async (
   color?: string,
   icon?: string
 ): Promise<Category> => {
-  if (id === 1 || id === 2 || id === 3 || id === 4) {
+  if (id === 1 || id === 2 || id === 3 || id === 4 || id === 5) {
     throw { statusCode: 403, message: 'Cannot edit system categories' };
   }
 
@@ -241,7 +241,7 @@ export const updateCategory = async (
 };
 
 export const deleteCategory = async (id: number, userId: number): Promise<void> => {
-  if (id === 1 || id === 2 || id === 3 || id === 4) {
+  if (id === 1 || id === 2 || id === 3 || id === 4 || id === 5) {
     throw { statusCode: 403, message: 'Cannot delete system categories' };
   }
   
