@@ -65,7 +65,7 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→004)
+- Migrations in `backend/src/db/migrations/` — run in order (001→012)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -77,6 +77,21 @@ All API responses use this envelope format consistently.
   `services/access.ts` synthesises level 4 (owner) for owned accounts.
   Granting someone level 3 makes the account co-owned: it then resolves to
   level 3 for its owner too, so level 4 means "personal account".
+- System category **Network fees** (id 5, under Expenses) seeded in
+  migration 012; ids 1–5 are protected from edit/delete.
+
+#### Blockchain-synced (tracked) accounts
+
+A `crypto` account with `settings.address` and a supported
+`settings.blockchain` (today `bitcoin`, see `services/chain/index.ts`) is
+*tracked*: `POST /api/accounts/:id/sync` loads its history through a chain
+provider (`services/chain/bitcoin.ts`, Esplora at `BITCOIN_ESPLORA_URL`) and
+`services/chainSync.ts` writes it, identified by `import_hash` (`txid`,
+`txid:out`, `txid:fee`). Tracked accounts start at 0 in the chain's currency;
+their transactions cannot be created, deleted or imported by hand, and an
+edit may change only the category, the other (untracked) account and its
+amount when currencies differ, and the description. A payment between two
+tracked wallets is one transfer, merged whichever side syncs first.
 
 #### Transactions — single table, double-entry style
 
