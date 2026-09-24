@@ -13,7 +13,8 @@
     <div class="row">
         <tui-textfield>
             <label tuiLabel>Starting Balance</label>
-            <input tuiInputNumber formControlName="startBalance" [min]="0" [quantum]="0.01" placeholder="0.00" />
+            <input tuiInputNumber formControlName="startBalance" [min]="0" [quantum]="balanceQuantum()"
+                [tuiNumberFormat]="{ precision: balancePrecision() }" placeholder="0" />
         </tui-textfield>
 
         <tui-textfield tuiChevron class="currency" [tuiTextfieldCleaner]="false">

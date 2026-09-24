@@ -65,11 +65,15 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→013)
+- Migrations in `backend/src/db/migrations/` — run in order (001→014)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
+- An account's `scale` (decimal places of its stored integers) is set by the
+  backend from the currency (`services/currencyScale.ts`: ISO minor units,
+  BTC/ETH 8, USDT/USDC/TRX 6, SOL/TON 9); the API does not accept it, and a
+  currency change that would rescale existing transactions is refused.
 - Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
 - `account_shares` added in migration 009: `(account_id, user_id, level)`,
   level 1 = read, 2 = transactions, 3 = admin. The owner is **not** stored

@@ -26,6 +26,7 @@
         <div class="row">
             <tui-textfield>
                 <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
+                    [tuiNumberFormat]="{ precision: debitPrecision() }"
                     placeholder="0.00" />
             </tui-textfield>
             <span>{{fromAccountValue()?.currency}}</span>
@@ -42,6 +43,7 @@
             <div class="row">
                 <tui-textfield>
                     <input tuiAutoFocus tuiInputNumber formControlName="creditAmount" [min]="0" [quantum]="creditQuantum()"
+                    [tuiNumberFormat]="{ precision: creditPrecision() }"
                         placeholder="0.00" />
                 </tui-textfield>
                 <span>{{toAccountValue()?.currency}}</span>

@@ -1,7 +1,7 @@
-import { afterNextRender, ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
 import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -10,6 +10,7 @@ import { SYNCED_CHAINS, type Account, type AccountPayload, type AccountType } fr
 import { firstValueFrom, merge, startWith } from 'rxjs';
 import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 import { NotificationService } from '../../../core/notification.service';
+import { currencyScale } from '../../../core/currency-scale';
 
 const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto'];
 
@@ -21,7 +22,7 @@ const TYPE_LABELS: Record<AccountType, string> = {
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,6 +59,13 @@ export class AccountForm {
 
   readonly blockchains: readonly string[] = ['', ...Object.keys(SYNCED_CHAINS)];
   readonly blockchainLabel = (chain: string): string => chain || 'None';
+  private readonly currency = toSignal(this.form.controls.currency.valueChanges, {
+    initialValue: this.form.controls.currency.value,
+  });
+  /** The backend stores the account at its currency's scale. */
+  readonly balancePrecision = computed(() => currencyScale(this.currency() ?? ''));
+  readonly balanceQuantum = computed(() => 1 / Math.pow(10, this.balancePrecision()));
+
   /** Mirrors backend isTracked: transactions will come from the chain. */
   readonly tracked = signal(false);
 

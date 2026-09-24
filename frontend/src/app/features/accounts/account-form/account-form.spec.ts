@@ -112,3 +112,15 @@ describe('AccountForm tracked wallet', () => {
     expect(form.tracked()).toBe(false);
   });
 });
+
+describe('AccountForm start balance precision', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('follows the chosen currency', () => {
+    const form = createForm({ currency: 'EUR' });
+    form.form.patchValue({ currency: 'EUR' });
+    expect(form.balancePrecision()).toBe(2);
+    form.form.patchValue({ currency: 'BTC' });
+    expect(form.balancePrecision()).toBe(8);
+  });
+});

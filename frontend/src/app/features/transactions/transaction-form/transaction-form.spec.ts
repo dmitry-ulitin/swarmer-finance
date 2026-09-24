@@ -168,3 +168,15 @@ describe('TransactionForm on a synced account', () => {
     expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([false, false, false]);
   });
 });
+
+describe('TransactionForm amount precision', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it("shows each side's amount at its account's scale", () => {
+    const btc = { id: 1, name: 'Cold', currency: 'BTC', scale: 8 };
+    const eur = { id: 2, name: 'Bank', currency: 'EUR', scale: 2 };
+    const form = configure({ debit_account: btc, credit_account: eur, debit: 0.00146435, credit: 90 }, [btc, eur]);
+    expect(form.debitPrecision()).toBe(8);
+    expect(form.creditPrecision()).toBe(2);
+  });
+});

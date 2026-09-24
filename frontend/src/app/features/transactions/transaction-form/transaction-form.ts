@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
 import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea } from '@taiga-ui/kit';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TuiAutoFocus, type TuiStringHandler } from '@taiga-ui/cdk';
@@ -35,6 +35,7 @@ import { syncedLock } from '../synced-lock';
     TuiChevron,
     TuiButton,
     TuiAutoFocus,
+    TuiNumberFormat,
     CategorySelect
   ],
   templateUrl: './transaction-form.html',
@@ -96,8 +97,12 @@ export class TransactionForm {
   });
 
 
-  readonly debitQuantum = computed(() => 1 / Math.pow(10, this.fromAccountValue()?.scale ?? 2));
-  readonly creditQuantum = computed(() => 1 / Math.pow(10, this.toAccountValue()?.scale ?? 2));
+  // Each amount is entered at its own account's scale; the input would
+  // otherwise round to 2 decimals and show 0.00146435 BTC as 0.
+  readonly debitPrecision = computed(() => this.fromAccountValue()?.scale ?? 2);
+  readonly creditPrecision = computed(() => this.toAccountValue()?.scale ?? 2);
+  readonly debitQuantum = computed(() => 1 / Math.pow(10, this.debitPrecision()));
+  readonly creditQuantum = computed(() => 1 / Math.pow(10, this.creditPrecision()));
 
   constructor() {
     const c = this.form.controls;
