@@ -55,7 +55,7 @@ export interface Transaction {
   credit_account_id: number | null;
   debit: number;
   credit: number;
-  date: Date;
+  date: string;
   description: string;
   payee: string | null;
   created_at: Date;
@@ -77,7 +77,7 @@ export interface TransactionDTO {
   credit_account: TransactionAccount | null;
   debit: number;
   credit: number;
-  date: Date;
+  date: string;
   description: string;
   payee: string | null;
   created_at: Date;

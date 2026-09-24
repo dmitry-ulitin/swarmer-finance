@@ -199,6 +199,27 @@ describe('Transactions API', () => {
       expect(Number(res.body.data.debit)).toBe(500);
     });
 
+    it('returns the date as the plain calendar day it was stored as', async () => {
+      // A DATE parsed into a local-midnight Date serialized as the previous
+      // UTC day in any timezone ahead of UTC.
+      const created = await request(app)
+        .post('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({
+          categoryId: incomeCategoryId,
+          creditAccountId: testAccountId,
+          debit: 500,
+          credit: 500,
+          date: '2026-02-18',
+        });
+      expect(created.body.data.date).toBe('2026-02-18');
+
+      const list = await request(app)
+        .get('/api/transactions')
+        .set({ Authorization: `Bearer ${token}` });
+      expect(list.body.data.map((t: { date: string }) => t.date)).toEqual(['2026-02-18']);
+    });
+
     it('should reject expense with debit != credit', async () => {
       // debit != credit
       // would silently lose value between sides — must be rejected.

@@ -32,14 +32,6 @@ type UpdateInput = {
   payee?: string | null;
 };
 
-function formatDate(date: string | Date): string {
-  if (typeof date === 'string') return date;
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 /**
  * The account, provided it exists, is not deleted, and the caller may write
  * to it. `checkedIds` names accounts whose access was already asserted by the
@@ -212,9 +204,7 @@ async function attachRunningBalances(
   // — rather than a bare date — avoids double-counting same-date
   // transactions that fall on a different page.
   const last = transactions[transactions.length - 1];
-  const lastDate = new Date(last.date);
-  const dateStr = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')}`;
-  const balanceRows = await transactionQueries.getBalancesAt(accountIds, dateStr, last.created_at, last.id);
+  const balanceRows = await transactionQueries.getBalancesAt(accountIds, last.date, last.created_at, last.id);
   const balanceMap = new Map(balanceRows.map(r => [r.id, r.balance]));
 
   const withBalances = [];
@@ -284,7 +274,7 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     creditAccountId: input.creditAccountId !== undefined ? (input.creditAccountId ?? undefined) : (existing.credit_account_id ?? undefined),
     debit: input.debit ?? toDecimal(existing.debit, existingScale),
     credit: input.credit ?? toDecimal(existing.credit, existingScale),
-    date: input.date ?? formatDate(existing.date),
+    date: input.date ?? existing.date,
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),
   };

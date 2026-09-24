@@ -1,7 +1,11 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// DATE has no time zone; keep it as the 'YYYY-MM-DD' string Postgres stores
+// instead of a local-midnight Date that serializes to the previous UTC day.
+types.setTypeParser(types.builtins.DATE, (v) => v);
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

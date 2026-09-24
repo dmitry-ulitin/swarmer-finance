@@ -61,7 +61,7 @@ export class TransactionForm {
   );
 
   readonly form = new FormGroup({
-    date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.fromLocalNativeDate(new Date(this.context.data.date)) : TuiDay.currentLocal(), [Validators.required]),
+    date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.jsonParse(this.context.data.date) : TuiDay.currentLocal(), [Validators.required]),
     fromAccount: new FormControl<TransactionAccount | null>(this.context.data.debit_account ?? null),
     toAccount: new FormControl<TransactionAccount | null>(this.context.data.credit_account ?? null),
     // The transaction's own category is the starting value, falling back to

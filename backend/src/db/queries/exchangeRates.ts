@@ -16,8 +16,7 @@ export const getLatestRate = (from: string, to: string) =>
 
 // True if the latest cached rate for this pair is dated on or after `since`
 // (e.g. today's date) — used to decide whether a Frankfurter refresh is
-// needed without pulling as_of into JS, since pg returns DATE columns as
-// timezone-shifted Date objects rather than the plain string it was stored as.
+// needed.
 export const hasRateSince = async (from: string, to: string, since: string): Promise<boolean> => {
   const result = await queryOne<{ exists: boolean }>(
     `SELECT EXISTS(

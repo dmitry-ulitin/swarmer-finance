@@ -295,7 +295,7 @@ export interface AccountBalance {
   credit_account_id: number | null;
   debit: number;
   credit: number;
-  last_date: Date;
+  last_date: string;
 }
 
 export const getAccountBalances = async (
@@ -353,7 +353,7 @@ export const findByDates = async (
   dates: string[]
 ): Promise<{
   id: number;
-  date: Date;
+  date: string;
   debit: string;
   credit: string;
   debit_account_id: number | null;
@@ -362,7 +362,7 @@ export const findByDates = async (
   if (dates.length === 0) return [];
   return query<{
     id: number;
-    date: Date;
+    date: string;
     debit: string;
     credit: string;
     debit_account_id: number | null;

@@ -57,10 +57,7 @@ async function refreshRate(from: string, to: string): Promise<void> {
 // Shared cache/refresh/fallback policy for a single currency pair:
 // use the latest cached rate if any row is dated today or later -> otherwise
 // refresh via the provider chain -> re-check the latest cache -> null if
-// nothing exists. The freshness check is done in SQL (hasRateSince) rather
-// than by pulling as_of into JS and comparing, since pg returns DATE columns
-// as Date objects that shift with the local timezone, not the plain date
-// string they were stored as.
+// nothing exists. The freshness check is done in SQL (hasRateSince).
 async function getCachedRate(from: string, to: string): Promise<number | null> {
   if (await exchangeRateQueries.hasRateSince(from, to, today())) {
     const latest = await exchangeRateQueries.getLatestRate(from, to);

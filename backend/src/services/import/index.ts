@@ -28,18 +28,6 @@ export interface ParseResult {
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
 }
 
-// pg returns DATE columns as a Date set to local midnight for that calendar
-// day; toISOString() would convert to UTC and can shift the day in either
-// direction depending on the local offset. Local getters read back the same
-// calendar date node-postgres was given.
-function formatDate(date: string | Date): string {
-  if (typeof date === 'string') return date.slice(0, 10);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 /** The account, once the caller is known to hold WRITE on it. */
 async function loadWritableAccount(accountId: number, userId: number) {
   const account = await accountQueries.getAccountById(accountId);
@@ -98,7 +86,7 @@ export const parseStatement = async (
   const sameDay = await transactionQueries.findByDates(accountId, dates);
   const byKey = new Map<string, number>();
   for (const t of sameDay) {
-    const d = formatDate(t.date);
+    const d = t.date;
     // Only the side that actually belongs to THIS account is keyed — using
     // both sides unconditionally made an expense also register an
     // income-shaped key (and vice versa), matching an imported row of the
