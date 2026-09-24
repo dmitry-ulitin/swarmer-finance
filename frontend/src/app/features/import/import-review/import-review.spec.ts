@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { of, throwError } from 'rxjs';
@@ -37,6 +37,8 @@ function makeRow(i: number, status: ImportRowStatus, amount = -10): ImportRow {
     hash: `hash-${i}`,
     status,
     duplicateOf: status === 'new' ? null : 500 + i,
+    suggestedCategoryId: null,
+    suggestionSource: null,
   };
 }
 
@@ -54,7 +56,11 @@ function makeResult(rows: ImportRow[]): ImportParseResult {
   };
 }
 
-function configure(result: ImportParseResult, api: Partial<ApiService> = {}) {
+function configure(
+  result: ImportParseResult,
+  api: Partial<ApiService> = {},
+  categories: WritableSignal<Category[]> = signal(tree)
+) {
   const completeWith = vi.fn();
   const showError = vi.fn();
   TestBed.configureTestingModule({
@@ -62,7 +68,7 @@ function configure(result: ImportParseResult, api: Partial<ApiService> = {}) {
       ImportReview,
       { provide: POLYMORPHEUS_CONTEXT, useValue: { data: result, completeWith } },
       { provide: ApiService, useValue: api },
-      { provide: CategoriesState, useValue: { categories: signal(tree) } },
+      { provide: CategoriesState, useValue: { categories } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
       { provide: NotificationService, useValue: { showError, showSuccess: vi.fn() } },
     ],
@@ -222,6 +228,71 @@ describe('ImportReview', () => {
 
       expect(showError).toHaveBeenCalled();
       expect(completeWith).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('category suggestions', () => {
+    const suggested = (id: number | null, source: 'payee' | 'mcc' = 'payee'): ImportRow => ({
+      ...makeRow(0, 'new'),
+      suggestedCategoryId: id,
+      suggestionSource: id === null ? null : source,
+    });
+
+    it('pre-fills the suggested category and marks it', () => {
+      const { component } = configure(makeResult([suggested(10)]));
+      const row = component.rows()[0];
+      expect(component.categoryOf(row)).toBe(groceries);
+      expect(row.suggested).toBe(true);
+    });
+
+    it('leaves a row without a suggestion unmarked', () => {
+      const { component } = configure(makeResult([suggested(null)]));
+      const row = component.rows()[0];
+      expect(component.categoryOf(row)).toBeNull();
+      expect(row.suggested).toBe(false);
+    });
+
+    it('drops the mark once the user picks a category', () => {
+      const { component } = configure(makeResult([suggested(10)]));
+      component.setCategory(0, null);
+      const row = component.rows()[0];
+      expect(row.suggested).toBe(false);
+      expect(component.categoryOf(row)).toBeNull();
+    });
+
+    it('leaves an unknown suggestion uncategorised', async () => {
+      const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 1, skipped: 0 }, error: null }));
+      const { component } = configure(makeResult([suggested(999)]), { reconcileImport } as never);
+
+      expect(component.categoryOf(component.rows()[0])).toBeNull();
+      await component.submit();
+      expect(reconcileImport.mock.calls[0][1][0].categoryId).toBeNull();
+    });
+
+    it('resolves a suggestion once the category tree arrives', () => {
+      const categories = signal<Category[]>([]);
+      const { component } = configure(makeResult([suggested(10)]), {}, categories);
+      expect(component.categoryOf(component.rows()[0])).toBeNull();
+
+      categories.set(tree);
+
+      expect(component.categoryOf(component.rows()[0])).toBe(groceries);
+    });
+
+    it('submits an accepted suggestion', async () => {
+      const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 1, skipped: 0 }, error: null }));
+      const { component } = configure(makeResult([suggested(10)]), { reconcileImport } as never);
+
+      await component.submit();
+
+      expect(reconcileImport.mock.calls[0][1][0].categoryId).toBe(10);
+    });
+
+    it('names where the suggestion came from', () => {
+      const { component } = configure(makeResult([suggested(10, 'payee'), { ...suggested(10, 'mcc'), index: 1 }]));
+      const [fromHistory, fromMcc] = component.rows();
+      expect(component.suggestionHint(fromHistory)).toBe('Suggested from history');
+      expect(component.suggestionHint(fromMcc)).toBe('Suggested by merchant type');
     });
   });
 });

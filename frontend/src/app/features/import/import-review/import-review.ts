@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { TuiAppearance, TuiButton, TuiCheckbox, TuiLoader } from '@taiga-ui/core';
+import { TuiAppearance, TuiButton, TuiCheckbox, TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { TuiBadge } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
@@ -9,6 +9,8 @@ import { ApiService } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { MoneyPipe } from '../../../core/money.pipe';
 import { CategorySelect } from '../../categories/category-select/category-select';
+import { CategoriesState } from '../../../core/categories.state';
+import { findCategoryById } from '../../../models/category';
 import type { Category } from '../../../models/category';
 import { IMPORT_FORMATS } from '../../../models/import';
 import type {
@@ -18,10 +20,13 @@ import type {
   ImportRowStatus,
 } from '../../../models/import';
 
-/** A parsed row plus the two things the user controls on this screen. */
+/** A parsed row plus the things the user controls on this screen. */
 export interface ReviewRow extends ImportRow {
   selected: boolean;
+  /** The user's own pick; ignored while `suggested` is true. */
   category: Category | null;
+  /** True until the user touches the category: the server's suggestion stands. */
+  suggested: boolean;
 }
 
 const STATUS_LABEL: Record<ImportRowStatus, string> = {
@@ -39,6 +44,8 @@ const STATUS_LABEL: Record<ImportRowStatus, string> = {
     TuiAppearance,
     TuiButton,
     TuiLoader,
+    TuiIcon,
+    TuiHint,
     MoneyPipe,
     CategorySelect,
   ],
@@ -51,6 +58,7 @@ export class ImportReview {
     inject<TuiDialogContext<ImportReconcileResult | null, ImportParseResult>>(POLYMORPHEUS_CONTEXT);
   private readonly api = inject(ApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly categories = inject(CategoriesState);
 
   readonly result = this.context.data;
   readonly account = this.result.account;
@@ -69,6 +77,7 @@ export class ImportReview {
       ...row,
       selected: row.status !== 'duplicate',
       category: null,
+      suggested: row.suggestedCategoryId !== null,
     }))
   );
 
@@ -86,6 +95,20 @@ export class ImportReview {
   /** 1 = Income, 2 = Expenses, following the row's own sign. */
   readonly rootIdFor = (row: ReviewRow): number => (row.amount < 0 ? 2 : 1);
 
+  /**
+   * The row's effective category: the server's suggestion until the user
+   * picks one. Looked up on read rather than once at construction, so a
+   * suggestion still lands when the category tree loads after the dialog
+   * opens; an id missing from the tree resolves to no category.
+   */
+  readonly categoryOf = (row: ReviewRow): Category | null =>
+    row.suggested
+      ? findCategoryById(row.suggestedCategoryId ?? undefined, this.categories.categories())
+      : row.category;
+
+  readonly suggestionHint = (row: ReviewRow): string =>
+    row.suggestionSource === 'mcc' ? 'Suggested by merchant type' : 'Suggested from history';
+
   toggle(index: number, selected: boolean): void {
     this.rows.update(rows => rows.map(r => (r.index === index ? { ...r, selected } : r)));
   }
@@ -95,7 +118,9 @@ export class ImportReview {
   }
 
   setCategory(index: number, category: Category | null): void {
-    this.rows.update(rows => rows.map(r => (r.index === index ? { ...r, category } : r)));
+    this.rows.update(rows =>
+      rows.map(r => (r.index === index ? { ...r, category, suggested: false } : r))
+    );
   }
 
   async submit(): Promise<void> {
@@ -112,7 +137,7 @@ export class ImportReview {
         hash: r.hash,
         // null lets the server apply its own Uncategorized default rather
         // than this screen guessing one.
-        categoryId: r.category?.id ?? null,
+        categoryId: this.categoryOf(r)?.id ?? null,
       }));
       const response = await firstValueFrom(this.api.reconcileImport(this.account.id, payload));
       if (response.data) {

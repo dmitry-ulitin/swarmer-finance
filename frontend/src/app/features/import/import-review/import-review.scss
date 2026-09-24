@@ -82,6 +82,17 @@
     inline-size: 14rem;
 }
 
+.category-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.suggested {
+    flex-shrink: 0;
+    color: var(--tui-text-tertiary);
+}
+
 .col-status {
     inline-size: 9rem;
 }

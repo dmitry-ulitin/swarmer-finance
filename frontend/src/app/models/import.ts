@@ -16,6 +16,10 @@ export interface ImportRow {
   status: ImportRowStatus;
   /** The existing transaction this row matched, for either duplicate kind. */
   duplicateOf: number | null;
+  /** Pre-filled category, learned from history; null when nothing is confident. */
+  suggestedCategoryId: number | null;
+  /** 'payee' = matched by merchant, 'mcc' = matched by merchant type. */
+  suggestionSource: 'payee' | 'mcc' | null;
 }
 
 export interface ImportParseResult {
