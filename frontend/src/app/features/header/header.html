@@ -5,7 +5,9 @@
 }
 @if(authService.isAuthenticated() && selectedTransaction()) {
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="editTransaction()" [iconStart]="'@tui.pencil'" aria-label="Edit transaction"></button>
+@if (canDelete()) {
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="deleteTransaction()" [iconStart]="'@tui.trash-2'" aria-label="Delete transaction"></button>
+}
 }
 <div class="fill"></div>
 @if(authService.isAuthenticated()) {

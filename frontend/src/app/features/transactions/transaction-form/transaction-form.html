@@ -3,9 +3,9 @@
     <!-- Type selector -->
     <tui-segmented [activeItemIndex]="activeTypeIndex()" (activeItemIndexChange)="activeTypeIndex.set($event)"
         class="type-selector">
-        <button type="button">Expense</button>
-        <button type="button">Income</button>
-        <button type="button" [disabled]="accountsState.accounts().length < 2">Transfer</button>
+        <button type="button" [disabled]="!typeAllowed(0)">Expense</button>
+        <button type="button" [disabled]="!typeAllowed(1)">Income</button>
+        <button type="button" [disabled]="accountsState.accounts().length < 2 || !typeAllowed(2)">Transfer</button>
     </tui-segmented>
 
     <!-- Date -->
@@ -21,7 +21,7 @@
             [identityMatcher]="accountMatcher">
             <label tuiLabel>{{ isTransfer() ? 'From Account' : 'Account' }}</label>
             <input tuiSelect formControlName="fromAccount" placeholder="Select account" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountOptions()" [itemContent]="accountTemplate" />
         </tui-textfield>
         <div class="row">
             <tui-textfield>
@@ -36,7 +36,7 @@
             [identityMatcher]="accountMatcher">
             <label tuiLabel>{{ isTransfer() ? 'To Account' : 'Account' }}</label>
             <input tuiSelect formControlName="toAccount" placeholder="Select account" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountsState.accounts()" [itemContent]="accountTemplate" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountOptions()" [itemContent]="accountTemplate" />
         </tui-textfield>
         @if (isIncome() || !isSameCurrency()) {
             <div class="row">

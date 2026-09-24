@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import { TuiButton, TuiDataList, TuiDropdown, TuiIcon } from '@taiga-ui/core';
 import { CategoryDialogService } from '../categories/category-dialog.service';
@@ -7,6 +7,7 @@ import { TransactionsState } from '../../core/transactions.state';
 import { TransactionDialogService } from '../transactions/transaction-dialog.service';
 import { AccountsState } from '../../core/accounts.state';
 import { TuiChevron } from '@taiga-ui/kit/directives/chevron';
+import { syncedLock } from '../transactions/synced-lock';
 
 @Component({
   selector: 'app-header',
@@ -24,6 +25,10 @@ export class Header {
   private readonly transactionDialogs = inject(TransactionDialogService);
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
+  readonly canDelete = computed(() => {
+    const t = this.selectedTransaction();
+    return !!t && !syncedLock(t, this.accountState.trackedIds()).synced;
+  });
 
   categories(): void {
     this.categoryDialogs.openManager();

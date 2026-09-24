@@ -11,6 +11,7 @@ import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { TransactionRequest } from '../../core/api.service';
 import { CategoriesState } from '../../core/categories.state';
+import { syncedLock } from './synced-lock';
 
 /**
  * Prefill for "Add transaction". Always defaults to Expense (a
@@ -54,12 +55,16 @@ export class TransactionDialogService {
 
   async openCreate(): Promise<Transaction | null> {
     const { TransactionForm } = await import('./transaction-form/transaction-form');
-    const lastTransaction = this.transactionsState.transactions()[0];
-    if (!lastTransaction && this.accountState.accounts().length < 1) {
+    // Synced accounts take no hand-entered transactions, so neither the
+    // prefill nor the default account may point at one.
+    const tracked = this.accountState.trackedIds();
+    const ordinary = this.accountState.accounts().filter(a => !tracked.has(a.id));
+    const lastTransaction = this.transactionsState.transactions().find(t => !syncedLock(t, tracked).synced);
+    if (!lastTransaction && ordinary.length < 1) {
       this.notifications.showError('No accounts available');
       return null;
     }
-    const preferredAccount = this.accountState.accounts().find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || this.accountState.accounts()[0];
+    const preferredAccount = ordinary.find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || ordinary[0];
     const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, new Date().toISOString().split('T')[0])!;
     try {
       const result = await firstValueFrom(

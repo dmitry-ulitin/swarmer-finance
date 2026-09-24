@@ -17,6 +17,7 @@ import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { AuthService } from '../../../core/auth.service';
 import { CategorySelect } from '../../categories/category-select/category-select';
+import { syncedLock } from '../synced-lock';
 
 @Component({
   selector: 'app-transaction-form',
@@ -50,6 +51,12 @@ export class TransactionForm {
 
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
+  readonly lock = syncedLock(this.context.data, this.accountsState.trackedIds());
+  /** Synced accounts are never picked by hand: sync alone writes to them. */
+  readonly accountOptions = computed(() => {
+    const tracked = this.accountsState.trackedIds();
+    return this.accountsState.accounts().filter(a => !tracked.has(a.id));
+  });
   readonly activeTypeIndex = signal(this.context.data.debit_account && this.context.data.credit_account ? 2 : (this.context.data.debit_account ? 0 : 1));
   readonly isExpense = computed(() => this.activeTypeIndex() === 0);
   readonly isIncome = computed(() => this.activeTypeIndex() === 1);
@@ -93,6 +100,20 @@ export class TransactionForm {
   readonly creditQuantum = computed(() => 1 / Math.pow(10, this.toAccountValue()?.scale ?? 2));
 
   constructor() {
+    const c = this.form.controls;
+    if (this.lock.synced) {
+      c.date.disable();
+      c.payee.disable();
+    }
+    if (this.lock.debitLocked) {
+      c.fromAccount.disable();
+      c.debitAmount.disable();
+    }
+    if (this.lock.creditLocked) {
+      c.toAccount.disable();
+      c.creditAmount.disable();
+    }
+
     effect(() => {
       const index = this.activeTypeIndex();
       untracked(() => {
@@ -118,20 +139,30 @@ export class TransactionForm {
             this.form.controls.toAccount.setValue(fromAccount);
           }
         } else {
+          const tracked = this.accountsState.trackedIds();
           if (!!fromAccount) {
-            toAccount = this.transactionsState.transactions().filter(t => t.debit_account?.id === fromAccount!.id && !!t.credit_account)[0]?.credit_account ||
-              this.accountsState.accounts().filter(a => a.id !== fromAccount!.id && a.currency === fromAccount!.currency)[0] ||
-              this.accountsState.accounts().filter(a => a.id !== fromAccount!.id)[0];
+            toAccount = this.transactionsState.transactions().filter(t => t.debit_account?.id === fromAccount!.id && !!t.credit_account && !tracked.has(t.credit_account.id))[0]?.credit_account ||
+              this.accountOptions().filter(a => a.id !== fromAccount!.id && a.currency === fromAccount!.currency)[0] ||
+              this.accountOptions().filter(a => a.id !== fromAccount!.id)[0];
             this.form.controls.toAccount.setValue(toAccount ?? null);
           } else if (!!toAccount) {
-            fromAccount = this.transactionsState.transactions().filter(t => t.credit_account?.id === toAccount!.id && !!t.debit_account)[0]?.debit_account ||
-              this.accountsState.accounts().filter(a => a.id !== toAccount!.id && a.currency === toAccount!.currency)[0] ||
-              this.accountsState.accounts().filter(a => a.id !== toAccount!.id)[0];
+            fromAccount = this.transactionsState.transactions().filter(t => t.credit_account?.id === toAccount!.id && !!t.debit_account && !tracked.has(t.debit_account.id))[0]?.debit_account ||
+              this.accountOptions().filter(a => a.id !== toAccount!.id && a.currency === toAccount!.currency)[0] ||
+              this.accountOptions().filter(a => a.id !== toAccount!.id)[0];
             this.form.controls.fromAccount.setValue(fromAccount ?? null);
           }
         }
       });
     });
+  }
+
+  /** 0 Expense, 1 Income, 2 Transfer. A locked side must stay filled. */
+  typeAllowed(index: 0 | 1 | 2): boolean {
+    const { debitLocked, creditLocked } = this.lock;
+    if (debitLocked && creditLocked) return false;
+    if (debitLocked) return index !== 1;
+    if (creditLocked) return index !== 0;
+    return true;
   }
 
   cancel(): void {

@@ -10,6 +10,7 @@ import { AuthService } from '../../../core/auth.service';
 import { NotificationService } from '../../../core/notification.service';
 import type { Category } from '../../../models/category';
 import type { Transaction } from '../../../models/transaction';
+import type { Account } from '../../../models/account';
 
 const ME = 1;
 const OTHER = 2;
@@ -48,13 +49,13 @@ const tree: Category[] = [
   }),
 ];
 
-function configure(data: Partial<Transaction>) {
+function configure(data: Partial<Transaction>, accounts: Partial<Account>[] = [], trackedIds: number[] = []) {
   TestBed.configureTestingModule({
     providers: [
       TransactionForm,
       { provide: POLYMORPHEUS_CONTEXT, useValue: { data, completeWith: () => {} } },
       { provide: CategoriesState, useValue: { categories: signal(tree) } },
-      { provide: AccountsState, useValue: { accounts: signal([]) } },
+      { provide: AccountsState, useValue: { accounts: signal(accounts), trackedIds: signal(new Set(trackedIds)) } },
       { provide: TransactionsState, useValue: { transactions: signal([]) } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
       { provide: NotificationService, useValue: { showError: () => {} } },
@@ -129,5 +130,41 @@ describe('TransactionForm category initialisation', () => {
     const form = configure({ credit_account: { id: 1, name: 'Mine', currency: 'USD', scale: 2 } });
 
     expect(form.categoryRootId()).toBe(1);
+  });
+});
+
+describe('TransactionForm on a synced account', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const wallet = { id: 1, name: 'Cold', currency: 'BTC', scale: 8 };
+  const exchange = { id: 3, name: 'Exchange', currency: 'BTC', scale: 8 };
+
+  it('locks what the chain states and leaves the rest editable', () => {
+    const form = configure(
+      { id: 5, debit_account: wallet, debit: 0.001, credit: 0.001, date: '2026-05-29', payee: 'bc1qshop', category: myCategory },
+      [wallet, exchange],
+      [1]
+    );
+    const c = form.form.controls;
+
+    expect(c.date.disabled).toBe(true);
+    expect(c.payee.disabled).toBe(true);
+    expect(c.fromAccount.disabled).toBe(true);
+    expect(c.debitAmount.disabled).toBe(true);
+    expect(c.category.enabled).toBe(true);
+    expect(c.description.enabled).toBe(true);
+    expect(c.toAccount.enabled).toBe(true);
+    expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([true, false, true]);
+  });
+
+  it('offers only ordinary accounts to pick', () => {
+    const form = configure({ debit_account: exchange }, [wallet, exchange], [1]);
+    expect(form.accountOptions().map(a => a.id)).toEqual([3]);
+  });
+
+  it('allows no type change on a transfer between synced wallets', () => {
+    const other = { id: 2, name: 'Hot', currency: 'BTC', scale: 8 };
+    const form = configure({ id: 6, debit_account: wallet, credit_account: other }, [wallet, other], [1, 2]);
+    expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([false, false, false]);
   });
 });
