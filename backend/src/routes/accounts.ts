@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import * as accountService from '../services/accounts';
+import * as chainSync from '../services/chainSync';
 
 const router = Router();
 
@@ -112,6 +113,16 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     const id = parseInt(req.params.id as string, 10);
     const result = await accountService.deleteAccount(id, req.userId!);
     res.json({ data: { success: true, kind: result.kind }, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/sync', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const result = await chainSync.syncAccount(req.userId!, id);
+    res.json({ data: result, error: null });
   } catch (error) {
     next(error);
   }
