@@ -5,6 +5,9 @@
     // The dialog gives the table a bounded height so the header and actions
     // stay put while a long statement scrolls between them.
     max-block-size: 70vh;
+    // The dialog has no size and shrinks to its content, and the table no
+    // longer pushes it wider (see .col-desc), so claim most of the screen here.
+    inline-size: min(80rem, calc(100vw - 10rem));
 }
 
 .summary {
@@ -34,8 +37,11 @@
     td {
         padding: 0.375rem 0.5rem;
         text-align: left;
-        vertical-align: middle;
         border-block-end: 1px solid var(--tui-border-normal);
+    }
+
+    td {
+        font-size: 0.875rem;
     }
 
     th {
@@ -58,8 +64,15 @@
     opacity: 0.5;
 }
 
-.col-check {
-    inline-size: 2.5rem;
+// Nested under .rows to outrank the shared th/td padding.
+.rows .col-check {
+    inline-size: 1rem;
+    padding-inline-end: 0;
+
+    // Block display drops the inline baseline gap that pushed it off-centre.
+    input {
+        display: block;
+    }
 }
 
 .col-date {
@@ -67,7 +80,8 @@
     white-space: nowrap;
 }
 
-.col-amount {
+// Nested under .rows to outrank the shared th/td alignment.
+.rows .col-amount {
     inline-size: 7rem;
     text-align: right;
     white-space: nowrap;
@@ -78,8 +92,11 @@
     }
 }
 
+// min-inline-size keeps the select from being squeezed by .col-desc, which
+// claims all spare width.
 .col-category {
     inline-size: 14rem;
+    min-inline-size: 14rem;
 }
 
 .category-cell {
@@ -93,36 +110,57 @@
     }
 }
 
+// The empty placeholder keeps every select the same width, icon or not.
 .suggested {
     flex-shrink: 0;
+    inline-size: 1rem;
+    font-size: 1rem;
     color: var(--tui-text-tertiary);
 }
 
-.col-status {
-    inline-size: 9rem;
+// Nested under .rows to outrank the shared th/td padding and alignment.
+.rows .col-status {
+    inline-size: 1rem;
+    padding-inline: 0.375rem 0;
+    text-align: center;
 }
 
+.status {
+    font-size: 1rem;
+}
+
+.status-new {
+    color: var(--tui-status-positive);
+}
+
+.status-possible_duplicate {
+    color: var(--tui-status-warning);
+}
+
+.status-duplicate {
+    color: var(--tui-status-negative);
+}
+
+// Takes all spare width; max-inline-size: 0 stops long text from widening the
+// table, so the description truncates at the column edge instead.
 .col-desc {
+    inline-size: 100%;
     min-inline-size: 12rem;
+    max-inline-size: 0;
 }
 
 // A <td> must keep its table display role, so the two lines stack inside it.
 .payee,
 .description {
     display: block;
-}
-
-.payee {
-    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .description {
     font-size: 0.75rem;
     color: var(--tui-text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-inline-size: 22rem;
 }
 
 .actions {

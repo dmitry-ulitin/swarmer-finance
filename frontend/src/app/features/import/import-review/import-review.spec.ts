@@ -85,11 +85,9 @@ describe('ImportReview', () => {
       expect(component.rows()[0].selected).toBe(true);
     });
 
-    it('selects possible duplicates, which are advisory only', () => {
-      // The server flags these against hand-entered transactions; the user
-      // decides. Defaulting them off would silently drop real transactions.
+    it('deselects possible duplicates', () => {
       const { component } = configure(makeResult([makeRow(0, 'possible_duplicate')]));
-      expect(component.rows()[0].selected).toBe(true);
+      expect(component.rows()[0].selected).toBe(false);
     });
 
     it('deselects exact duplicates', () => {

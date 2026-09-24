@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { TuiAppearance, TuiButton, TuiCheckbox, TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
+import { TuiButton, TuiCheckbox, TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
-import { TuiBadge } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
@@ -35,13 +35,18 @@ const STATUS_LABEL: Record<ImportRowStatus, string> = {
   possible_duplicate: 'Possible duplicate',
 };
 
+const STATUS_ICON: Record<ImportRowStatus, string> = {
+  new: '@tui.circle-plus',
+  duplicate: '@tui.copy',
+  possible_duplicate: '@tui.circle-alert',
+};
+
 @Component({
   selector: 'app-import-review',
   imports: [
     FormsModule,
+    DatePipe,
     TuiCheckbox,
-    TuiBadge,
-    TuiAppearance,
     TuiButton,
     TuiLoader,
     TuiIcon,
@@ -67,15 +72,14 @@ export class ImportReview {
     IMPORT_FORMATS.find(f => f.id === this.result.format)?.name ?? this.result.format;
 
   /**
-   * Exact duplicates start unselected — the server has already seen those
-   * hashes. Possible duplicates start selected: they are advisory matches
-   * against hand-entered transactions, and defaulting them off would quietly
-   * drop real rows the user never looked at.
+   * Only new rows start selected. Exact duplicates are hashes the server has
+   * already seen; possible duplicates match a hand-entered transaction, so the
+   * user opts them in after checking.
    */
   readonly rows = signal<ReviewRow[]>(
     this.result.rows.map(row => ({
       ...row,
-      selected: row.status !== 'duplicate',
+      selected: row.status === 'new',
       category: null,
       suggested: row.suggestedCategoryId !== null,
     }))
@@ -89,8 +93,7 @@ export class ImportReview {
 
   readonly statusLabel = (status: ImportRowStatus): string => STATUS_LABEL[status];
 
-  readonly statusAppearance = (status: ImportRowStatus): string =>
-    status === 'duplicate' ? 'negative' : status === 'possible_duplicate' ? 'warning' : 'success';
+  readonly statusIcon = (status: ImportRowStatus): string => STATUS_ICON[status];
 
   /** 1 = Income, 2 = Expenses, following the row's own sign. */
   readonly rootIdFor = (row: ReviewRow): number => (row.amount < 0 ? 2 : 1);

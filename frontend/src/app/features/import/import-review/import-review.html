@@ -15,16 +15,17 @@
                     <th class="col-check">
                         <input
                             tuiCheckbox
+                            size="s"
                             type="checkbox"
                             aria-label="Select all rows"
                             [ngModel]="allSelected()"
                             (ngModelChange)="toggleAll($event)" />
                     </th>
+                    <th class="col-status" aria-label="Status"></th>
                     <th class="col-date">Date</th>
                     <th class="col-desc">Description</th>
                     <th class="col-amount">Amount</th>
                     <th class="col-category">Category</th>
-                    <th class="col-status">Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,16 +34,26 @@
                         <td class="col-check">
                             <input
                                 tuiCheckbox
+                                size="s"
                                 type="checkbox"
                                 [attr.aria-label]="'Import ' + row.description"
                                 [ngModel]="row.selected"
                                 (ngModelChange)="toggle(row.index, $event)" />
                         </td>
-                        <td class="col-date">{{ row.date }}</td>
+                        <td class="col-status">
+                            <tui-icon
+                                class="status"
+                                [class]="'status-' + row.status"
+                                [icon]="statusIcon(row.status)"
+                                [tuiHint]="statusLabel(row.status)"
+                                [attr.aria-label]="statusLabel(row.status)"
+                                role="img" />
+                        </td>
+                        <td class="col-date">{{ row.date | date: 'dd MMM yyyy' }}</td>
                         <td class="col-desc">
-                            <span class="payee">{{ row.payee || row.description }}</span>
+                            <span class="payee" [title]="row.payee || row.description">{{ row.payee || row.description }}</span>
                             @if (row.payee && row.description) {
-                                <span class="description">{{ row.description }}</span>
+                                <span class="description" [title]="row.description">{{ row.description }}</span>
                             }
                         </td>
                         <td class="col-amount" [class.is-income]="row.amount > 0">
@@ -53,6 +64,7 @@
                                 <app-category-select
                                     [rootId]="rootIdFor(row)"
                                     [label]="''"
+                                    size="s"
                                     [ngModel]="categoryOf(row)"
                                     (ngModelChange)="setCategory(row.index, $event)" />
                                 @if (row.suggested && categoryOf(row)) {
@@ -61,13 +73,10 @@
                                         icon="@tui.sparkles"
                                         [tuiHint]="suggestionHint(row)"
                                         [attr.aria-label]="suggestionHint(row)" />
+                                } @else {
+                                    <span class="suggested"></span>
                                 }
                             </div>
-                        </td>
-                        <td class="col-status">
-                            <span tuiBadge size="s" [tuiAppearance]="statusAppearance(row.status)">
-                                {{ statusLabel(row.status) }}
-                            </span>
                         </td>
                     </tr>
                 }
