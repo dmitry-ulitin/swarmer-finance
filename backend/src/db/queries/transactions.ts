@@ -376,6 +376,39 @@ export const findByDates = async (
   );
 };
 
+/**
+ * Categorised expenses and incomes on these accounts, the history import
+ * learns category suggestions from. Transfers and the Uncategorized
+ * categories (3, 4) are left out: neither says anything about a merchant.
+ */
+export const findCategorizedHistory = async (
+  accountIds: number[]
+): Promise<{
+  categoryId: number;
+  side: 'expense' | 'income';
+  payee: string | null;
+  description: string;
+}[]> => {
+  if (accountIds.length === 0) return [];
+  return query<{
+    categoryId: number;
+    side: 'expense' | 'income';
+    payee: string | null;
+    description: string;
+  }>(
+    `SELECT category_id AS "categoryId",
+            CASE WHEN debit_account_id IS NOT NULL THEN 'expense' ELSE 'income' END AS side,
+            payee,
+            COALESCE(description, '') AS description
+     FROM transactions
+     WHERE category_id IS NOT NULL
+       AND category_id NOT IN (3, 4)
+       AND ((debit_account_id = ANY($1::int[]) AND credit_account_id IS NULL)
+         OR (credit_account_id = ANY($1::int[]) AND debit_account_id IS NULL))`,
+    [accountIds]
+  );
+};
+
 export interface ImportedTransactionData extends CreateTransactionData {
   importHash: string;
 }

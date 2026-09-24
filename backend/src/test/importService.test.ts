@@ -11,6 +11,9 @@ describe('parseStatement', () => {
   let otherUserId: number;
   let eurAccountId: number;
   let usdAccountId: number;
+  let otherAccountId: number;
+  let salaryCategoryId: number;
+  let otherSalaryCategoryId: number;
 
   beforeAll(async () => {
     const mk = async (email: string) => {
@@ -36,6 +39,22 @@ describe('parseStatement', () => {
       [userId]
     );
     usdAccountId = usd.rows[0].id;
+    const other = await pool.query(
+      `INSERT INTO accounts (user_id, name, currency, start_balance)
+       VALUES ($1, 'Other EUR', 'EUR', 0) RETURNING id`,
+      [otherUserId]
+    );
+    otherAccountId = other.rows[0].id;
+
+    const mkIncomeCategory = async (ownerId: number) => {
+      const c = await pool.query(
+        `INSERT INTO categories (user_id, name, parent_id) VALUES ($1, 'Salary', 1) RETURNING id`,
+        [ownerId]
+      );
+      return c.rows[0].id as number;
+    };
+    salaryCategoryId = await mkIncomeCategory(userId);
+    otherSalaryCategoryId = await mkIncomeCategory(otherUserId);
   });
 
   afterAll(async () => {
@@ -48,7 +67,7 @@ describe('parseStatement', () => {
   });
 
   beforeEach(async () => {
-    await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM transactions WHERE user_id = ANY($1::int[])', [[userId, otherUserId]]);
   });
 
   it('auto-detects LHV and returns every row as new', async () => {
@@ -152,5 +171,52 @@ describe('parseStatement', () => {
     );
     const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
     expect(result.rows[0].status).toBe('new');
+  });
+
+  describe('category suggestions', () => {
+    const seedIncome = (ownerId: number, accountId: number, categoryId: number, description: string | null = 'seed') =>
+      pool.query(
+        `INSERT INTO transactions
+           (user_id, category_id, credit_account_id, debit, credit, date, description, payee)
+         VALUES ($1, $2, $3, 1000, 1000, '2025-01-15', $4, 'Merchant 001')`,
+        [ownerId, categoryId, accountId, description]
+      );
+
+    it('suggests the category the same payee was filed under before', async () => {
+      await seedIncome(userId, eurAccountId, salaryCategoryId);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
+      expect(result.rows[0].suggestionSource).toBe('payee');
+    });
+
+    it('learns from the user\'s other accounts, not just the one being imported into', async () => {
+      await seedIncome(userId, usdAccountId, salaryCategoryId);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
+    });
+
+    it('ignores history on an account the user cannot access', async () => {
+      await seedIncome(otherUserId, otherAccountId, otherSalaryCategoryId);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBeNull();
+      expect(result.rows[0].suggestionSource).toBeNull();
+    });
+
+    it('ignores Uncategorized history', async () => {
+      await seedIncome(userId, eurAccountId, 3);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBeNull();
+    });
+
+    it('tolerates history rows with a NULL description', async () => {
+      await seedIncome(userId, eurAccountId, salaryCategoryId, null);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
+    });
+
+    it('returns null suggestions when there is no history at all', async () => {
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows.every(r => r.suggestedCategoryId === null && r.suggestionSource === null)).toBe(true);
+    });
   });
 });

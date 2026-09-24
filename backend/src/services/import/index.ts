@@ -1,10 +1,11 @@
 import * as accountQueries from '../../db/queries/accounts';
 import * as transactionQueries from '../../db/queries/transactions';
-import { LEVEL, requireLevel } from '../access';
+import { LEVEL, getAccessibleAccountIds, requireLevel } from '../access';
 import { toCents } from '../currency';
 import { detectProfile, getProfile, Profile } from './profiles';
 import { readStatement } from './rows';
 import { computeImportHashes } from './hash';
+import { suggestCategories, SuggestionSource } from './categorize';
 import { parseCsv } from './csv';
 import { resolveCategoryForOwner } from '../categories';
 
@@ -19,6 +20,9 @@ export interface ImportRow {
   hash: string;
   status: RowStatus;
   duplicateOf: number | null;
+  /** Pre-filled category, learned from history; null when nothing is confident. */
+  suggestedCategoryId: number | null;
+  suggestionSource: SuggestionSource | null;
 }
 
 export interface ParseResult {
@@ -101,6 +105,13 @@ export const parseStatement = async (
     }
   }
 
+  // History from every account the user can see, not just this one: the
+  // same merchant is usually paid from several accounts.
+  const history = await transactionQueries.findCategorizedHistory(
+    await getAccessibleAccountIds(userId)
+  );
+  const suggestions = suggestCategories(rows, history);
+
   const out: ImportRow[] = rows.map((row, i) => {
     const hash = hashes[i];
     let status: RowStatus = 'new';
@@ -126,6 +137,8 @@ export const parseStatement = async (
       hash,
       status,
       duplicateOf,
+      suggestedCategoryId: suggestions[i].categoryId,
+      suggestionSource: suggestions[i].source,
     };
   });
 
