@@ -204,7 +204,7 @@ async function attachRunningBalances(
   // — rather than a bare date — avoids double-counting same-date
   // transactions that fall on a different page.
   const last = transactions[transactions.length - 1];
-  const balanceRows = await transactionQueries.getBalancesAt(accountIds, last.date, last.created_at, last.id);
+  const balanceRows = await transactionQueries.getBalancesAt(accountIds, last.id);
   const balanceMap = new Map(balanceRows.map(r => [r.id, r.balance]));
 
   const withBalances = [];

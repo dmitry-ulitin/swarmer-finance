@@ -266,10 +266,12 @@ export interface AccountBalanceAt {
 // so a cursor anchored to one page's oldest transaction excludes exactly
 // the transactions already summed on earlier pages, even when several
 // transactions share the same date and created_at.
+//
+// The cursor is read back from the row by id rather than passed in: pg
+// returns created_at as a JS Date, which drops its microseconds, and a
+// rounded-down created_at would exclude same-date rows that sort before it.
 export const getBalancesAt = async (
   accountIds: number[],
-  date: string,
-  createdAt: Date,
   id: number
 ): Promise<AccountBalanceAt[]> => {
   if (accountIds.length === 0) return [];
@@ -282,10 +284,11 @@ export const getBalancesAt = async (
      FROM accounts a
      LEFT JOIN transactions t
             ON (t.credit_account_id = a.id OR t.debit_account_id = a.id)
-           AND (t.date, t.created_at, t.id) < ($1::date, $2::timestamptz, $3::int)
-     WHERE a.id = ANY($4::int[])
+           AND (t.date, t.created_at, t.id) <
+               (SELECT c.date, c.created_at, c.id FROM transactions c WHERE c.id = $1)
+     WHERE a.id = ANY($2::int[])
      GROUP BY a.id, a.start_balance`,
-    [date, createdAt, id, accountIds]
+    [id, accountIds]
   );
   return rows.map(r => ({ id: r.id, balance: Number(r.balance) }));
 };

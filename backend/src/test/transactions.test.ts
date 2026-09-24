@@ -618,6 +618,27 @@ describe('Transactions API', () => {
       // After 100 (08:00): 0 + 1 = 1
       expect(page2.body.data[0].credit_account.balance).toBe(1);
     });
+
+    it('computes correct balance when a page boundary splits rows sharing a sub-millisecond created_at', async () => {
+      // An import inserts every row with the same microsecond created_at,
+      // so id alone orders them. A JS Date would round that timestamp to
+      // milliseconds, which must not drop the older same-date rows.
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date, created_at)
+         VALUES
+           ($1, $2, $3, 100, 100, '2026-06-01', '2026-06-01 08:00:00.123456'),
+           ($1, $2, $3, 200, 200, '2026-06-01', '2026-06-01 08:00:00.123456')`,
+        [testUserId, incomeCategoryId, testAccountId]
+      );
+
+      const res = await request(app)
+        .get('/api/transactions?offset=0&limit=1')
+        .set({ Authorization: `Bearer ${token}` });
+
+      expect(res.status).toBe(200);
+      // After 200 (higher id): 0 + 1 + 2 = 3
+      expect(res.body.data[0].credit_account.balance).toBe(3);
+    });
   });
 
   describe('DELETE /api/transactions/:id', () => {
