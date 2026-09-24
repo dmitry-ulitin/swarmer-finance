@@ -3,7 +3,7 @@
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
-    <input tuiSelect [ngModel]="value" [disabled]="disabled" (ngModelChange)="onValueChange($event)"
+    <input tuiSelect placeholder="Uncategorized" [ngModel]="value" [disabled]="disabled" (ngModelChange)="onValueChange($event)"
         (blur)="onTouched()" />
     <tui-data-list *tuiDropdown>
         @for (item of visibleCategories(); track item.id) {
