@@ -89,7 +89,6 @@ anything, which is harmless.
 interface HistoryRow {
   categoryId: number;
   side: 'expense' | 'income';
-  date: string;          // YYYY-MM-DD
   payee: string | null;
   description: string;
 }
@@ -101,13 +100,13 @@ interface Suggestion {
 ```
 
 1. Index history by `(side, merchant)` and by `(side, mcc)`, counting rows
-   per category and remembering each category's latest `date`.
+   per category.
 2. A parsed row's side is `expense` when `amount < 0`, else `income`.
    Expense rows never draw on income history and vice versa.
 3. Look up the row's merchant key. The leading category wins when its
    share of that key's rows is **≥ 0.6** (`SUGGESTION_MIN_SHARE`). A single
-   history row is enough (share 1.0). Ties on count go to the category
-   with the most recent `date`.
+   history row is enough (share 1.0). No tie-break is needed: two
+   categories tied on count each hold at most half, below the threshold.
 4. If the merchant key yields nothing (no key, no history, or below the
    threshold), repeat step 3 with the MCC key.
 5. Otherwise, no suggestion.
@@ -127,8 +126,7 @@ given accounts:
   incomes (`credit_account_id = ANY($1) AND debit_account_id IS NULL`) —
   transfers excluded;
 - only rows with `category_id` not null and not 3 / 4 (Uncategorized);
-- columns `category_id`, side, `date` (as `YYYY-MM-DD`), `payee`,
-  `description`.
+- columns `category_id`, side, `payee`, `description`.
 
 Per CLAUDE.md, the query filters by account id only; `transactions.user_id`
 is not used.
@@ -168,12 +166,13 @@ category therefore takes the same path as a hand-picked one.
   `suggestionSource`.
 - `import-review.ts`:
   - `ReviewRow` gains `suggested: boolean`.
-  - Initial rows set `category` by looking `suggestedCategoryId` up in
-    `CategoriesState.categories()`. When found, `suggested = true`;
-    when missing (unknown or deleted id), `category = null` and
-    `suggested = false`.
+  - A row starts with `suggested = suggestedCategoryId !== null`. While
+    `suggested`, its category is `suggestedCategoryId` looked up in
+    `CategoriesState.categories()` on read — not once at construction, so a
+    suggestion still lands if the category tree loads after the dialog
+    opens. An unknown or deleted id resolves to no category.
   - `setCategory` clears `suggested`.
-  - Submission is unchanged: `categoryId: r.category?.id ?? null`.
+  - Submission sends the resolved category: `categoryId: categoryOf(r)?.id ?? null`.
 - `import-review.html`: a suggested category shows a small marker beside
   the select, with a tooltip "Suggested from history" (`payee`) or
   "Suggested by merchant type" (`mcc`). Accepting a suggestion needs no
@@ -190,7 +189,6 @@ category therefore takes the same path as a hand-picked one.
 - MCC extraction from a BoC line; `null` for an LHV line.
 - Threshold: a key split 3/2 between two categories (0.6) suggests; one
   split across many categories (the `Прочие расходы` case) does not.
-- Tie on count goes to the most recent category.
 - Expense history never suggests for an income row.
 - MCC is used only when the merchant key yields nothing.
 
@@ -206,3 +204,4 @@ category therefore takes the same path as a hand-picked one.
 - A suggested category is pre-filled and marked.
 - Changing the category clears the marker.
 - An unknown `suggestedCategoryId` leaves the row uncategorised.
+- A suggestion resolves once the category tree arrives after construction.
