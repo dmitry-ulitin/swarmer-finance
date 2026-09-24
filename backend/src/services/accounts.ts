@@ -4,6 +4,7 @@ import { getAccountBalances } from '../db/queries/transactions';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
 import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel } from './access';
+import { ChainProvider, getProvider, isTracked } from './chain';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -11,6 +12,7 @@ function toDecimalDTO(account: Account, userScale: number): Account {
     start_balance: toDecimal(account.start_balance, account.scale),
     balance: toDecimal(account.balance, account.scale),
     user_balance: account.user_balance != null ? toDecimal(account.user_balance, userScale) : account.user_balance,
+    tracked: isTracked(account),
   };
 }
 
@@ -32,6 +34,19 @@ async function getUserOrThrow(userId: number): Promise<User> {
     throw { statusCode: 401, message: 'User not found' };
   }
   return user;
+}
+
+/**
+ * A synced account's balance comes only from the chain, so it starts at 0
+ * and is kept in the chain's own currency.
+ */
+function assertTrackedShape(provider: ChainProvider, currency: string, startBalance: number | undefined): void {
+  if (startBalance != null && startBalance !== 0) {
+    throw { statusCode: 400, message: 'A blockchain-synced account starts at 0; its balance comes from the chain' };
+  }
+  if (currency !== provider.currency) {
+    throw { statusCode: 400, message: `A blockchain-synced account must be in ${provider.currency}` };
+  }
 }
 
 async function withConvertedBalances(user: User, accounts: Account[]): Promise<Account[]> {
@@ -63,6 +78,11 @@ export const createAccount = async (
   settings: Record<string, unknown> = {}
 ) => {
   const user = await getUserOrThrow(userId);
+  const provider = isTracked({ type, settings }) ? getProvider(settings.blockchain) : null;
+  if (provider) {
+    assertTrackedShape(provider, currency, startBalance);
+    scale = provider.scale;
+  }
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
   return toDecimalDTO(converted, user.currency_scale);
@@ -89,10 +109,32 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   const user = await getUserOrThrow(userId);
+
+  let scale = data.scale;
+  const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
+  if (provider) {
+    assertTrackedShape(provider, data.currency ?? existing.currency, data.startBalance);
+    scale = provider.scale;
+    // Rows already on the account came from somewhere else — by hand, or from
+    // another wallet — and would be mixed into this wallet's history.
+    const wasTracked = isTracked(existing);
+    const sameWallet = wasTracked
+      && existing.settings.address === data.settings.address
+      && existing.settings.blockchain === data.settings.blockchain;
+    if (!sameWallet && (Number(existing.start_balance) !== 0 || await accountQueries.hasTransactions(id))) {
+      throw {
+        statusCode: 400,
+        message: wasTracked
+          ? 'Cannot change the wallet of an account that already has transactions'
+          : 'Only an empty account with a zero start balance can be synced from a blockchain; create a new account',
+      };
+    }
+  }
+
   const startBalance = data.startBalance != null
-    ? toCents(data.startBalance, data.scale ?? existing.scale)
+    ? toCents(data.startBalance, scale ?? existing.scale)
     : undefined;
-  const account = await accountQueries.updateAccount(id, { ...data, startBalance });
+  const account = await accountQueries.updateAccount(id, { ...data, scale, startBalance });
   const [withBal] = await withBalances([account!]);
   const [converted] = await withConvertedBalances(user, [withBal]);
   return toDecimalDTO(converted, user.currency_scale);

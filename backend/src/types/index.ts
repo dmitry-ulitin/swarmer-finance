@@ -45,6 +45,8 @@ export interface Account {
   access_level?: 1 | 2 | 3 | 4;
   /** Display name of the account's owner; set by the accounts query. */
   owner_name?: string;
+  /** Transactions come from the blockchain; set by services/accounts.ts. */
+  tracked?: boolean;
 }
 
 export interface Transaction {
