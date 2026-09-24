@@ -108,7 +108,9 @@ select of the supported chains, mirrored in a frontend constant.
   transactions only, newest first, 25 per page. Unconfirmed ones are skipped
   and picked up by a later sync.
 - Incremental: paging stops at the first page whose txids are all in
-  `knownTxids`. Unique indexes on `import_hash` stay the final guard.
+  `knownTxids` — the txids this account's own sync has processed, kept in
+  `chain_seen_txids` (not derived from transactions: a peer's sync can file
+  rows into this account first). Unique indexes on `import_hash` stay the final guard.
 - Per tx, for the account address `S`: `in` = sum of inputs from `S`,
   `out` = sum of outputs to `S`.
   - `in = 0`: received. One transfer entry `{ counterparty: first input

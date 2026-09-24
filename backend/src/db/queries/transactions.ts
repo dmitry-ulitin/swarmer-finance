@@ -464,19 +464,23 @@ export const createImportedTransactions = async (
   return inserted.length;
 };
 
-/**
- * Transaction ids already synced onto this account. A hash is the txid
- * itself or the txid with a ':fee' / ':out' suffix, so the suffix is cut.
- */
-export const findSyncedTxids = async (accountId: number): Promise<string[]> => {
+/** On-chain transaction ids this account's own sync has already processed. */
+export const findSeenTxids = async (accountId: number): Promise<string[]> => {
   const rows = await query<{ txid: string }>(
-    `SELECT DISTINCT split_part(import_hash, ':', 1) AS txid
-     FROM transactions
-     WHERE import_hash IS NOT NULL
-       AND (debit_account_id = $1 OR credit_account_id = $1)`,
+    'SELECT txid FROM chain_seen_txids WHERE account_id = $1',
     [accountId]
   );
   return rows.map(r => r.txid);
+};
+
+export const markTxidsSeen = async (db: Tx, accountId: number, txids: string[]): Promise<void> => {
+  if (txids.length === 0) return;
+  await db.query(
+    `INSERT INTO chain_seen_txids (account_id, txid)
+     SELECT $1, unnest($2::text[])
+     ON CONFLICT DO NOTHING`,
+    [accountId, txids]
+  );
 };
 
 /** The row carrying `hash` on the given side of this account, locked for the sync. */

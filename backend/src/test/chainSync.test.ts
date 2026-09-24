@@ -102,6 +102,7 @@ describe('syncAccount', () => {
   beforeEach(async () => {
     history.clear();
     await pool.query('DELETE FROM transactions WHERE user_id = ANY($1::int[])', [[userId, otherUserId]]);
+    await pool.query('DELETE FROM chain_seen_txids WHERE account_id = ANY($1::int[])', [[walletA, walletB]]);
     await pool.query(
       `UPDATE accounts SET settings = $2, deleted = false WHERE id = $1`,
       [walletB, JSON.stringify({ address: 'bc1qb', blockchain: 'bitcoin' })]
@@ -232,6 +233,76 @@ describe('syncAccount', () => {
       expect(owner.rows[0].user_id).toBe(userId);
     } finally {
       await pool.query('DELETE FROM account_shares WHERE user_id = $1', [otherUserId]);
+    }
+  });
+
+  it('imports older history even when a synced peer filed a whole page of transfers into it first', async () => {
+    // 25 payments B -> A, synced from B's side: every one lands on A as a transfer.
+    const payouts = Array.from({ length: 25 }, (_, i) => `pay${String(i).padStart(2, '0')}`);
+    history.set('bc1qb', payouts.map(id => tx(id, 10, [['bc1qa', -1000]])));
+    await syncAccount(userId, walletB);
+
+    // A's own history: an old receipt from a third party, then the 25 payouts.
+    // The mock mimics Esplora paging: the provider stops at a page it fully knows.
+    const aHistory = [tx('old', 0, [['bc1qx', 5000]]), ...payouts.map(id => tx(id, 0, [['bc1qb', 1000]]))];
+    spy.mockImplementationOnce(async (_address, known) => {
+      const newestFirst = [...aHistory].reverse();
+      const fresh: ChainTx[] = [];
+      for (let i = 0; i < newestFirst.length; i += 25) {
+        const page = newestFirst.slice(i, i + 25);
+        const unseen = page.filter(t => !known.has(t.txid));
+        fresh.push(...unseen);
+        if (page.length < 25 || unseen.length === 0) break;
+      }
+      return fresh.reverse();
+    });
+
+    await syncAccount(userId, walletA);
+
+    const receipt = (await rows(walletA)).find(r => r.import_hash === 'old');
+    expect(receipt).toMatchObject({ credit_account_id: walletA, credit: 5000 });
+    // The transfers B already filed are left alone, not duplicated.
+    const count = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM transactions WHERE import_hash = ANY($1::text[])`, [payouts]
+    );
+    expect(count.rows[0].n).toBe(25);
+  });
+
+  it('keeps a transfer to one synced wallet when a second synced wallet in the same tx syncs', async () => {
+    const walletC = await wallet(userId, 'C', { address: 'bc1qc', blockchain: 'bitcoin' });
+    try {
+      history.set('bc1qa', [tx('m1', 100, [['bc1qb', -7000], ['bc1qc', -3000]])]);
+      history.set('bc1qc', [tx('m1', 0, [['bc1qa', 3000]])]);
+      history.set('bc1qb', [tx('m1', 0, [['bc1qa', 7000]])]);
+
+      await syncAccount(userId, walletA);
+      await syncAccount(userId, walletC);
+      await syncAccount(userId, walletB);
+
+      expect(await rows(walletB)).toEqual([
+        { debit_account_id: walletA, credit_account_id: walletB, debit: 7000, credit: 7000, category_id: null, payee: 'bc1qb', import_hash: 'm1' },
+      ]);
+      // C files its own income; A's expense already covers that outflow.
+      expect(await rows(walletC)).toEqual([
+        { debit_account_id: null, credit_account_id: walletC, debit: 3000, credit: 3000, category_id: 3, payee: 'bc1qa', import_hash: 'm1' },
+      ]);
+      const a = await rows(walletA);
+      expect(a.find(r => r.import_hash === 'm1:out')).toMatchObject({ debit: 3000 });
+    } finally {
+      await pool.query('DELETE FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1', [walletC]);
+      await pool.query('DELETE FROM accounts WHERE id = $1', [walletC]);
+    }
+  });
+
+  it('refuses to sync a tracked account whose scale or start balance does not fit the chain', async () => {
+    const legacy = await wallet(userId, 'Legacy', { address: 'bc1qlegacy', blockchain: 'bitcoin' });
+    try {
+      await pool.query('UPDATE accounts SET scale = 2 WHERE id = $1', [legacy]);
+      await expect(syncAccount(userId, legacy)).rejects.toMatchObject({ statusCode: 400 });
+      await pool.query('UPDATE accounts SET scale = 8, start_balance = 100 WHERE id = $1', [legacy]);
+      await expect(syncAccount(userId, legacy)).rejects.toMatchObject({ statusCode: 400 });
+    } finally {
+      await pool.query('DELETE FROM accounts WHERE id = $1', [legacy]);
     }
   });
 

@@ -70,8 +70,8 @@ export const bitcoinProvider: ChainProvider = {
       const page = await getJson<EsploraTx[]>(path);
       const unseen = page.filter(t => !known.has(t.txid));
       fresh.push(...unseen);
-      // Pages run newest first, and a sync writes all of its txs or none, so
-      // a page with nothing new means everything older is already stored.
+      // Pages run newest first, and a sync records all of its txs as seen or
+      // none, so a page with nothing new means everything older was seen too.
       if (page.length < PAGE_SIZE || unseen.length === 0) break;
       path = `${base}/${page[page.length - 1].txid}`;
     }

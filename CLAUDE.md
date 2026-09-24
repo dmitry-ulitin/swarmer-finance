@@ -65,7 +65,7 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→012)
+- Migrations in `backend/src/db/migrations/` — run in order (001→013)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -87,7 +87,8 @@ A `crypto` account with `settings.address` and a supported
 *tracked*: `POST /api/accounts/:id/sync` loads its history through a chain
 provider (`services/chain/bitcoin.ts`, Esplora at `BITCOIN_ESPLORA_URL`) and
 `services/chainSync.ts` writes it, identified by `import_hash` (`txid`,
-`txid:out`, `txid:fee`). Tracked accounts start at 0 in the chain's currency;
+`txid:out`, `txid:fee`); `chain_seen_txids` (migration 013) records which
+txids each account's own sync has processed, which is what paging stops on. Tracked accounts start at 0 in the chain's currency;
 their transactions cannot be created, deleted or imported by hand, and an
 edit may change only the category, the other (untracked) account and its
 amount when currencies differ, and the description. A payment between two
