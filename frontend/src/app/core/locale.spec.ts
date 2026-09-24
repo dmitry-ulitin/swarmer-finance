@@ -47,7 +47,11 @@ function stubLocaleScripts(
 
 beforeEach(() => {
   // Each test starts with an empty registry, so a previous one cannot satisfy it.
-  delete (globalThis as LocaleGlobal).ng;
+  // Clear only the registry, not all of `ng`: it also holds the JIT compiler
+  // facade, and the unit-test builder runs spec files in a shared worker
+  // (isolate: false), so deleting it breaks whichever spec loads Angular next
+  // with "FetchBackend needs to be compiled using the JIT compiler".
+  delete (globalThis as LocaleGlobal).ng?.common?.locales;
 });
 
 describe('resolveLocale', () => {
