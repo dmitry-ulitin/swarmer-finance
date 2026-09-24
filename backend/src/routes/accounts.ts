@@ -41,7 +41,6 @@ const createBase = {
   name: z.string().min(1).max(255),
   currency: currencySchema,
   startBalance: z.number().default(0),
-  scale: z.number().optional().default(2),
 };
 
 // A discriminated union can't default a missing discriminant itself, so a
@@ -64,7 +63,6 @@ const updateBase = {
   name: z.string().min(1).max(255).optional(),
   currency: currencySchema.optional(),
   startBalance: z.number().optional(),
-  scale: z.number().optional(),
 };
 
 // Unlike create, `settings` has NO default here — it is required on every
@@ -90,8 +88,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { name, currency, startBalance, scale, type, settings } = req.body;
-    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, scale, type, settings);
+    const { name, currency, startBalance, type, settings } = req.body;
+    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, type, settings);
     res.json({ data: account, error: null });
   } catch (error) {
     next(error);

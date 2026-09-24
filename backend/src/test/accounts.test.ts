@@ -150,7 +150,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'New Account', currency: 'EUR', startBalance: 20, scale: 2 });
+        .send({ name: 'New Account', currency: 'EUR', startBalance: 20 });
 
       expect(res.status).toBe(200);
       expect(res.body.data.balance).toBe(20);
@@ -160,7 +160,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Crypto', currency: 'USDT', startBalance: 0, scale: 2 });
+        .send({ name: 'Crypto', currency: 'USDT', startBalance: 0 });
 
       expect(res.status).toBe(200);
       expect(res.body.data.currency).toBe('USDT');
@@ -262,7 +262,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Empty', currency: 'USD', startBalance: 0, scale: 2 });
+        .send({ name: 'Empty', currency: 'USD', startBalance: 0 });
       const id = created.body.data.id;
 
       const res = await request(app)
@@ -282,7 +282,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'ZeroBalance', currency: 'USD', startBalance: 100, scale: 2 });
+        .send({ name: 'ZeroBalance', currency: 'USD', startBalance: 100 });
       const id = created.body.data.id;
 
       await pool.query(
@@ -308,7 +308,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Positive', currency: 'USD', startBalance: 50, scale: 2 });
+        .send({ name: 'Positive', currency: 'USD', startBalance: 50 });
       const id = created.body.data.id;
 
       // Add a transaction that does NOT zero out the balance.
@@ -334,7 +334,7 @@ describe('Accounts API — balance field', () => {
       const created = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Twice', currency: 'USD', startBalance: 100, scale: 2 });
+        .send({ name: 'Twice', currency: 'USD', startBalance: 100 });
       const id = created.body.data.id;
 
       await pool.query(

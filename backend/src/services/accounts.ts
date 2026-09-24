@@ -5,6 +5,7 @@ import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
 import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel } from './access';
 import { ChainProvider, getProvider, isTracked } from './chain';
+import { getCurrencyScale } from './currencyScale';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -73,7 +74,6 @@ export const createAccount = async (
   name: string,
   currency: string,
   startBalance: number,
-  scale = 2,
   type: AccountType = 'cash',
   settings: Record<string, unknown> = {}
 ) => {
@@ -81,8 +81,8 @@ export const createAccount = async (
   const provider = isTracked({ type, settings }) ? getProvider(settings.blockchain) : null;
   if (provider) {
     assertTrackedShape(provider, currency, startBalance);
-    scale = provider.scale;
   }
+  const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
   return toDecimalDTO(converted, user.currency_scale);
@@ -95,7 +95,6 @@ export const updateAccount = async (
     name?: string;
     currency?: string;
     startBalance?: number;
-    scale?: number;
     type: AccountType;
     settings: Record<string, unknown>;
   }
@@ -110,11 +109,24 @@ export const updateAccount = async (
   }
   const user = await getUserOrThrow(userId);
 
-  let scale = data.scale;
+  const currency = data.currency ?? existing.currency;
+  let scale = existing.scale;
+  if (getCurrencyScale(currency) !== existing.scale) {
+    // Stored amounts are integers at the account's scale; rescaling an
+    // account that already holds some would silently change every one.
+    if (!await accountQueries.hasTransactions(id)) {
+      scale = getCurrencyScale(currency);
+    } else if (currency !== existing.currency) {
+      throw {
+        statusCode: 400,
+        message: `Cannot change the currency to ${currency}: it has a different scale and the account already has transactions`,
+      };
+    }
+  }
+
   const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
   if (provider) {
-    assertTrackedShape(provider, data.currency ?? existing.currency, data.startBalance);
-    scale = provider.scale;
+    assertTrackedShape(provider, currency, data.startBalance);
     // Rows already on the account came from somewhere else — by hand, or from
     // another wallet — and would be mixed into this wallet's history.
     const wasTracked = isTracked(existing);
@@ -132,7 +144,7 @@ export const updateAccount = async (
   }
 
   const startBalance = data.startBalance != null
-    ? toCents(data.startBalance, scale ?? existing.scale)
+    ? toCents(data.startBalance, scale)
     : undefined;
   const account = await accountQueries.updateAccount(id, { ...data, scale, startBalance });
   const [withBal] = await withBalances([account!]);
