@@ -240,6 +240,10 @@ export class AccountsState {
   // Use `accounts` instead where deleted accounts must remain selectable
   // (e.g. editing an existing transaction that references one).
   readonly visibleAccounts = computed(() => this.accounts().filter(a => !a.deleted));
+  /** Accounts whose transactions come from the blockchain. */
+  readonly trackedIds = computed<ReadonlySet<number>>(
+    () => new Set(this.accounts().filter(a => a.tracked).map(a => a.id))
+  );
   readonly groupedAccounts = computed<AccountTreeItem[]>(() => buildAccountTree(this.visibleAccounts()));
   readonly accountSections = computed<AccountSection[]>(() => groupIntoSections(this.groupedAccounts()));
   readonly summary = computed<BalanceSummary | null>(() => {

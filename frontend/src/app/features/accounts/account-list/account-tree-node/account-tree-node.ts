@@ -8,6 +8,7 @@ import { TuiExpand, TuiButton } from '@taiga-ui/core';
 import { TuiHovered } from '@taiga-ui/cdk';
 import { Account } from '../../../../models/account';
 import { ImportDialogService } from '../../../import/import-dialog.service';
+import { AccountSyncService } from '../../account-sync.service';
 
 @Component({
   selector: 'app-account-tree-node',
@@ -24,6 +25,7 @@ export class AccountTreeNode {
   protected readonly transactions = inject(TransactionsState);
   protected readonly auth = inject(AuthService);
   private readonly importDialog = inject(ImportDialogService);
+  protected readonly sync = inject(AccountSyncService);
   protected hovered = false;
 
   protected readonly nodeAccountIds = computed(() => {
@@ -54,5 +56,9 @@ export class AccountTreeNode {
 
   protected onImport(account: Account): void {
     void this.importDialog.open(account);
+  }
+
+  protected onSync(account: Account): void {
+    void this.sync.sync(account);
   }
 }

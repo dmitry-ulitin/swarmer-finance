@@ -21,6 +21,20 @@
         Import
       </button>
       }
+      @if (account.tracked) {
+      <button
+        appearance="gray"
+        class="small"
+        [class.hidden]="!hovered && !sync.syncing().has(account.id)"
+        [disabled]="sync.syncing().has(account.id)"
+        iconStart="@tui.refresh-cw"
+        size="xs"
+        tuiIconButton
+        (click)="onSync(account)"
+        type="button">
+        Sync
+      </button>
+      }
       @if (account.balance !== null) {
         <span class="row-balance">{{ account.balance | money: account.currency : account.scale }}</span>
       }

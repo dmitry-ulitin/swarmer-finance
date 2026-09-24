@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category } from '../models/category';
-import { Account, AccountPayload } from '../models/account';
+import { Account, AccountPayload, AccountSyncResult } from '../models/account';
 import { Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { Observable } from 'rxjs';
@@ -60,6 +60,10 @@ export class ApiService {
 
   deleteAccount(id: number): Observable<ApiResponse<{ success: boolean }>> {
     return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/accounts/${id}`);
+  }
+
+  syncAccount(id: number): Observable<ApiResponse<AccountSyncResult>> {
+    return this.http.post<ApiResponse<AccountSyncResult>>(`/api/accounts/${id}/sync`, {});
   }
 
   // Transactions

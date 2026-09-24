@@ -25,6 +25,8 @@ interface AccountBase {
   access_level?: 1 | 2 | 3 | 4;
   /** Display name of the account's owner. */
   owner_name?: string;
+  /** Transactions come from the blockchain; computed by the backend. */
+  tracked?: boolean;
 }
 
 // A union over type, so `@if (account.type === 'crypto')` narrows
@@ -42,3 +44,15 @@ export type AccountPayload = {
 } & {
   [T in AccountType]: { type: T; settings: AccountSettings[T] };
 }[AccountType];
+
+export interface AccountSyncResult {
+  added: number;
+  merged: number;
+  fees: number;
+}
+
+/**
+ * Chains the backend syncs from, with their native currency. Mirrors the
+ * provider registry in backend/src/services/chain/index.ts.
+ */
+export const SYNCED_CHAINS: Readonly<Record<string, string>> = { bitcoin: 'BTC' };
