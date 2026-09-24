@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../index';
+import { query, queryOne, execute, Tx } from '../index';
 import { Transaction, TransactionDTO } from '../../types';
 import { CATEGORY_PATHS_CTE } from './categories';
 
@@ -462,4 +462,82 @@ export const createImportedTransactions = async (
     values
   );
   return inserted.length;
+};
+
+/**
+ * Transaction ids already synced onto this account. A hash is the txid
+ * itself or the txid with a ':fee' / ':out' suffix, so the suffix is cut.
+ */
+export const findSyncedTxids = async (accountId: number): Promise<string[]> => {
+  const rows = await query<{ txid: string }>(
+    `SELECT DISTINCT split_part(import_hash, ':', 1) AS txid
+     FROM transactions
+     WHERE import_hash IS NOT NULL
+       AND (debit_account_id = $1 OR credit_account_id = $1)`,
+    [accountId]
+  );
+  return rows.map(r => r.txid);
+};
+
+/** The row carrying `hash` on the given side of this account, locked for the sync. */
+export const findByImportHashForUpdate = async (
+  db: Tx,
+  accountId: number,
+  side: 'debit' | 'credit',
+  hash: string
+): Promise<Transaction | null> => {
+  const column = side === 'debit' ? 'debit_account_id' : 'credit_account_id';
+  return db.queryOne<Transaction>(
+    `SELECT * FROM transactions WHERE ${column} = $1 AND import_hash = $2 FOR UPDATE`,
+    [accountId, hash]
+  );
+};
+
+export interface SyncedShape {
+  debitAccountId: number | null;
+  creditAccountId: number | null;
+  debit: number;
+  credit: number;
+  categoryId: number | null;
+}
+
+/** Re-points an existing synced row; date, payee and description stay. */
+export const setSyncedShape = async (db: Tx, id: number, shape: SyncedShape): Promise<void> => {
+  await db.query(
+    `UPDATE transactions
+     SET debit_account_id = $1, credit_account_id = $2, debit = $3, credit = $4, category_id = $5
+     WHERE id = $6`,
+    [shape.debitAccountId, shape.creditAccountId, shape.debit, shape.credit, shape.categoryId, id]
+  );
+};
+
+/**
+ * One synced row. ON CONFLICT DO NOTHING against the import_hash indexes
+ * makes a concurrent double sync harmless; returns whether it landed.
+ */
+export const insertSynced = async (
+  db: Tx,
+  userId: number,
+  row: ImportedTransactionData
+): Promise<boolean> => {
+  const inserted = await db.query<{ id: number }>(
+    `INSERT INTO transactions
+       (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, payee, import_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    [
+      userId,
+      row.categoryId ?? null,
+      row.debitAccountId ?? null,
+      row.creditAccountId ?? null,
+      row.debit,
+      row.credit,
+      row.date,
+      row.description || '',
+      row.payee ?? null,
+      row.importHash,
+    ]
+  );
+  return inserted.length > 0;
 };
