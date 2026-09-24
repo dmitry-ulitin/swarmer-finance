@@ -42,19 +42,17 @@ const parentPath = (fullName: string): string => {
 };
 
 /**
- * The categories below one system root, keyed by path rather than by row.
+ * The row that stands for each path, keyed by `pathKey`.
  *
  * Several users can own the same path — each keeps their own row, since
  * categories are per-user — but the tree shows one node per path. The
  * user's own row wins, otherwise the first the query returned (ordered by
- * id, so the oldest). Nesting follows the path too: a node hangs off the
- * group whose path is its own minus the last segment, which is what lets
- * one user's child sit under another user's parent row.
+ * id, so the oldest). System roots are not paths and are left out.
  */
-const buildTree = (categories: Category[], rootId: number, userId: number): Category[] => {
+const pathWinners = (categories: Category[], userId: number): Map<string, Category> => {
   const winners = new Map<string, Category>();
   for (const category of categories) {
-    if (category.parent_id === null || category.root_id !== rootId) continue;
+    if (category.parent_id === null) continue;
     const key = pathKey(category.root_id, category.fullName);
     const current = winners.get(key);
     // Ownership outranks list order; among equals the first one stays.
@@ -62,6 +60,36 @@ const buildTree = (categories: Category[], rootId: number, userId: number): Cate
       winners.set(key, category);
     }
   }
+  return winners;
+};
+
+/**
+ * Every category id `userId` can meet in a transaction, mapped to the id
+ * their tree shows for the same path. A co-owner's row at a path the user
+ * also owns maps to the user's own row; ids outside the user's reach are
+ * absent.
+ */
+export const getTreeCategoryIds = async (userId: number): Promise<Map<number, number>> => {
+  const categories = await categoryQueries.getCategoriesByUserIds(await getRelatedUserIds(userId));
+  const winners = pathWinners(categories, userId);
+  return new Map(
+    categories.map(c => [
+      c.id,
+      c.parent_id === null ? c.id : winners.get(pathKey(c.root_id, c.fullName))!.id,
+    ])
+  );
+};
+
+/**
+ * The categories below one system root, keyed by path rather than by row
+ * (see `pathWinners`). Nesting follows the path too: a node hangs off the
+ * group whose path is its own minus the last segment, which is what lets
+ * one user's child sit under another user's parent row.
+ */
+const buildTree = (categories: Category[], rootId: number, userId: number): Category[] => {
+  const winners = new Map(
+    [...pathWinners(categories, userId)].filter(([, c]) => c.root_id === rootId)
+  );
 
   const childrenByParent = new Map<string, Category[]>();
   for (const category of winners.values()) {

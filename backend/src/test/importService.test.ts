@@ -68,6 +68,7 @@ describe('parseStatement', () => {
 
   beforeEach(async () => {
     await pool.query('DELETE FROM transactions WHERE user_id = ANY($1::int[])', [[userId, otherUserId]]);
+    await pool.query('DELETE FROM account_shares WHERE account_id = $1', [otherAccountId]);
   });
 
   it('auto-detects LHV and returns every row as new', async () => {
@@ -210,6 +211,37 @@ describe('parseStatement', () => {
 
     it('tolerates history rows with a NULL description', async () => {
       await seedIncome(userId, eurAccountId, salaryCategoryId, null);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
+    });
+
+    // Both users own an Income / Salary row. On an account shared with the
+    // importer, history carries the owner's row, which the importer's
+    // category tree hides behind their own row at the same path.
+    const shareOtherAccount = () =>
+      pool.query(
+        'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, 2)',
+        [otherAccountId, userId]
+      );
+
+    it('suggests the importer\'s own row for a path learned from a shared account', async () => {
+      await shareOtherAccount();
+      await seedIncome(otherUserId, otherAccountId, otherSalaryCategoryId);
+      const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+      expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
+    });
+
+    it('pools votes for the same path across users\' rows', async () => {
+      // Salary via two rows (own + co-owner's) against one Bonus: 2/3 once
+      // pooled by path, but a 1/1/1 split — no suggestion — if counted by id.
+      const bonus = await pool.query(
+        `INSERT INTO categories (user_id, name, parent_id) VALUES ($1, 'Bonus', 1) RETURNING id`,
+        [userId]
+      );
+      await shareOtherAccount();
+      await seedIncome(userId, eurAccountId, salaryCategoryId);
+      await seedIncome(otherUserId, otherAccountId, otherSalaryCategoryId);
+      await seedIncome(userId, eurAccountId, bonus.rows[0].id);
       const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
       expect(result.rows[0].suggestedCategoryId).toBe(salaryCategoryId);
     });

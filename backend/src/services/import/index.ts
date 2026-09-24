@@ -7,7 +7,7 @@ import { readStatement } from './rows';
 import { computeImportHashes } from './hash';
 import { suggestCategories, SuggestionSource } from './categorize';
 import { parseCsv } from './csv';
-import { resolveCategoryForOwner } from '../categories';
+import { getTreeCategoryIds, resolveCategoryForOwner } from '../categories';
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate';
 
@@ -110,7 +110,17 @@ export const parseStatement = async (
   const history = await transactionQueries.findCategorizedHistory(
     await getAccessibleAccountIds(userId)
   );
-  const suggestions = suggestCategories(rows, history);
+  // History on a shared account stores the owner's category row. Vote by
+  // the row the user's tree shows for that path instead, so co-owners' rows
+  // pool their votes and the winner is an id the review screen can display.
+  const treeIds = await getTreeCategoryIds(userId);
+  const suggestions = suggestCategories(
+    rows,
+    history.flatMap(h => {
+      const categoryId = treeIds.get(h.categoryId);
+      return categoryId === undefined ? [] : [{ ...h, categoryId }];
+    })
+  );
 
   const out: ImportRow[] = rows.map((row, i) => {
     const hash = hashes[i];
