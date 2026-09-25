@@ -128,9 +128,12 @@ export const updateAccount = async (
 
   const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
   const wasTracked = isTracked(existing);
+  // A wallet is an address on a chain in one currency: TRON's TRX and USDT
+  // at the same address are separate histories.
   const sameWallet = wasTracked
     && existing.settings.address === data.settings.address
-    && existing.settings.blockchain === data.settings.blockchain;
+    && existing.settings.blockchain === data.settings.blockchain
+    && existing.currency === currency;
   if (provider) {
     assertTrackedShape(provider, currency, data.startBalance);
     // Rows already on a tracked account came from its wallet; pointing it at

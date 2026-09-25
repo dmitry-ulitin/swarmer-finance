@@ -70,7 +70,7 @@ export function planTx(tx: ChainTx, peers: ReadonlyMap<string, Account>): Plan {
   return plan;
 }
 
-/** Other synced wallets on the same chain the user can write, by address. */
+/** Other synced wallets on the same chain and in the same currency the user can write, by address. */
 async function loadPeers(access: Map<number, AccessLevel>, account: Account): Promise<Map<string, Account>> {
   const writable = [...access]
     .filter(([id, level]) => id !== account.id && level >= LEVEL.WRITE)
@@ -78,7 +78,9 @@ async function loadPeers(access: Map<number, AccessLevel>, account: Account): Pr
   const accounts = await accountQueries.getAccountsByIds(writable);
   return new Map(
     accounts
-      .filter(a => !a.deleted && isTracked(a) && a.settings.blockchain === account.settings.blockchain)
+      .filter(a => !a.deleted && isTracked(a)
+        && a.settings.blockchain === account.settings.blockchain
+        && a.currency === account.currency)
       .map(a => [a.settings.address as string, a])
   );
 }
