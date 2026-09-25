@@ -162,7 +162,7 @@ export class AccountForm {
     const data: TuiConfirmData = {
       content: 'Existing transactions of this account will be reconciled with the blockchain now: '
         + 'matching ones keep their category and description, the rest are removed; '
-        + 'transfers to other accounts are left to those accounts. The start balance becomes 0.',
+        + 'transfers to accounts not synced from a blockchain are left to those accounts. The start balance becomes 0.',
       yes: 'Enable sync',
       no: 'Cancel',
     };
