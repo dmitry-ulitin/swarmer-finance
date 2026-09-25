@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiDropdown, TuiError, TuiIcon, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDropdown, TuiIcon, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiInputColor, TuiSelect, TuiTree } from '@taiga-ui/kit';
-import { TuiValidationError } from '@taiga-ui/cdk/classes';
 import { TuiAutoFocus, type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { CategoriesState } from '../../../core/categories.state';
+import { NotificationService } from '../../../core/notification.service';
 import type { Category } from '../../../models/category';
 import { findCategoryById } from '../../../models/category';
 import { firstValueFrom, pipe } from 'rxjs';
@@ -15,7 +15,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-category-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputColor, TuiButton, TuiError, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiTree, TuiIcon, TuiAutoFocus],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputColor, TuiButton, TuiDataList, TuiDropdown, TuiSelect, TuiChevron, TuiTree, TuiIcon, TuiAutoFocus],
   templateUrl: './category-form.html',
   styleUrl: './category-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,6 +23,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 export class CategoryForm {
   private readonly context = inject<TuiDialogContext<Category | null, Category>>(POLYMORPHEUS_CONTEXT);
   private readonly categoriesState = inject(CategoriesState);
+  private readonly notifications = inject(NotificationService);
 
   readonly categories = this.categoriesState.categories;
 
@@ -56,7 +57,6 @@ export class CategoryForm {
 
   readonly loading = signal(false);
   readonly categoryId = signal(this.context.data?.id ?? null);
-  readonly error = signal<TuiValidationError | null>(null);
   readonly parent = toSignal(this.form.controls.parent.valueChanges, { initialValue: this.form.controls.parent.value });
 
   readonly stringifyCategory: TuiStringHandler<Category | null> = (item) => {
@@ -91,7 +91,6 @@ export class CategoryForm {
 
     try {
       this.loading.set(true);
-      this.error.set(null);
 
       const id = this.context.data?.id;
       const { parent, name, color, icon } = this.form.getRawValue();
@@ -100,8 +99,9 @@ export class CategoryForm {
         : this.categoriesState.create({ name, parentId: parent?.id ?? TransactionType.Expense, color, icon });
       const responce = await firstValueFrom(obs);
       this.context.completeWith(responce.data);
-    } catch (err) { }
-    finally {
+    } catch (e) {
+      this.notifications.showError(e, 'Failed to save category');
+    } finally {
       this.loading.set(false);
     }
   }

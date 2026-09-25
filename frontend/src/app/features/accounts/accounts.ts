@@ -5,7 +5,6 @@ import { Account } from '../../models/account';
 import { AuthService } from '../../core/auth.service';
 import { TuiButton, TuiLoader } from '@taiga-ui/core';
 import { AccountDialogService } from './account-dialog.service';
-import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-accounts',
@@ -46,9 +45,7 @@ export class Accounts {
   async openDeleteDialog(): Promise<void> {
     const account = this.selectedAccount();
     if (!account) return;
-    const confirmed = await this.accountDialogs.openDelete(account);
-    if (confirmed) {
-      await firstValueFrom(this.accountsState.delete(account.id));
+    if (await this.accountDialogs.openDelete(account)) {
       this.selectedId.set(null);
     }
   }

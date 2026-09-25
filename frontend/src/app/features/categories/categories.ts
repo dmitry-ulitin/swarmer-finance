@@ -4,7 +4,6 @@ import { TuiTree } from '@taiga-ui/kit';
 import { Category, findAncestors, findCategoryById, flattenCategories } from '../../models/category';
 import { TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiIcon, TuiLoader } from '@taiga-ui/core';
-import { firstValueFrom } from 'rxjs';
 import { TransactionType } from '../../models/transaction';
 import { CategoryDialogService } from './category-dialog.service';
 import { AuthService } from '../../core/auth.service';
@@ -87,9 +86,7 @@ export class Categories {
   async openDeleteDialog(): Promise<void> {
     const category = this.selectedCategory();
     if (!category || !this.isDeletable()) return;
-    const confirmed = await this.categoryDialogs.openDelete(category);
-    if (confirmed) {
-      await firstValueFrom(this.categoriesState.delete(category.id));
+    if (await this.categoryDialogs.openDelete(category)) {
       this.selectedId.set(null);
     }
   }
