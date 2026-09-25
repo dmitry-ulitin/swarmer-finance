@@ -15,12 +15,9 @@
     @for (account of accountsState.accounts(); track account.id) {
         <div class="account" [class.active]="account.id === selectedAccount()?.id"
              (click)="setAsSelected(account)">
-            <span class="account-name">{{ account.name }}</span>
+            <span>{{ account.name }}</span>
             <span class="account-meta">
                 {{ account.balance | money: account.currency : account.scale }}
-                @if (showUserBalance(account)) {
-                    <span class="account-user-balance">&middot; {{ account.user_balance | money: auth.user()?.currency : auth.user()?.currency_scale }}</span>
-                }
             </span>
         </div>
     }
