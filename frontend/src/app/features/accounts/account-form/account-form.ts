@@ -1,8 +1,8 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
-import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
+import { TuiButton, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
+import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
@@ -32,6 +32,7 @@ export class AccountForm {
   private readonly context = inject<TuiDialogContext<Account | null, Partial<Account> | null>>(POLYMORPHEUS_CONTEXT);
   private readonly accountsState = inject(AccountsState);
   private readonly notifications = inject(NotificationService);
+  private readonly dialogs = inject(TuiDialogService);
 
   readonly currencies = this.accountsState.currencies;
   readonly accountTypes = ACCOUNT_TYPES;
@@ -151,8 +152,29 @@ export class AccountForm {
     this.context.completeWith(null);
   }
 
+  /** An existing account starts syncing: its rows get reconciled with the chain. */
+  private switchesSyncOn(): boolean {
+    const data = this.context.data;
+    return data?.id != null && !data.tracked && this.tracked();
+  }
+
+  private confirmSync(): Promise<boolean> {
+    const data: TuiConfirmData = {
+      content: 'Existing transactions of this account will be reconciled with the blockchain now: '
+        + 'matching ones keep their category and description, the rest are removed; '
+        + 'transfers to other accounts are left to those accounts. The start balance becomes 0.',
+      yes: 'Enable sync',
+      no: 'Cancel',
+    };
+    return firstValueFrom(
+      this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Sync from blockchain', size: 's', data }),
+      { defaultValue: false }
+    );
+  }
+
   async onSubmit() {
     if (this.form.invalid) return;
+    if (this.switchesSyncOn() && !await this.confirmSync()) return;
 
     try {
       this.loading.set(true);

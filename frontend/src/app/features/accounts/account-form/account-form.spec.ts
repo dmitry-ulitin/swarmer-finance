@@ -1,19 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
+import { TuiDialogService } from '@taiga-ui/core';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { AccountForm } from './account-form';
+import { AccountsState } from '../../../core/accounts.state';
 import type { Account } from '../../../models/account';
 
-function createForm(data: Partial<Account> | null) {
+function createForm(data: Partial<Account> | null, dialogOpen = vi.fn(() => of(true))) {
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: POLYMORPHEUS_CONTEXT, useValue: { data, completeWith: () => {} } },
+      { provide: TuiDialogService, useValue: { open: dialogOpen } },
     ],
   });
   return TestBed.createComponent(AccountForm).componentInstance;
@@ -122,5 +126,52 @@ describe('AccountForm start balance precision', () => {
     expect(form.balancePrecision()).toBe(2);
     form.form.patchValue({ currency: 'BTC' });
     expect(form.balancePrecision()).toBe(8);
+  });
+});
+
+describe('AccountForm switching sync on', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const plainWallet = {
+    id: 7, name: 'Cold', currency: 'BTC', start_balance: 0, type: 'crypto', settings: {}, tracked: false,
+  } as Partial<Account>;
+  const spyUpdate = () => vi.spyOn(TestBed.inject(AccountsState), 'update')
+    .mockReturnValue(of({ data: { ...plainWallet, tracked: true } as Account, error: null }));
+  const track = (form: AccountForm) => form.form.patchValue({ name: 'Cold', address: 'bc1qcold', blockchain: 'bitcoin' });
+
+  it('asks before switching sync on for an existing account, and saves on yes', async () => {
+    const dialogOpen = vi.fn(() => of(true));
+    const form = createForm(plainWallet, dialogOpen);
+    const update = spyUpdate();
+    track(form);
+    await form.onSubmit();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalled();
+  });
+
+  it('sends nothing when the confirmation is cancelled', async () => {
+    const form = createForm(plainWallet, vi.fn(() => of(false)));
+    const update = spyUpdate();
+    track(form);
+    await form.onSubmit();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('does not ask when a tracked account is saved again', async () => {
+    const dialogOpen = vi.fn(() => of(true));
+    const form = createForm({ ...plainWallet, tracked: true, settings: { address: 'bc1qcold', blockchain: 'bitcoin' } } as Partial<Account>, dialogOpen);
+    spyUpdate();
+    await form.onSubmit();
+    expect(dialogOpen).not.toHaveBeenCalled();
+  });
+
+  it('does not ask when creating a tracked account', async () => {
+    const dialogOpen = vi.fn(() => of(true));
+    const form = createForm({ currency: 'BTC' }, dialogOpen);
+    vi.spyOn(TestBed.inject(AccountsState), 'create').mockReturnValue(of({ data: plainWallet as Account, error: null }));
+    form.form.patchValue({ type: 'crypto' });
+    track(form);
+    await form.onSubmit();
+    expect(dialogOpen).not.toHaveBeenCalled();
   });
 });
