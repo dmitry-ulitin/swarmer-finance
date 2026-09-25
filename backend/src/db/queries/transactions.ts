@@ -483,6 +483,11 @@ export const markTxidsSeen = async (db: Tx, accountId: number, txids: string[]):
   );
 };
 
+/** Forgets what the account's sync processed, so the next sync reads the whole history. */
+export const clearSeenTxids = async (db: Tx, accountId: number): Promise<void> => {
+  await db.query('DELETE FROM chain_seen_txids WHERE account_id = $1', [accountId]);
+};
+
 /** The row carrying `hash` on the given side of this account, locked for the sync. */
 export const findByImportHashForUpdate = async (
   db: Tx,

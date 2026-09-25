@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
+import { bitcoinProvider } from '../services/chain/bitcoin';
 
 const app = createTestApp();
 const WALLET = { type: 'crypto', settings: { address: 'bc1qtracked', blockchain: 'bitcoin' } };
@@ -98,19 +99,64 @@ describe('Tracked (blockchain-synced) accounts', () => {
       expect(res.body.data.scale).toBe(8);
     });
 
-    it('refuses to track an account that has transactions', async () => {
+    const seenCount = async (id: number) =>
+      (await pool.query('SELECT COUNT(*)::int AS n FROM chain_seen_txids WHERE account_id = $1', [id])).rows[0].n;
+
+    it('tracks an account that has transactions, clearing its seen set', async () => {
       const plain = await create({ name: 'Used', currency: 'BTC', startBalance: 0, type: 'crypto', settings: {} });
-      await addTransaction(plain.body.data.id);
-      const res = await update(plain.body.data.id, { name: 'Used', currency: 'BTC', startBalance: 0, ...WALLET });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/create a new account/);
+      const id = plain.body.data.id;
+      await addTransaction(id);
+      await pool.query(`INSERT INTO chain_seen_txids (account_id, txid) VALUES ($1, 'stale')`, [id]);
+
+      const res = await update(id, { name: 'Used', currency: 'BTC', startBalance: 0, ...WALLET });
+      expect(res.status).toBe(200);
+      expect(res.body.data.tracked).toBe(true);
+      expect(await seenCount(id)).toBe(0);
     });
 
-    it('refuses to track an account with a start balance', async () => {
+    it('zeroes the start balance when tracking is switched on', async () => {
       const plain = await create({ name: 'Funded', currency: 'BTC', startBalance: 1, type: 'crypto', settings: {} });
       const res = await update(plain.body.data.id, { name: 'Funded', currency: 'BTC', startBalance: 0, ...WALLET });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/create a new account/);
+      expect(res.status).toBe(200);
+      expect(Number(res.body.data.start_balance)).toBe(0);
+    });
+
+    it('keeps the seen set when a tracked account is saved again', async () => {
+      const w = await create({ name: 'Kept', currency: 'BTC', startBalance: 0, ...WALLET });
+      const id = w.body.data.id;
+      await pool.query(`INSERT INTO chain_seen_txids (account_id, txid) VALUES ($1, 'known')`, [id]);
+      await update(id, { name: 'Kept 2', currency: 'BTC', startBalance: 0, ...WALLET });
+      expect(await seenCount(id)).toBe(1);
+    });
+
+    it('restores a deleted synced row when tracking is switched off and on again', async () => {
+      const spy = jest.spyOn(bitcoinProvider, 'fetchNewTxs').mockImplementation(async (_a, known) =>
+        [
+          { txid: 'rt1', date: '2026-05-29', fee: 0, transfers: [{ counterparty: 'bc1qx', amount: 5000 }] },
+          { txid: 'rt2', date: '2026-05-29', fee: 0, transfers: [{ counterparty: 'bc1qy', amount: 6000 }] },
+        ].filter(t => !known.has(t.txid))
+      );
+      try {
+        const w = await create({ name: 'Round', currency: 'BTC', startBalance: 0, type: 'crypto',
+          settings: { address: 'bc1qround', blockchain: 'bitcoin' } });
+        const id = w.body.data.id;
+        const sync = () => request(app).post(`/api/accounts/${id}/sync`).set(auth());
+        expect((await sync()).body.data).toMatchObject({ added: 2 });
+        await pool.query(`UPDATE transactions SET description = 'kept' WHERE import_hash = 'rt1'`);
+
+        await update(id, { name: 'Round', currency: 'BTC', startBalance: 0, type: 'crypto', settings: { blockchain: 'bitcoin' } });
+        await pool.query(`DELETE FROM transactions WHERE import_hash = 'rt2'`);
+        await update(id, { name: 'Round', currency: 'BTC', startBalance: 0, type: 'crypto',
+          settings: { address: 'bc1qround', blockchain: 'bitcoin' } });
+
+        expect((await sync()).body.data).toEqual({ added: 1, merged: 0, fees: 0, adopted: 0, removed: 0 });
+        const after = await pool.query(
+          'SELECT import_hash, description FROM transactions WHERE credit_account_id = $1 ORDER BY import_hash', [id]
+        );
+        expect(after.rows).toEqual([{ import_hash: 'rt1', description: 'kept' }, { import_hash: 'rt2', description: '' }]);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('refuses a start balance change on a tracked account', async () => {

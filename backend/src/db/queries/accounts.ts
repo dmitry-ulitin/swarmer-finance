@@ -52,7 +52,8 @@ export const updateAccount = async (
     scale?: number;
     type: AccountType;
     settings: Record<string, unknown>;
-  }
+  },
+  db: Pick<Tx, 'query'> = { query }
 ): Promise<Account | null> => {
   // `type` and `settings` are written unconditionally, not COALESCEd:
   // changing an account's type must drop the previous type's fields.
@@ -60,7 +61,7 @@ export const updateAccount = async (
   // No user_id predicate: permission is checked in services/accounts.ts.
   // Keeping one here would be worse than redundant — for an admin who is
   // not the owner it is false, and the update would silently affect no rows.
-  const result = await query<Account>(
+  const result = await db.query<Account>(
     `UPDATE accounts
      SET name = COALESCE($1, name),
          currency = COALESCE($2, currency),

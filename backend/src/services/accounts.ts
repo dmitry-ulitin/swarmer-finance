@@ -1,6 +1,6 @@
 import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
-import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions } from '../db/queries/transactions';
+import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions, clearSeenTxids } from '../db/queries/transactions';
 import { withTransaction } from '../db';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
@@ -126,28 +126,31 @@ export const updateAccount = async (
   }
 
   const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
+  const wasTracked = isTracked(existing);
   if (provider) {
     assertTrackedShape(provider, currency, data.startBalance);
-    // Rows already on the account came from somewhere else — by hand, or from
-    // another wallet — and would be mixed into this wallet's history.
-    const wasTracked = isTracked(existing);
+    // Rows already on a tracked account came from its wallet; pointing it at
+    // another wallet would mix two histories. An untracked account's rows are
+    // reconciled by its first sync instead (services/chainAdopt.ts).
     const sameWallet = wasTracked
       && existing.settings.address === data.settings.address
       && existing.settings.blockchain === data.settings.blockchain;
-    if (!sameWallet && (Number(existing.start_balance) !== 0 || await accountQueries.hasTransactions(id))) {
-      throw {
-        statusCode: 400,
-        message: wasTracked
-          ? 'Cannot change the wallet of an account that already has transactions'
-          : 'Only an empty account with a zero start balance can be synced from a blockchain; create a new account',
-      };
+    if (wasTracked && !sameWallet && (Number(existing.start_balance) !== 0 || await accountQueries.hasTransactions(id))) {
+      throw { statusCode: 400, message: 'Cannot change the wallet of an account that already has transactions' };
     }
   }
+  // Switching tracking on: the balance comes from the chain from now on, and
+  // an empty seen set makes the next sync read the whole history and
+  // reconcile the rows already here.
+  const enablesTracking = provider !== null && !wasTracked;
 
-  const startBalance = data.startBalance != null
-    ? toCents(data.startBalance, scale)
-    : undefined;
-  const account = await accountQueries.updateAccount(id, { ...data, scale, startBalance });
+  const startBalance = enablesTracking
+    ? 0
+    : data.startBalance != null ? toCents(data.startBalance, scale) : undefined;
+  const account = await withTransaction(async tx => {
+    if (enablesTracking) await clearSeenTxids(tx, id);
+    return accountQueries.updateAccount(id, { ...data, scale, startBalance }, tx);
+  });
   const [withBal] = await withBalances([account!]);
   const [converted] = await withConvertedBalances(user, [withBal]);
   return toDecimalDTO(converted, user.currency_scale);
