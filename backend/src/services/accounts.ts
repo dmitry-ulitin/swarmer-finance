@@ -141,7 +141,14 @@ export const updateAccount = async (
     // none of its rows are provably that wallet's; the next sync then
     // reconciles them like any other switch-on.
     if (wasTracked && !sameWallet && (await findSeenTxids(id)).length > 0) {
-      throw { statusCode: 400, message: 'Cannot change the wallet of an account that already has transactions' };
+      const onlyCurrency = existing.settings.address === data.settings.address
+        && existing.settings.blockchain === data.settings.blockchain;
+      throw {
+        statusCode: 400,
+        message: onlyCurrency
+          ? 'Cannot change the currency of an account that has already synced; create a new account'
+          : 'Cannot change the wallet of an account that already has transactions',
+      };
     }
   }
   // Switching tracking on, or pointing an already-tracked account at a

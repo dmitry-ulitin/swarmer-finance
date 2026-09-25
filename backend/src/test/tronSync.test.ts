@@ -88,7 +88,7 @@ describe('TRON sync', () => {
       await syncAccount(userId, id);
       const res = await update(id, 'Switch', 'USDT', RULES);
       expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/wallet/);
+      expect(res.body.error).toBe('Cannot change the currency of an account that has already synced; create a new account');
     });
 
     it('treats a currency change before any sync as a wallet switch', async () => {

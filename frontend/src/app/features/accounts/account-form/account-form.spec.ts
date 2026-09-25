@@ -134,6 +134,18 @@ describe('AccountForm tracked wallet', () => {
     expect(form.buildPayload()).toMatchObject({ currency: 'USDT' });
   });
 
+  it('locks the currency of an already-tracked wallet while its address and chain stay', () => {
+    const form = createForm({
+      currency: 'USDT', type: 'crypto', tracked: true, settings: { address: 'TPJe9t', blockchain: 'tron' },
+    } as Partial<Account>);
+
+    expect(form.form.controls.currency.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ currency: 'USDT' });
+
+    form.form.patchValue({ address: 'TOther' });
+    expect(form.form.controls.currency.enabled).toBe(true);
+  });
+
   it('offers the usual currencies again when tracking is off', () => {
     const form = createForm({ currency: 'USD' });
     form.form.patchValue({ type: 'crypto', address: 'TPJe9t', blockchain: 'tron' });

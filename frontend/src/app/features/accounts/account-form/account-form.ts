@@ -107,14 +107,21 @@ export class AccountForm {
     const { type, address, blockchain, startBalance, currency } = this.form.controls;
     const tracked = type.value === 'crypto' && address.value.trim() !== '' && blockchain.value in SYNCED_CHAINS;
     const allowed = tracked ? SYNCED_CHAINS[blockchain.value] : null;
+    // The currency is part of the wallet: once the account is tracked, the
+    // backend refuses another one for the same address and chain after its
+    // first sync, so the form does not offer it at all.
+    const data = this.context.data;
+    const sameTrackedWallet = !!data?.tracked
+      && address.value.trim() === (data.settings as { address?: string })?.address
+      && blockchain.value === (data.settings as { blockchain?: string })?.blockchain;
     this.tracked.set(tracked);
     this.trackedCurrencies.set(allowed);
     if (allowed) {
       startBalance.setValue(0);
       startBalance.disable();
       if (!allowed.includes(currency.value ?? '')) currency.setValue(allowed[0]);
-      // A chain with one asset leaves nothing to choose.
-      if (allowed.length === 1) currency.disable();
+      // Nothing to choose on a one-asset chain or for a wallet already tracked.
+      if (allowed.length === 1 || sameTrackedWallet) currency.disable();
       else currency.enable();
     } else {
       startBalance.enable();
