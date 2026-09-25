@@ -63,7 +63,7 @@ describe('POST /api/accounts/:id/sync', () => {
   it('syncs a real payment into transfer, expense and fee, then reports up to date', async () => {
     const first = await sync(sender);
     expect(first.status).toBe(200);
-    expect(first.body).toEqual({ data: { added: 2, merged: 0, fees: 1 }, error: null });
+    expect(first.body).toEqual({ data: { added: 2, merged: 0, fees: 1, adopted: 0, removed: 0 }, error: null });
 
     const rows = await pool.query(
       `SELECT debit_account_id, credit_account_id, debit::bigint::text AS debit, category_id, payee, import_hash
@@ -77,7 +77,7 @@ describe('POST /api/accounts/:id/sync', () => {
     ]);
 
     const again = await sync(receiver);
-    expect(again.body.data).toEqual({ added: 0, merged: 0, fees: 0 });
+    expect(again.body.data).toEqual({ added: 0, merged: 0, fees: 0, adopted: 0, removed: 0 });
   });
 
   it('maps an unreachable API to 502', async () => {

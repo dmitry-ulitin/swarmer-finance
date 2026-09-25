@@ -4,6 +4,7 @@ import * as transactionQueries from '../db/queries/transactions';
 import { Account } from '../types';
 import { AccessLevel, LEVEL, getAccessMap } from './access';
 import { ChainTx, getProvider, isTracked } from './chain';
+import { reconcile } from './chainAdopt';
 import { suggestCategories } from './import/categorize';
 import { getTreeCategoryIds, resolveCategoryForOwner } from './categories';
 
@@ -18,6 +19,10 @@ export interface SyncResult {
   merged: number;
   /** New Network fees rows. */
   fees: number;
+  /** Rows already on the account adopted as synced rows on its first sync. */
+  adopted: number;
+  /** Rows already on the account that matched nothing on the chain. */
+  removed: number;
 }
 
 /**
@@ -254,7 +259,11 @@ export const syncAccount = async (userId: number, accountId: number): Promise<Sy
   // must leave the database untouched.
   const known = new Set(await transactionQueries.findSeenTxids(accountId));
   const txs = await provider.fetchNewTxs(account.settings.address as string, known);
-  if (txs.length === 0) return { added: 0, merged: 0, fees: 0 };
+  // An empty seen set means tracking was just switched on (or the address has
+  // no history yet): rows already on the account are reconciled, even when
+  // the chain has nothing for them to match.
+  const firstSync = known.size === 0;
+  if (txs.length === 0 && !firstSync) return { added: 0, merged: 0, fees: 0, adopted: 0, removed: 0 };
 
   const peers = await loadPeers(access, account);
   const peerIds = new Set([...peers.values()].map(a => a.id));
@@ -262,7 +271,10 @@ export const syncAccount = async (userId: number, accountId: number): Promise<Sy
   const categories = await suggest(userId, account, access, plans);
 
   return withTransaction(async db => {
-    const result: SyncResult = { added: 0, merged: 0, fees: 0 };
+    const result: SyncResult = { added: 0, merged: 0, fees: 0, adopted: 0, removed: 0 };
+    if (firstSync) {
+      Object.assign(result, await reconcile(db, account, access, plans));
+    }
     for (const plan of plans) {
       await apply(db, userId, account, plan, peerIds, categories, result);
     }

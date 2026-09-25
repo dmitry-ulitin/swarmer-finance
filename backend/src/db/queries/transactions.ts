@@ -559,6 +559,48 @@ export const insertSynced = async (
   return inserted.length > 0;
 };
 
+/** Every transaction of the account, locked for the first sync's reconciliation. */
+export const findAccountRowsForUpdate = async (db: Tx, accountId: number): Promise<AccountTxRow[]> => {
+  const rows = await db.query<AccountTxRow>(
+    `SELECT id, debit_account_id, credit_account_id, debit, credit, date, description, payee, import_hash
+     FROM transactions
+     WHERE debit_account_id = $1 OR credit_account_id = $1
+     ORDER BY id
+     FOR UPDATE`,
+    [accountId]
+  );
+  return rows.map(r => ({ ...r, debit: Number(r.debit), credit: Number(r.credit) }));
+};
+
+/** Turns a hand-made row into the synced row it stands in for; accounts and category stay. */
+export const adoptSyncedRow = async (
+  db: Tx,
+  id: number,
+  row: { importHash: string; date: string; debit: number; credit: number; payee: string | null }
+): Promise<void> => {
+  await db.query(
+    `UPDATE transactions SET import_hash = $1, date = $2, debit = $3, credit = $4, payee = $5 WHERE id = $6`,
+    [row.importHash, row.date, row.debit, row.credit, row.payee, id]
+  );
+};
+
+export const deleteTransactionTx = async (db: Tx, id: number): Promise<void> => {
+  await db.query('DELETE FROM transactions WHERE id = $1', [id]);
+};
+
+/**
+ * Drops one side of a transfer, leaving the other account an uncategorized
+ * income or expense of its own amount — as purgeAccountTransactions does.
+ */
+export const detachSide = async (db: Tx, id: number, side: 'debit' | 'credit', categoryId: number): Promise<void> => {
+  await db.query(
+    side === 'debit'
+      ? 'UPDATE transactions SET debit_account_id = NULL, debit = credit, category_id = $2 WHERE id = $1'
+      : 'UPDATE transactions SET credit_account_id = NULL, credit = debit, category_id = $2 WHERE id = $1',
+    [id, categoryId]
+  );
+};
+
 /**
  * The accounts on the far side of this account's transfers, locking those
  * rows so none is re-pointed between the access check and the purge.

@@ -1,5 +1,14 @@
+import { Tx } from '../db';
+import * as accountQueries from '../db/queries/accounts';
+import * as transactionQueries from '../db/queries/transactions';
 import type { AccountTxRow } from '../db/queries/transactions';
+import { Account } from '../types';
+import { AccessLevel, LEVEL } from './access';
+import { isTracked } from './chain';
 import type { Plan } from './chainSync';
+
+const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
+const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
 
 /**
  * A row the sync would insert for one on-chain transaction — one that a row
@@ -99,4 +108,69 @@ export function matchRows(accountId: number, slots: Slot[], rows: AccountTxRow[]
     if (rivals.length === 1) matched.set(row.id, options[0]);
   }
   return matched;
+}
+
+/**
+ * The first sync after an account became tracked: rows the sync did not
+ * write (by hand, from a statement, from before tracking was switched off)
+ * are adopted when they match an on-chain transaction, or removed. Runs
+ * before apply, which then finds adopted rows by their import_hash and
+ * inserts nothing for them.
+ */
+export async function reconcile(
+  db: Tx,
+  account: Account,
+  access: Map<number, AccessLevel>,
+  plans: Plan[]
+): Promise<{ adopted: number; removed: number }> {
+  const rows = await transactionQueries.findAccountRowsForUpdate(db, account.id);
+  const hashes = chainHashes(plans);
+  const isChainRow = (r: AccountTxRow) => r.import_hash !== null && hashes.has(r.import_hash);
+  const candidates = rows.filter(r => !isChainRow(r));
+  if (candidates.length === 0) return { adopted: 0, removed: 0 };
+
+  const otherOf = (r: AccountTxRow) => (r.debit_account_id === account.id ? r.credit_account_id : r.debit_account_id);
+  const otherIds = [...new Set(candidates.map(otherOf))].filter((id): id is number => id !== null && id !== account.id);
+  const others = new Map((await accountQueries.getAccountsByIds(otherIds)).map(a => [a.id, a]));
+  for (const other of others.values()) {
+    if ((access.get(other.id) ?? 0) < LEVEL.WRITE) {
+      throw { statusCode: 403, message: `Cannot reconcile: no write access to account ${other.name}` };
+    }
+  }
+
+  const taken = { in: new Set<string>(), out: new Set<string>() };
+  for (const r of rows.filter(isChainRow)) taken[rowDirection(account.id, r)].add(r.import_hash!);
+  // The other wallet's sync owns a transfer with a tracked account.
+  const adoptable = candidates.filter(r => {
+    const other = otherOf(r);
+    return other === null || (other !== account.id && !isTracked(others.get(other)!));
+  });
+  const matched = matchRows(account.id, buildSlots(plans, taken), adoptable);
+
+  for (const row of candidates) {
+    const other = otherOf(row);
+    const otherAccount = other === null || other === account.id ? undefined : others.get(other);
+    const inbound = rowDirection(account.id, row) === 'in';
+    const slot = matched.get(row.id);
+    if (slot) {
+      const theirs = otherAccount && otherAccount.currency !== account.currency
+        ? (inbound ? row.debit : row.credit)
+        : slot.amount;
+      await transactionQueries.adoptSyncedRow(db, row.id, {
+        importHash: slot.hash,
+        date: slot.date,
+        debit: inbound ? theirs : slot.amount,
+        credit: inbound ? slot.amount : theirs,
+        payee: row.payee ?? slot.counterparty,
+      });
+    } else if (!otherAccount || (isTracked(otherAccount) && row.import_hash === null)) {
+      await transactionQueries.deleteTransactionTx(db, row.id);
+    } else {
+      await transactionQueries.detachSide(
+        db, row.id, inbound ? 'credit' : 'debit',
+        inbound ? UNCATEGORIZED_EXPENSE_CATEGORY_ID : UNCATEGORIZED_INCOME_CATEGORY_ID
+      );
+    }
+  }
+  return { adopted: matched.size, removed: candidates.length - matched.size };
 }
