@@ -244,21 +244,24 @@ export const syncAccount = async (userId: number, accountId: number): Promise<Sy
   }
 
   const provider = getProvider(account.settings.blockchain)!;
-  // The account rules keep a tracked account at the chain's scale and a zero
-  // start balance; one made tracked another way (direct SQL, data older than
-  // sync) would have satoshis read at the wrong scale or stacked on a balance
-  // the chain knows nothing about.
-  if (account.scale !== provider.scale || Number(account.start_balance) !== 0) {
+  // The account rules keep a tracked account in one of the chain's
+  // currencies, at that currency's scale, with a zero start balance; one
+  // made tracked another way (direct SQL, data older than sync) would have
+  // base units read at the wrong scale or stacked on a balance the chain
+  // knows nothing about.
+  const scale = provider.currencies[account.currency];
+  if (scale === undefined || account.scale !== scale || Number(account.start_balance) !== 0) {
+    const allowed = Object.keys(provider.currencies).join(' or ');
     throw {
       statusCode: 400,
-      message: `This account cannot be synced: it must be at scale ${provider.scale} with a zero start balance; create a new account`,
+      message: `This account cannot be synced: it must be in ${allowed} at its currency's scale with a zero start balance; create a new account`,
     };
   }
 
   // Everything from the network first: a failure part-way through paging
   // must leave the database untouched.
   const known = new Set(await transactionQueries.findSeenTxids(accountId));
-  const txs = await provider.fetchNewTxs(account.settings.address as string, known);
+  const txs = await provider.fetchNewTxs(account.settings.address as string, account.currency, known);
   // An empty seen set means tracking was just switched on (or the address has
   // no history yet): rows already on the account are reconciled, even when
   // the chain has nothing for them to match.

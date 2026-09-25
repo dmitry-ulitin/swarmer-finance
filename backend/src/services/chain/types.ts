@@ -23,10 +23,12 @@ export interface ChainTx {
 }
 
 export interface ChainProvider {
-  /** Native currency, e.g. 'BTC'. A tracked account must use it. */
-  currency: string;
-  /** Decimal places of the base unit, e.g. 8 for satoshis. */
-  scale: number;
-  /** Confirmed transactions of `address` not in `known`, oldest first. */
-  fetchNewTxs(address: string, known: ReadonlySet<string>): Promise<ChainTx[]>;
+  /**
+   * Currencies a tracked account on this chain may use, with the decimal
+   * places of their base unit, e.g. { BTC: 8 } for satoshis. One chain can
+   * carry several assets (TRON: TRX and USDT); an account syncs one.
+   */
+  currencies: Readonly<Record<string, number>>;
+  /** Confirmed transactions of `address` in `currency` not in `known`, oldest first. */
+  fetchNewTxs(address: string, currency: string, known: ReadonlySet<string>): Promise<ChainTx[]>;
 }

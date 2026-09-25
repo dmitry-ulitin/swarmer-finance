@@ -59,10 +59,9 @@ export function toChainTx(tx: EsploraTx, address: string): ChainTx {
 }
 
 export const bitcoinProvider: ChainProvider = {
-  currency: 'BTC',
-  scale: 8,
+  currencies: { BTC: 8 },
 
-  async fetchNewTxs(address, known) {
+  async fetchNewTxs(address, _currency, known) {
     const base = `/address/${encodeURIComponent(address)}/txs/chain`;
     const fresh: EsploraTx[] = [];
     let path = base;

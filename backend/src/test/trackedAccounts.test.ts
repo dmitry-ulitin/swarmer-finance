@@ -159,7 +159,7 @@ describe('Tracked (blockchain-synced) accounts', () => {
     });
 
     it('restores a deleted synced row when tracking is switched off and on again', async () => {
-      const spy = jest.spyOn(bitcoinProvider, 'fetchNewTxs').mockImplementation(async (_a, known) =>
+      const spy = jest.spyOn(bitcoinProvider, 'fetchNewTxs').mockImplementation(async (_a, _c, known) =>
         [
           { txid: 'rt1', date: '2026-05-29', fee: 0, transfers: [{ counterparty: 'bc1qx', amount: 5000 }] },
           { txid: 'rt2', date: '2026-05-29', fee: 0, transfers: [{ counterparty: 'bc1qy', amount: 6000 }] },

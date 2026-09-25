@@ -40,14 +40,15 @@ async function getUserOrThrow(userId: number): Promise<User> {
 
 /**
  * A synced account's balance comes only from the chain, so it starts at 0
- * and is kept in the chain's own currency.
+ * and is kept in one of the currencies the chain carries.
  */
 function assertTrackedShape(provider: ChainProvider, currency: string, startBalance: number | undefined): void {
   if (startBalance != null && startBalance !== 0) {
     throw { statusCode: 400, message: 'A blockchain-synced account starts at 0; its balance comes from the chain' };
   }
-  if (currency !== provider.currency) {
-    throw { statusCode: 400, message: `A blockchain-synced account must be in ${provider.currency}` };
+  if (!(currency in provider.currencies)) {
+    const allowed = Object.keys(provider.currencies).join(' or ');
+    throw { statusCode: 400, message: `A blockchain-synced account must be in ${allowed}` };
   }
 }
 

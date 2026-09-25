@@ -82,7 +82,7 @@ describe('bitcoinProvider.fetchNewTxs', () => {
       respond(200, url.endsWith(`/txs/chain/${first[24].txid}`) ? second : first)
     );
 
-    const result = await bitcoinProvider.fetchNewTxs(S, new Set(['b2']));
+    const result = await bitcoinProvider.fetchNewTxs(S, 'BTC', new Set(['b2']));
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][0]).toBe(`https://mempool.space/api/address/${S}/txs/chain`);
@@ -95,7 +95,7 @@ describe('bitcoinProvider.fetchNewTxs', () => {
     fetchMock.mockImplementation(() => respond(200, first));
 
     const known = new Set(first.map(t => t.txid));
-    await expect(bitcoinProvider.fetchNewTxs(S, known)).resolves.toEqual([]);
+    await expect(bitcoinProvider.fetchNewTxs(S, 'BTC', known)).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -103,7 +103,7 @@ describe('bitcoinProvider.fetchNewTxs', () => {
     process.env.BITCOIN_ESPLORA_URL = 'https://esplora.test/api';
     fetchMock.mockImplementation(() => respond(200, []));
     try {
-      await bitcoinProvider.fetchNewTxs(S, new Set());
+      await bitcoinProvider.fetchNewTxs(S, 'BTC', new Set());
       expect(fetchMock.mock.calls[0][0]).toBe(`https://esplora.test/api/address/${S}/txs/chain`);
     } finally {
       delete process.env.BITCOIN_ESPLORA_URL;
@@ -112,19 +112,25 @@ describe('bitcoinProvider.fetchNewTxs', () => {
 
   it('maps an Esplora 400 to Invalid address', async () => {
     fetchMock.mockImplementation(() => respond(400, 'Invalid Bitcoin address'));
-    await expect(bitcoinProvider.fetchNewTxs('nope', new Set()))
+    await expect(bitcoinProvider.fetchNewTxs('nope', 'BTC', new Set()))
       .rejects.toEqual({ statusCode: 400, message: 'Invalid address' });
   });
 
   it.each([429, 500, 503])('maps HTTP %i to 502', async status => {
     fetchMock.mockImplementation(() => respond(status, 'busy'));
-    await expect(bitcoinProvider.fetchNewTxs(S, new Set()))
+    await expect(bitcoinProvider.fetchNewTxs(S, 'BTC', new Set()))
       .rejects.toEqual({ statusCode: 502, message: 'Blockchain API unavailable' });
   });
 
   it('maps a network failure or timeout to 502', async () => {
     fetchMock.mockImplementation(() => Promise.reject(new Error('The operation was aborted due to timeout')));
-    await expect(bitcoinProvider.fetchNewTxs(S, new Set()))
+    await expect(bitcoinProvider.fetchNewTxs(S, 'BTC', new Set()))
       .rejects.toEqual({ statusCode: 502, message: 'Blockchain API unavailable' });
+  });
+});
+
+describe('bitcoinProvider.currencies', () => {
+  it('syncs BTC at scale 8', () => {
+    expect(bitcoinProvider.currencies).toEqual({ BTC: 8 });
   });
 });

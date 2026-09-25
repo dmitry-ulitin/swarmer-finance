@@ -85,7 +85,7 @@ describe('syncAccount', () => {
     shop = (await pool.query(
       'SELECT id FROM categories WHERE user_id = $1 AND parent_id = 2 LIMIT 1', [userId]
     )).rows[0].id;
-    spy = jest.spyOn(bitcoinProvider, 'fetchNewTxs').mockImplementation(async (address, known) =>
+    spy = jest.spyOn(bitcoinProvider, 'fetchNewTxs').mockImplementation(async (address, _currency, known) =>
       (history.get(address) ?? []).filter(t => !known.has(t.txid))
     );
   });
@@ -279,7 +279,7 @@ describe('syncAccount', () => {
     // A's own history: an old receipt from a third party, then the 25 payouts.
     // The mock mimics Esplora paging: the provider stops at a page it fully knows.
     const aHistory = [tx('old', 0, [['bc1qx', 5000]]), ...payouts.map(id => tx(id, 0, [['bc1qb', 1000]]))];
-    spy.mockImplementationOnce(async (_address, known) => {
+    spy.mockImplementationOnce(async (_address, _currency, known) => {
       const newestFirst = [...aHistory].reverse();
       const fresh: ChainTx[] = [];
       for (let i = 0; i < newestFirst.length; i += 25) {
