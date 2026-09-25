@@ -505,6 +505,19 @@ export interface SyncedShape {
   categoryId: number | null;
 }
 
+/** A transaction of one account as the first sync's reconciliation reads it; amounts as numbers. */
+export interface AccountTxRow {
+  id: number;
+  debit_account_id: number | null;
+  credit_account_id: number | null;
+  debit: number;
+  credit: number;
+  date: string;
+  description: string;
+  payee: string | null;
+  import_hash: string | null;
+}
+
 /** Re-points an existing synced row; date, payee and description stay. */
 export const setSyncedShape = async (db: Tx, id: number, shape: SyncedShape): Promise<void> => {
   await db.query(
