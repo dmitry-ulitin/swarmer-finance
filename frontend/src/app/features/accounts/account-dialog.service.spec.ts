@@ -7,6 +7,7 @@ import { AccountsState } from '../../core/accounts.state';
 import { AuthService } from '../../core/auth.service';
 import { TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
+import { AccountSyncService } from './account-sync.service';
 import type { Account } from '../../models/account';
 
 const account: Account = {
@@ -31,6 +32,7 @@ describe('AccountDialogService.openDelete', () => {
         { provide: AuthService, useValue: { user: () => null } },
         { provide: TransactionsState, useValue: { reload: vi.fn() } },
         { provide: NotificationService, useValue: { showError } },
+        { provide: AccountSyncService, useValue: { sync: vi.fn() } },
       ],
     });
     service = TestBed.inject(AccountDialogService);
@@ -79,6 +81,7 @@ describe('AccountDialogService purge actions', () => {
         { provide: TransactionsState, useValue: { reload: reloadTransactions } },
         { provide: AuthService, useValue: { user: () => null } },
         { provide: NotificationService, useValue: { showError, showSuccess } },
+        { provide: AccountSyncService, useValue: { sync: vi.fn() } },
       ],
     });
     service = TestBed.inject(AccountDialogService);
@@ -114,5 +117,52 @@ describe('AccountDialogService purge actions', () => {
     expect(await service.openDeleteWithTransactions(account)).toBe(false);
     expect(showError).toHaveBeenCalledWith(err, 'Failed to delete transactions');
     expect(showError).toHaveBeenCalledWith(err, 'Failed to delete account');
+  });
+});
+
+describe('AccountDialogService syncs a newly tracked account', () => {
+  let service: AccountDialogService;
+  let dialogOpen: ReturnType<typeof vi.fn>;
+  let sync: ReturnType<typeof vi.fn>;
+  const wallet: Account = { ...account, type: 'crypto', currency: 'BTC', scale: 8, tracked: false,
+    settings: {} } as Account;
+  const tracked: Account = { ...wallet, tracked: true, settings: { address: 'bc1qcold', blockchain: 'bitcoin' } } as Account;
+
+  beforeEach(() => {
+    dialogOpen = vi.fn();
+    sync = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: TuiDialogService, useValue: { open: dialogOpen } },
+        { provide: AccountsState, useValue: {} },
+        { provide: AuthService, useValue: { user: () => null } },
+        { provide: TransactionsState, useValue: { reload: vi.fn() } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountSyncService, useValue: { sync } },
+      ],
+    });
+    service = TestBed.inject(AccountDialogService);
+  });
+
+  it('syncs after switching tracking on', async () => {
+    dialogOpen.mockReturnValue(of(tracked));
+    await service.openEdit(wallet);
+    expect(sync).toHaveBeenCalledWith(tracked);
+  });
+
+  it('syncs after creating a tracked account', async () => {
+    dialogOpen.mockReturnValue(of(tracked));
+    await service.openCreate();
+    expect(sync).toHaveBeenCalledWith(tracked);
+  });
+
+  it('does not sync a re-saved tracked account, an untracked one, or a cancelled form', async () => {
+    dialogOpen.mockReturnValue(of(tracked));
+    await service.openEdit(tracked);
+    dialogOpen.mockReturnValue(of(wallet));
+    await service.openCreate();
+    dialogOpen.mockReturnValue(of(null));
+    await service.openEdit(wallet);
+    expect(sync).not.toHaveBeenCalled();
   });
 });

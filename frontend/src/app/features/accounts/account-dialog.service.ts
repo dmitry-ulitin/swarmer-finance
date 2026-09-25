@@ -8,6 +8,7 @@ import { AuthService } from '../../core/auth.service';
 import { AccountsState } from '../../core/accounts.state';
 import { TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
+import { AccountSyncService } from './account-sync.service';
 
 @Injectable({ providedIn: 'root' })
 export class AccountDialogService {
@@ -17,6 +18,7 @@ export class AccountDialogService {
   private readonly accountsState = inject(AccountsState);
   private readonly transactionsState = inject(TransactionsState);
   private readonly notifications = inject(NotificationService);
+  private readonly sync = inject(AccountSyncService);
 
   async openManager(): Promise<void> {
     try {
@@ -33,13 +35,15 @@ export class AccountDialogService {
   async openCreate(): Promise<Account | null> {
     try {
       const { AccountForm } = await import('./account-form/account-form');
-      return await firstValueFrom(
+      const saved = await firstValueFrom(
         this.dialogs.open<Account | null>(
           new PolymorpheusComponent(AccountForm, this.injector),
           { data: { currency: this.auth.user()?.currency || 'EUR' }, label: 'Add Account', size: 's' }
         ),
         { defaultValue: null }
       );
+      this.syncIfNewlyTracked(null, saved);
+      return saved;
     } catch (e) {
       this.notifications.showError(e, 'Failed to open account form');
       return null;
@@ -49,13 +53,14 @@ export class AccountDialogService {
   async openEdit(account: Account): Promise<void> {
     try {
       const { AccountForm } = await import('./account-form/account-form');
-      await firstValueFrom(
+      const saved = await firstValueFrom(
         this.dialogs.open<Account | null>(
           new PolymorpheusComponent(AccountForm, this.injector),
           { data: account, label: 'Edit Account', size: 's' }
         ),
         { defaultValue: null }
       );
+      this.syncIfNewlyTracked(account, saved);
     } catch (e) {
       this.notifications.showError(e, 'Failed to open account form');
     }
@@ -119,6 +124,15 @@ export class AccountDialogService {
       this.notifications.showError(e, 'Failed to delete account');
       return false;
     }
+  }
+
+  /**
+   * A wallet that just became tracked has a zero start balance and rows not
+   * yet reconciled with the chain; syncing at once keeps its balance right.
+   * The sync service reports its own success or failure.
+   */
+  private syncIfNewlyTracked(before: Account | null, saved: Account | null): void {
+    if (saved?.tracked && !before?.tracked) void this.sync.sync(saved);
   }
 
   private confirm(label: string, data: TuiConfirmData): Promise<boolean> {
