@@ -10,6 +10,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export function describeSync(r: AccountSyncResult): string {
   const parts: string[] = [];
+  if (r.adopted) parts.push(`${plural(r.adopted, 'transaction', 'transactions')} matched`);
+  if (r.removed) parts.push(`${r.removed} removed`);
   if (r.added) parts.push(`${plural(r.added, 'transaction', 'transactions')} added`);
   if (r.merged) parts.push(`${r.merged} merged into ${r.merged === 1 ? 'a transfer' : 'transfers'}`);
   if (r.fees) parts.push(plural(r.fees, 'fee', 'fees'));

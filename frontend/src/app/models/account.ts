@@ -49,6 +49,10 @@ export interface AccountSyncResult {
   added: number;
   merged: number;
   fees: number;
+  /** Rows already on the account kept as synced rows (first sync only). */
+  adopted: number;
+  /** Rows already on the account that matched nothing on the chain. */
+  removed: number;
 }
 
 export interface AccountPurgeResult {

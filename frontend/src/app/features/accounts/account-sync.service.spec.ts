@@ -10,13 +10,21 @@ import { NotificationService } from '../../core/notification.service';
 import type { Account } from '../../models/account';
 
 describe('describeSync', () => {
+  const none = { added: 0, merged: 0, fees: 0, adopted: 0, removed: 0 };
+
   it('says so when nothing changed', () => {
-    expect(describeSync({ added: 0, merged: 0, fees: 0 })).toBe('Already up to date');
+    expect(describeSync(none)).toBe('Already up to date');
   });
 
   it('lists only non-zero counts', () => {
-    expect(describeSync({ added: 12, merged: 0, fees: 3 })).toBe('12 transactions added, 3 fees');
-    expect(describeSync({ added: 1, merged: 1, fees: 1 })).toBe('1 transaction added, 1 merged into a transfer, 1 fee');
+    expect(describeSync({ ...none, added: 12, fees: 3 })).toBe('12 transactions added, 3 fees');
+    expect(describeSync({ ...none, added: 1, merged: 1, fees: 1 })).toBe('1 transaction added, 1 merged into a transfer, 1 fee');
+  });
+
+  it('reports rows matched and removed on the first sync first', () => {
+    expect(describeSync({ ...none, adopted: 130, removed: 6, added: 3, fees: 2 }))
+      .toBe('130 transactions matched, 6 removed, 3 transactions added, 2 fees');
+    expect(describeSync({ ...none, adopted: 1 })).toBe('1 transaction matched');
   });
 });
 
@@ -45,7 +53,7 @@ describe('AccountSyncService', () => {
   });
 
   it('reloads lists and reports the result', async () => {
-    api.syncAccount.mockReturnValue(of({ data: { added: 2, merged: 0, fees: 1 }, error: null }));
+    api.syncAccount.mockReturnValue(of({ data: { added: 2, merged: 0, fees: 1, adopted: 0, removed: 0 }, error: null }));
     const service = TestBed.inject(AccountSyncService);
 
     await service.sync(account);
@@ -70,7 +78,7 @@ describe('AccountSyncService', () => {
   it('ignores a second press while the first sync runs', async () => {
     let finish!: () => void;
     api.syncAccount.mockReturnValue(new Observable(sub => {
-      finish = () => { sub.next({ data: { added: 0, merged: 0, fees: 0 }, error: null }); sub.complete(); };
+      finish = () => { sub.next({ data: { added: 0, merged: 0, fees: 0, adopted: 0, removed: 0 }, error: null }); sub.complete(); };
     }));
     const service = TestBed.inject(AccountSyncService);
 
