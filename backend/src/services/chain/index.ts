@@ -1,11 +1,15 @@
 import type { Account } from '../../types';
 import type { ChainProvider } from './types';
 import { bitcoinProvider } from './bitcoin';
+import { tronProvider } from './tron';
 
 export type { ChainProvider, ChainTx, ChainTransfer } from './types';
 
 // Keyed by the value stored in accounts.settings.blockchain.
-const PROVIDERS = new Map<string, ChainProvider>([['bitcoin', bitcoinProvider]]);
+const PROVIDERS = new Map<string, ChainProvider>([
+  ['bitcoin', bitcoinProvider],
+  ['tron', tronProvider],
+]);
 
 /** The provider for a `settings.blockchain` value, or null when unsupported. */
 export function getProvider(blockchain: unknown): ChainProvider | null {
