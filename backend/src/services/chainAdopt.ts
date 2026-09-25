@@ -66,8 +66,13 @@ export const rowDirection = (accountId: number, row: AccountTxRow): 'in' | 'out'
 const rowAmount = (accountId: number, row: AccountTxRow): number =>
   rowDirection(accountId, row) === 'in' ? row.credit : row.debit;
 
+// import_hash is read only to tell a chain row from a candidate (reconcile
+// already filters those out) — never to find a txid: a candidate's
+// import_hash, by definition, is not one of the fetched plans' hashes, so a
+// txid read from it (a CSV hash happens to be the same shape) can never name
+// a real one. The description is the only place a row can carry a real txid.
 const txidOf = (row: AccountTxRow): string | undefined =>
-  (row.import_hash?.match(TXID) ?? row.description.match(TXID))?.[0].toLowerCase();
+  row.description.match(TXID)?.[0].toLowerCase();
 
 /**
  * Which row stands in for which slot. A txid written on the row decides

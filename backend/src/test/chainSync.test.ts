@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import request from 'supertest';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
@@ -418,7 +419,7 @@ describe('syncAccount', () => {
 
     it('adopts an imported row whose hash is not a chain hash', async () => {
       history.set('bc1qa', [tx('r2', 0, [['bc1qy', 5000]])]);
-      await hand({ credit: walletA, amountDebit: 5000, category: salary, importHash: 'csv-abc' });
+      await hand({ credit: walletA, amountDebit: 5000, category: salary, importHash: createHash('sha256').update('r2-statement-row').digest('hex') });
 
       await expect(syncAccount(userId, walletA)).resolves.toMatchObject({ added: 0, adopted: 1 });
       expect((await rows(walletA))[0]).toMatchObject({ import_hash: 'r2', category_id: salary });
@@ -445,6 +446,26 @@ describe('syncAccount', () => {
       expect(await rows(walletB)).toEqual([]);
       expect(await rows(exchange)).toEqual([
         { debit_account_id: exchange, credit_account_id: null, debit: 700, credit: 700, category_id: 4, payee: null, import_hash: null },
+      ]);
+    });
+
+    it('leaves an unmatched outbound transfer to its other account as uncategorized income', async () => {
+      await hand({ debit: walletA, credit: exchange, amountDebit: 750 });
+
+      await expect(syncAccount(userId, walletA)).resolves.toEqual({ added: 0, merged: 0, fees: 0, adopted: 0, removed: 1 });
+      expect(await rows(walletA)).toEqual([]);
+      expect(await rows(exchange)).toEqual([
+        { debit_account_id: null, credit_account_id: exchange, debit: 750, credit: 750, category_id: 3, payee: null, import_hash: null },
+      ]);
+    });
+
+    it('detaches, rather than deletes, an unmatched transfer whose row already carries a hash for the tracked other wallet', async () => {
+      await hand({ debit: walletA, credit: walletB, amountDebit: 850, importHash: 'already-walletbs' });
+
+      await expect(syncAccount(userId, walletA)).resolves.toEqual({ added: 0, merged: 0, fees: 0, adopted: 0, removed: 1 });
+      expect(await rows(walletA)).toEqual([]);
+      expect(await rows(walletB)).toEqual([
+        { debit_account_id: null, credit_account_id: walletB, debit: 850, credit: 850, category_id: 3, payee: null, import_hash: 'already-walletbs' },
       ]);
     });
 

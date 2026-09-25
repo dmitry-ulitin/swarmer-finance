@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { buildSlots, chainHashes, matchRows } from '../services/chainAdopt';
 import type { AccountTxRow } from '../db/queries/transactions';
 import type { Plan } from '../services/chainSync';
@@ -7,6 +8,8 @@ const A = 83;
 const TX1 = 'a'.repeat(64);
 const TX2 = 'b'.repeat(64);
 const none = { in: new Set<string>(), out: new Set<string>() };
+/** A statement-import hash: bare sha256 hex, same shape as a txid but never one. */
+const csvHash = (input: string) => createHash('sha256').update(input).digest('hex');
 
 const incomeRow = (over: Partial<AccountTxRow>): AccountTxRow => ({
   id: 1, debit_account_id: null, credit_account_id: A, debit: 5000, credit: 5000,
@@ -61,14 +64,28 @@ describe('matchRows', () => {
     expect(m.get(1)?.hash).toBe(TX1);
   });
 
-  it('matches a txid in import_hash and an upper-case one in the description', () => {
-    const slots = buildSlots([income(TX1, 5000), income(TX2, 6000)], none);
+  it('matches an upper-case txid in the description', () => {
+    const slots = buildSlots([income(TX1, 5000)], none);
+    const m = matchRows(A, slots, [incomeRow({ description: TX1.toUpperCase() })]);
+    expect(m.get(1)?.hash).toBe(TX1);
+  });
+
+  it('ignores a CSV import_hash and falls back to the heuristic pass', () => {
+    // A statement-imported row's import_hash is a bare sha256 hex — the same
+    // shape as a txid, but never one, since reconcile only offers rows whose
+    // import_hash is not a fetched plan's hash. Reading it as a txid would
+    // manufacture a fake match and hide the row from the heuristic pass.
+    const slots = buildSlots([income(TX1, 5000)], none);
+    const m = matchRows(A, slots, [incomeRow({ import_hash: csvHash('statement row') })]);
+    expect(m.get(1)?.hash).toBe(TX1);
+  });
+
+  it('matches by a real txid in the description even when import_hash is a CSV hash', () => {
+    const slots = buildSlots([income(TX1, 5000)], none);
     const m = matchRows(A, slots, [
-      incomeRow({ id: 1, import_hash: `csv:${TX1}` }),
-      incomeRow({ id: 2, description: TX2.toUpperCase() }),
+      incomeRow({ import_hash: csvHash('statement row'), description: `tx_hash: ${TX1}`, credit: 1, debit: 1 }),
     ]);
     expect(m.get(1)?.hash).toBe(TX1);
-    expect(m.get(2)?.hash).toBe(TX2);
   });
 
   it('sends an outgoing txid row to the fee slot when it equals the fee, else to the expense', () => {
