@@ -114,6 +114,35 @@ describe('Tracked (blockchain-synced) accounts', () => {
       expect(await seenCount(id)).toBe(0);
     });
 
+    it('refuses to enable tracking when a transfer peer cannot be written, leaving the account untracked', async () => {
+      const otherEmail = `trackedpeer${Date.now()}@example.com`;
+      await request(app).post('/api/auth/register').send({ email: otherEmail, password: 'password123' });
+      const otherUserId = (await pool.query('SELECT id FROM users WHERE email = $1', [otherEmail])).rows[0].id;
+      const peerAccount = (await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, scale, start_balance, type, settings)
+         VALUES ($1, 'Peer', 'USD', 2, 0, 'cash', '{}') RETURNING id`,
+        [otherUserId]
+      )).rows[0].id;
+      try {
+        const plain = await create({ name: 'NoAccess', currency: 'BTC', startBalance: 0, type: 'crypto', settings: {} });
+        const id = plain.body.data.id;
+        await pool.query(
+          `INSERT INTO transactions (user_id, debit_account_id, credit_account_id, debit, credit, date)
+           VALUES ($1, $2, $3, 100, 100, '2026-01-01')`,
+          [userId, id, peerAccount]
+        );
+
+        const res = await update(id, { name: 'NoAccess', currency: 'BTC', startBalance: 0, ...WALLET });
+        expect(res.status).toBe(403);
+        const stored = await pool.query('SELECT settings FROM accounts WHERE id = $1', [id]);
+        expect(stored.rows[0].settings.address).toBeUndefined();
+      } finally {
+        await pool.query('DELETE FROM transactions WHERE credit_account_id = $1 OR debit_account_id = $1', [peerAccount]);
+        await pool.query('DELETE FROM accounts WHERE id = $1', [peerAccount]);
+        await pool.query('DELETE FROM users WHERE id = $1', [otherUserId]);
+      }
+    });
+
     it('zeroes the start balance when tracking is switched on', async () => {
       const plain = await create({ name: 'Funded', currency: 'BTC', startBalance: 1, type: 'crypto', settings: {} });
       const res = await update(plain.body.data.id, { name: 'Funded', currency: 'BTC', startBalance: 0, ...WALLET });
@@ -173,11 +202,23 @@ describe('Tracked (blockchain-synced) accounts', () => {
       expect(res.body.data.name).toBe('W2 renamed');
     });
 
-    it('refuses an address change once transactions exist', async () => {
+    it('allows an address change on a tracked account with transactions when it never synced, clearing the seen set', async () => {
       const w = await create({ name: 'W3', currency: 'BTC', startBalance: 0, ...WALLET });
       await addTransaction(w.body.data.id);
       const res = await update(w.body.data.id, {
         name: 'W3', currency: 'BTC', startBalance: 0, type: 'crypto', settings: { address: 'bc1qother', blockchain: 'bitcoin' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.settings.address).toBe('bc1qother');
+      expect(await seenCount(w.body.data.id)).toBe(0);
+    });
+
+    it('refuses an address change once the account has already synced', async () => {
+      const w = await create({ name: 'W3b', currency: 'BTC', startBalance: 0, ...WALLET });
+      await addTransaction(w.body.data.id);
+      await pool.query(`INSERT INTO chain_seen_txids (account_id, txid) VALUES ($1, 'seen1')`, [w.body.data.id]);
+      const res = await update(w.body.data.id, {
+        name: 'W3b', currency: 'BTC', startBalance: 0, type: 'crypto', settings: { address: 'bc1qother', blockchain: 'bitcoin' },
       });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/wallet/);

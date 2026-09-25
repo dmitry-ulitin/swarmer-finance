@@ -1,6 +1,6 @@
 import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
-import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions, clearSeenTxids } from '../db/queries/transactions';
+import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions, clearSeenTxids, findSeenTxids } from '../db/queries/transactions';
 import { withTransaction } from '../db';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
@@ -127,28 +127,39 @@ export const updateAccount = async (
 
   const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
   const wasTracked = isTracked(existing);
+  const sameWallet = wasTracked
+    && existing.settings.address === data.settings.address
+    && existing.settings.blockchain === data.settings.blockchain;
   if (provider) {
     assertTrackedShape(provider, currency, data.startBalance);
     // Rows already on a tracked account came from its wallet; pointing it at
-    // another wallet would mix two histories. An untracked account's rows are
-    // reconciled by its first sync instead (services/chainAdopt.ts).
-    const sameWallet = wasTracked
-      && existing.settings.address === data.settings.address
-      && existing.settings.blockchain === data.settings.blockchain;
-    if (wasTracked && !sameWallet && (Number(existing.start_balance) !== 0 || await accountQueries.hasTransactions(id))) {
+    // another wallet would mix two histories — unless it never synced, so
+    // none of its rows are provably that wallet's; the next sync then
+    // reconciles them like any other switch-on.
+    if (wasTracked && !sameWallet && (await findSeenTxids(id)).length > 0) {
       throw { statusCode: 400, message: 'Cannot change the wallet of an account that already has transactions' };
     }
   }
-  // Switching tracking on: the balance comes from the chain from now on, and
-  // an empty seen set makes the next sync read the whole history and
-  // reconcile the rows already here.
+  // Switching tracking on, or pointing an already-tracked account at a
+  // different (never-synced) wallet: the balance comes from the chain from
+  // now on, and an empty seen set makes the next sync read the whole history
+  // and reconcile the rows already here.
   const enablesTracking = provider !== null && !wasTracked;
+  const walletChanges = provider !== null && !sameWallet;
 
   const startBalance = enablesTracking
     ? 0
     : data.startBalance != null ? toCents(data.startBalance, scale) : undefined;
   const account = await withTransaction(async tx => {
-    if (enablesTracking) await clearSeenTxids(tx, id);
+    if (enablesTracking) {
+      // Reconciliation on the first sync can re-point rows of other
+      // accounts (services/chainAdopt.ts); require WRITE on every transfer
+      // peer up front, the same guard purgeAccount uses, so a sync that
+      // would later 403 mid-way never gets the chance to commit tracking.
+      const peers = await findTransferPeersForUpdate(tx, id);
+      await requireLevelOnAll(peers, userId, LEVEL.WRITE);
+    }
+    if (walletChanges) await clearSeenTxids(tx, id);
     return accountQueries.updateAccount(id, { ...data, scale, startBalance }, tx);
   });
   const [withBal] = await withBalances([account!]);
