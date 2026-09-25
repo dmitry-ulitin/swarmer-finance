@@ -1,9 +1,10 @@
 import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
-import { getAccountBalances } from '../db/queries/transactions';
+import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions } from '../db/queries/transactions';
+import { withTransaction } from '../db';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
-import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel } from './access';
+import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel, requireLevelOnAll } from './access';
 import { ChainProvider, getProvider, isTracked } from './chain';
 import { getCurrencyScale } from './currencyScale';
 
@@ -221,4 +222,52 @@ export const deleteAccount = async (
     throw { statusCode: 404, message: 'Account not found' };
   }
   return { kind: 'soft-deleted' };
+};
+
+const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
+const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
+
+export interface PurgeResult {
+  deleted: number;
+  /** Transfers left to their other account as uncategorized income/expense. */
+  detached: number;
+}
+
+/**
+ * Clean-up for accounts made by mistake or for testing: removes every
+ * transaction of the account and, with `removeAccount`, the account itself.
+ *
+ * A transfer is not deleted — the other account's balance must not move —
+ * but left to that account as uncategorized income or expense. For a synced
+ * wallet that is the row its own sync would have written, so re-syncing the
+ * purged wallet (its seen txids are forgotten) merges it back into a transfer.
+ *
+ * Needs ADMIN on the account, like deleting it, and WRITE on every account
+ * across its transfers, like entering one; otherwise nothing changes.
+ */
+export const purgeAccount = async (
+  id: number,
+  userId: number,
+  removeAccount: boolean
+): Promise<PurgeResult> => {
+  const existing = await accountQueries.getAccountById(id);
+  if (!existing) {
+    throw { statusCode: 404, message: 'Account not found' };
+  }
+  await requireLevel(id, userId, LEVEL.ADMIN);
+  if (existing.deleted) {
+    throw { statusCode: 404, message: 'Account is deleted' };
+  }
+
+  return withTransaction(async (tx) => {
+    const peers = await findTransferPeersForUpdate(tx, id);
+    await requireLevelOnAll(peers, userId, LEVEL.WRITE);
+    const result = await purgeAccountTransactions(
+      tx, id, UNCATEGORIZED_INCOME_CATEGORY_ID, UNCATEGORIZED_EXPENSE_CATEGORY_ID
+    );
+    if (removeAccount) {
+      await accountQueries.deleteAccountRow(tx, id);
+    }
+    return result;
+  });
 };

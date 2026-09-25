@@ -3,12 +3,13 @@ import { MoneyPipe } from '../../core/money.pipe';
 import { AccountsState } from '../../core/accounts.state';
 import { Account } from '../../models/account';
 import { AuthService } from '../../core/auth.service';
-import { TuiButton, TuiLoader } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDropdown, TuiLoader } from '@taiga-ui/core';
+import { TuiChevron } from '@taiga-ui/kit';
 import { AccountDialogService } from './account-dialog.service';
 
 @Component({
   selector: 'app-accounts',
-  imports: [TuiButton, TuiLoader, MoneyPipe],
+  imports: [TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiLoader, MoneyPipe],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,6 +24,11 @@ export class Accounts {
     const id = this.selectedId();
     if (id === null) return null;
     return this.accountsState.visibleAccounts().find(a => a.id === id) ?? null;
+  });
+  /** Owner or admin; a missing level means the user's own account. */
+  readonly canPurge = computed(() => {
+    const account = this.selectedAccount();
+    return !!account && (account.access_level ?? 4) >= 3;
   });
 
   setAsSelected(account: Account) {
@@ -46,6 +52,20 @@ export class Accounts {
     const account = this.selectedAccount();
     if (!account) return;
     if (await this.accountDialogs.openDelete(account)) {
+      this.selectedId.set(null);
+    }
+  }
+
+  async openPurgeDialog(): Promise<void> {
+    const account = this.selectedAccount();
+    if (!account) return;
+    await this.accountDialogs.openPurgeTransactions(account);
+  }
+
+  async openDeleteWithTransactionsDialog(): Promise<void> {
+    const account = this.selectedAccount();
+    if (!account) return;
+    if (await this.accountDialogs.openDeleteWithTransactions(account)) {
       this.selectedId.set(null);
     }
   }

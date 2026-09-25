@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../index';
+import { query, queryOne, execute, Tx } from '../index';
 import { Account, AccountType } from '../../types';
 
 export const getAccountsByIds = async (accountIds: number[]): Promise<Account[]> => {
@@ -112,4 +112,8 @@ export const hardDeleteAccount = async (id: number): Promise<boolean> => {
     [id]
   );
   return count > 0;
+};
+/** Removes the account inside a purge; its shares and seen txids cascade. */
+export const deleteAccountRow = async (db: Tx, id: number): Promise<void> => {
+  await db.query('DELETE FROM accounts WHERE id = $1', [id]);
 };

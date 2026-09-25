@@ -7,6 +7,16 @@
         [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
     <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
         [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
+    @if (canPurge()) {
+        <button tuiButton tuiChevron appearance="outline-destructive" size="s" type="button"
+            [iconStart]="'@tui.triangle-alert'" [tuiDropdown]="danger" tuiDropdownAuto>Danger</button>
+        <ng-template #danger let-close>
+            <tui-data-list size="s">
+                <button tuiOption type="button" (click)="close(); openPurgeDialog()">Delete all transactions…</button>
+                <button tuiOption type="button" (click)="close(); openDeleteWithTransactionsDialog()">Delete account with transactions…</button>
+            </tui-data-list>
+        </ng-template>
+    }
 </div>
 <tui-loader [loading]="accountsState.loading()" class="list">
     @if (accountsState.accounts().length === 0 && !accountsState.loading()) {

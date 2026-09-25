@@ -545,3 +545,50 @@ export const insertSynced = async (
   );
   return inserted.length > 0;
 };
+
+/**
+ * The accounts on the far side of this account's transfers, locking those
+ * rows so none is re-pointed between the access check and the purge.
+ */
+export const findTransferPeersForUpdate = async (db: Tx, accountId: number): Promise<number[]> => {
+  const rows = await db.query<{ peer: number }>(
+    `SELECT CASE WHEN debit_account_id = $1 THEN credit_account_id ELSE debit_account_id END AS peer
+     FROM transactions
+     WHERE (debit_account_id = $1 OR credit_account_id = $1)
+       AND debit_account_id IS NOT NULL AND credit_account_id IS NOT NULL
+     FOR UPDATE`,
+    [accountId]
+  );
+  return [...new Set(rows.map(r => r.peer))];
+};
+
+/**
+ * Removes every transaction of the account. A transfer is not removed but
+ * left to its other account as uncategorized income or expense of that
+ * account's own amount — the row a sync of that side alone would produce.
+ */
+export const purgeAccountTransactions = async (
+  db: Tx,
+  accountId: number,
+  uncategorizedIncomeId: number,
+  uncategorizedExpenseId: number
+): Promise<{ deleted: number; detached: number }> => {
+  const out = await db.query(
+    `UPDATE transactions SET debit_account_id = NULL, debit = credit, category_id = $2
+     WHERE debit_account_id = $1 AND credit_account_id IS NOT NULL AND credit_account_id <> $1
+     RETURNING id`,
+    [accountId, uncategorizedIncomeId]
+  );
+  const into = await db.query(
+    `UPDATE transactions SET credit_account_id = NULL, credit = debit, category_id = $2
+     WHERE credit_account_id = $1 AND debit_account_id IS NOT NULL AND debit_account_id <> $1
+     RETURNING id`,
+    [accountId, uncategorizedExpenseId]
+  );
+  const deleted = await db.query(
+    'DELETE FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1 RETURNING id',
+    [accountId]
+  );
+  await db.query('DELETE FROM chain_seen_txids WHERE account_id = $1', [accountId]);
+  return { deleted: deleted.length, detached: out.length + into.length };
+};

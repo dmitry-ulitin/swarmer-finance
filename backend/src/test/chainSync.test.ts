@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { bitcoinProvider } from '../services/chain/bitcoin';
 import { ChainTx } from '../services/chain';
 import { planTx, syncAccount } from '../services/chainSync';
+import { purgeAccount } from '../services/accounts';
 import { Account } from '../types';
 
 const app = createTestApp();
@@ -160,6 +161,38 @@ describe('syncAccount', () => {
     expect(await rows(walletB)).toEqual([
       { debit_account_id: walletA, credit_account_id: walletB, debit: 7000, credit: 7000, category_id: null, payee: 'bc1qa', import_hash: 't2' },
     ]);
+  });
+
+  it('re-merges a transfer when the purged sender wallet syncs again', async () => {
+    history.set('bc1qa', [tx('t3', 100, [['bc1qb', -7000]])]);
+    history.set('bc1qb', [tx('t3', 0, [['bc1qa', 7000]])]);
+    await syncAccount(userId, walletA);
+
+    await expect(purgeAccount(walletA, userId, false)).resolves.toEqual({ deleted: 1, detached: 1 });
+    expect(await rows(walletB)).toEqual([
+      { debit_account_id: null, credit_account_id: walletB, debit: 7000, credit: 7000, category_id: 3, payee: 'bc1qb', import_hash: 't3' },
+    ]);
+
+    await expect(syncAccount(userId, walletA)).resolves.toEqual({ added: 0, merged: 1, fees: 1 });
+    expect(await rows(walletB)).toEqual([
+      { debit_account_id: walletA, credit_account_id: walletB, debit: 7000, credit: 7000, category_id: null, payee: 'bc1qb', import_hash: 't3' },
+    ]);
+  });
+
+  it('re-merges a transfer when the purged receiver wallet syncs again', async () => {
+    history.set('bc1qa', [tx('t4', 100, [['bc1qb', -7000]])]);
+    history.set('bc1qb', [tx('t4', 0, [['bc1qa', 7000]])]);
+    await syncAccount(userId, walletA);
+
+    await expect(purgeAccount(walletB, userId, false)).resolves.toEqual({ deleted: 0, detached: 1 });
+    expect((await rows(walletA)).find(r => r.import_hash === 't4')).toMatchObject(
+      { debit_account_id: walletA, credit_account_id: null, category_id: 4 }
+    );
+
+    await expect(syncAccount(userId, walletB)).resolves.toEqual({ added: 0, merged: 1, fees: 0 });
+    expect((await rows(walletA)).find(r => r.import_hash === 't4')).toMatchObject(
+      { debit_account_id: walletA, credit_account_id: walletB, debit: 7000, credit: 7000, category_id: null }
+    );
   });
 
   it('overrides a hand-set transfer source on the receiver row', async () => {

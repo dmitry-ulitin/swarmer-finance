@@ -106,9 +106,24 @@ router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, 
   }
 });
 
+router.delete('/:id/transactions', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const result = await accountService.purgeAccount(id, req.userId!, false);
+    res.json({ data: result, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id as string, 10);
+    if (req.query.withTransactions === 'true') {
+      const purged = await accountService.purgeAccount(id, req.userId!, true);
+      res.json({ data: { success: true, kind: 'purged', ...purged }, error: null });
+      return;
+    }
     const result = await accountService.deleteAccount(id, req.userId!);
     res.json({ data: { success: true, kind: result.kind }, error: null });
   } catch (error) {

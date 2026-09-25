@@ -51,6 +51,12 @@ export interface AccountSyncResult {
   fees: number;
 }
 
+export interface AccountPurgeResult {
+  deleted: number;
+  /** Transfers left to their other account as uncategorized income/expense. */
+  detached: number;
+}
+
 /**
  * Chains the backend syncs from, with their native currency. Mirrors the
  * provider registry in backend/src/services/chain/index.ts.

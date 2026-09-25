@@ -277,4 +277,12 @@ export class AccountsState {
   delete(id: number) {
     return this.api.deleteAccount(id).pipe(tap(() => this.reload()));
   }
+
+  purgeTransactions(id: number) {
+    return this.api.purgeAccountTransactions(id).pipe(tap(() => this.reload()));
+  }
+
+  deleteWithTransactions(id: number) {
+    return this.api.deleteAccountWithTransactions(id).pipe(tap(() => this.reload()));
+  }
 }

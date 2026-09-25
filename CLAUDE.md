@@ -81,6 +81,11 @@ All API responses use this envelope format consistently.
   `services/access.ts` synthesises level 4 (owner) for owned accounts.
   Granting someone level 3 makes the account co-owned: it then resolves to
   level 3 for its owner too, so level 4 means "personal account".
+- Clean-up for mistaken/test accounts (ADMIN on the account, WRITE on every
+  transfer peer): `DELETE /api/accounts/:id/transactions` removes all its
+  transactions, `DELETE /api/accounts/:id?withTransactions=true` also removes
+  the account. Transfers are never deleted but left to the other account as
+  Uncategorized income/expense (`services/accounts.ts` `purgeAccount`).
 - System category **Network fees** (id 5, under Expenses) seeded in
   migration 012; ids 1–5 are protected from edit/delete.
 
