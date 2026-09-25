@@ -43,6 +43,12 @@ interface Page<T> {
 
 const PAGE_SIZE = 200;
 const TIMEOUT_MS = 10_000;
+// Keyless TronGrid allows one request per second and suspends the caller
+// for 5 s on a breach; pages (and back-to-back syncs) keep to that.
+const KEYLESS_INTERVAL_MS = 1_100;
+// Base58check form users see; the API also accepts hex, but every
+// comparison here is against base58, so a hex address would match nothing.
+const ADDRESS = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 const baseUrl = () => process.env.TRON_API_URL || 'https://api.trongrid.io';
@@ -67,8 +73,15 @@ export function toBase58(hex: string): string {
   return out;
 }
 
+let nextKeylessAt = 0;
+
 async function getJson<T>(path: string): Promise<T> {
   const key = process.env.TRONGRID_API_KEY;
+  if (!key) {
+    const wait = nextKeylessAt - Date.now();
+    if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+    nextKeylessAt = Date.now() + KEYLESS_INTERVAL_MS;
+  }
   let res: Response;
   try {
     res = await fetch(`${baseUrl()}${path}`, {
@@ -161,6 +174,7 @@ export const tronProvider: ChainProvider = {
   currencies: { TRX: 6, USDT: 6 },
 
   async fetchNewTxs(address, currency, known) {
+    if (!ADDRESS.test(address)) throw { statusCode: 400, message: 'Invalid address' };
     const base = `/v1/accounts/${encodeURIComponent(address)}`;
     if (currency === 'USDT') {
       const records = await fetchUnseen<Trc20Transfer>(

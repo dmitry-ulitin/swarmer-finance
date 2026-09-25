@@ -123,6 +123,11 @@ describe('tronProvider.fetchNewTxs', () => {
   beforeEach(() => {
     fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
+    // Keyless requests are throttled to TronGrid's 1 rps; a key skips that.
+    process.env.TRONGRID_API_KEY = 'test-key';
+  });
+  afterEach(() => {
+    delete process.env.TRONGRID_API_KEY;
   });
   afterAll(() => {
     global.fetch = originalFetch;
@@ -190,9 +195,29 @@ describe('tronProvider.fetchNewTxs', () => {
     }
   });
 
+  it('spaces keyless requests at least a second apart', async () => {
+    delete process.env.TRONGRID_API_KEY;
+    const at: number[] = [];
+    fetchMock.mockImplementation((url: string) => {
+      at.push(Date.now());
+      return respond(200, url.includes('fingerprint=')
+        ? { data: trx.slice(4), meta: {} }
+        : { data: trx.slice(0, 4), meta: { fingerprint: 'fp' } });
+    });
+    await tronProvider.fetchNewTxs(ADDR, 'TRX', new Set());
+    expect(at).toHaveLength(2);
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('refuses an address that is not base58 without asking the API', async () => {
+    await expect(tronProvider.fetchNewTxs('41924688d76aab0d0bc11f447296157f3ede8d5955', 'TRX', new Set()))
+      .rejects.toEqual({ statusCode: 400, message: 'Invalid address' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('maps a 400 to Invalid address', async () => {
     fetchMock.mockImplementation(() => respond(400, { success: false, error: 'A valid account address is required.' }));
-    await expect(tronProvider.fetchNewTxs('nope', 'TRX', new Set()))
+    await expect(tronProvider.fetchNewTxs('TPJe9tgEJFsgVTQ4gLjzRTCrQ6pRJYc1aZ', 'TRX', new Set()))
       .rejects.toEqual({ statusCode: 400, message: 'Invalid address' });
   });
 

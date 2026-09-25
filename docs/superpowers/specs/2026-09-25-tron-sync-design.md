@@ -72,6 +72,12 @@ interface ChainProvider {
 - Request timeout 10 s. Network error, timeout, 5xx or 429 → 502 "Blockchain
   API unavailable"; TronGrid 400 → 400 "Invalid address".
 - Block time: `block_timestamp` (ms) → UTC `YYYY-MM-DD`.
+- Without an API key TronGrid allows 1 request/s and suspends the caller for
+  5 s on a breach, so keyless requests are spaced ≥ 1.1 s apart (across
+  pages and across syncs in the same process).
+- The address must be base58 (`T` + 33 chars); anything else (including the
+  hex form the API would also accept) → 400 "Invalid address" before any
+  request, since all matching is done on base58.
 
 ### USDT account
 
