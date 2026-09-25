@@ -1,3 +1,5 @@
+@use "../../../styles/access-levels";
+
 :host {
     height: 60vh;
     display: flex;
@@ -16,27 +18,11 @@
     overflow: auto;
 }
 
-// Same tints per access level as the side list (account-list.scss).
 .section {
     padding: .25rem;
     margin-bottom: .5rem;
     border-radius: var(--tui-radius-l);
-
-    &[data-level="4"] {
-        background: var(--tui-status-info-pale);
-    }
-
-    &[data-level="3"] {
-        background: var(--tui-status-negative-pale);
-    }
-
-    &[data-level="2"] {
-        background: var(--tui-status-warning-pale);
-    }
-
-    &[data-level="1"] {
-        background: var(--tui-background-neutral-1);
-    }
+    @include access-levels.tints;
 }
 
 .account {

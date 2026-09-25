@@ -1,0 +1,21 @@
+// Tint for a block of accounts reached on one access level, keyed by its
+// data-level attribute. The tint is the only thing telling the levels apart,
+// so each gets a distinct pale status colour, all of which the Taiga theme
+// redefines for dark mode.
+@mixin tints {
+  &[data-level="4"] {
+    background: var(--tui-status-info-pale);
+  }
+
+  &[data-level="3"] {
+    background: var(--tui-status-negative-pale);
+  }
+
+  &[data-level="2"] {
+    background: var(--tui-status-warning-pale);
+  }
+
+  &[data-level="1"] {
+    background: var(--tui-background-neutral-1);
+  }
+}
