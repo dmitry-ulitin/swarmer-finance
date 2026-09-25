@@ -20,7 +20,7 @@
         <tui-textfield tuiChevron class="currency" [tuiTextfieldCleaner]="false">
             <label tuiLabel>Currency</label>
             <input tuiComboBox formControlName="currency" placeholder="e.g. USD, EUR" [strict]="false" />
-            <tui-data-list-wrapper *tuiDropdown [items]="currencies() | tuiFilterByInput" />
+            <tui-data-list-wrapper *tuiDropdown [items]="currencyOptions() | tuiFilterByInput" />
         </tui-textfield>
     </div>
 

@@ -115,6 +115,32 @@ describe('AccountForm tracked wallet', () => {
 
     expect(form.tracked()).toBe(false);
   });
+
+  it('offers TRX and USDT for a tron wallet and keeps currency editable', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ name: 'Ledger', currency: 'EUR', startBalance: 5, type: 'crypto', address: 'TPJe9t', blockchain: 'tron' });
+
+    expect(form.tracked()).toBe(true);
+    expect(form.currencyOptions()).toEqual(['TRX', 'USDT']);
+    expect(form.form.controls.currency.enabled).toBe(true);
+    expect(form.form.controls.startBalance.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 0, currency: 'TRX' });
+  });
+
+  it('keeps an allowed currency when a tron wallet is set', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ currency: 'USDT', type: 'crypto', address: 'TPJe9t', blockchain: 'tron' });
+
+    expect(form.buildPayload()).toMatchObject({ currency: 'USDT' });
+  });
+
+  it('offers the usual currencies again when tracking is off', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ type: 'crypto', address: 'TPJe9t', blockchain: 'tron' });
+    form.form.patchValue({ address: '' });
+
+    expect(form.currencyOptions()).not.toEqual(['TRX', 'USDT']);
+  });
 });
 
 describe('AccountForm start balance precision', () => {

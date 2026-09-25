@@ -62,7 +62,11 @@ export interface AccountPurgeResult {
 }
 
 /**
- * Chains the backend syncs from, with their native currency. Mirrors the
- * provider registry in backend/src/services/chain/index.ts.
+ * Chains the backend syncs from, with the currencies a synced account on
+ * them may use. Mirrors the provider registry in
+ * backend/src/services/chain/index.ts.
  */
-export const SYNCED_CHAINS: Readonly<Record<string, string>> = { bitcoin: 'BTC' };
+export const SYNCED_CHAINS: Readonly<Record<string, readonly string[]>> = {
+  bitcoin: ['BTC'],
+  tron: ['TRX', 'USDT'],
+};

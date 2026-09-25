@@ -69,6 +69,9 @@ export class AccountForm {
 
   /** Mirrors backend isTracked: transactions will come from the chain. */
   readonly tracked = signal(false);
+  /** Currencies the chosen chain syncs; null while the account is not tracked. */
+  private readonly trackedCurrencies = signal<readonly string[] | null>(null);
+  readonly currencyOptions = computed(() => this.trackedCurrencies() ?? this.currencies());
 
   constructor() {
     const data = this.context.data;
@@ -92,7 +95,7 @@ export class AccountForm {
 
     // Applied synchronously with every change to the deciding controls, so a
     // patchValue and the lock can never disagree. A synced wallet's balance
-    // comes only from the chain: it starts at 0 in the chain's own currency,
+    // comes only from the chain: it starts at 0 in one of the chain's currencies,
     // and the backend rejects anything else.
     const c = this.form.controls;
     merge(c.type.valueChanges, c.address.valueChanges, c.blockchain.valueChanges)
@@ -103,12 +106,16 @@ export class AccountForm {
   private applyTrackedLock(): void {
     const { type, address, blockchain, startBalance, currency } = this.form.controls;
     const tracked = type.value === 'crypto' && address.value.trim() !== '' && blockchain.value in SYNCED_CHAINS;
+    const allowed = tracked ? SYNCED_CHAINS[blockchain.value] : null;
     this.tracked.set(tracked);
-    if (tracked) {
+    this.trackedCurrencies.set(allowed);
+    if (allowed) {
       startBalance.setValue(0);
-      currency.setValue(SYNCED_CHAINS[blockchain.value]);
       startBalance.disable();
-      currency.disable();
+      if (!allowed.includes(currency.value ?? '')) currency.setValue(allowed[0]);
+      // A chain with one asset leaves nothing to choose.
+      if (allowed.length === 1) currency.disable();
+      else currency.enable();
     } else {
       startBalance.enable();
       currency.enable();
