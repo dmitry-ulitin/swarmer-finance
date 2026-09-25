@@ -35,17 +35,30 @@ nothing is removed. After the first sync the balance equals the address's.
 | Transition | Now | New |
 |---|---|---|
 | untracked → tracked, no transactions | allowed | allowed |
-| untracked → tracked, with transactions | 400 | **allowed** |
+| untracked → tracked, with transactions | 400 | **allowed**, requires WRITE on every transfer peer |
 | tracked → same address and chain | allowed | allowed, seen set kept |
-| tracked → other address or chain, with transactions | 400 | 400 |
+| tracked → other address or chain, never synced (empty seen set) | 400 | **allowed**, seen set cleared (already empty) |
+| tracked → other address or chain, already synced | 400 | 400 |
 
 On untracked → tracked, in the same DB transaction as the account update:
 
+- reconciliation on the first sync can re-point rows of other accounts
+  (`services/chainAdopt.ts`), so — exactly as `purgeAccount` does before its
+  own clean-up — WRITE is required on every current transfer peer of the
+  account (`findTransferPeersForUpdate` + `requireLevelOnAll`); otherwise
+  403 and nothing changes;
 - `chain_seen_txids` of the account is cleared, so the next sync fetches
   the whole history and reconciles;
 - `start_balance` is set to 0. A non-zero `startBalance` in the request is
   still rejected by `assertTrackedShape`; a non-zero stored value is reset
   silently.
+
+Pointing an already-tracked account at a different address or chain is
+allowed when its `chain_seen_txids` set is empty — it never synced, so none
+of its rows are provably that wallet's, and the next sync reconciles them
+like any other switch-on; `chain_seen_txids` is cleared for this transition
+too (already empty). Once the account has synced at least once (a non-empty
+seen set), changing its wallet still gets 400.
 
 The currency/scale rule is unchanged: an account holding USD rows cannot
 switch to BTC. Switching tracking off is unchanged too — `import_hash`
@@ -88,10 +101,14 @@ slot. A hand row matching such a transaction is removed; the merge logic in
 
 ### Matching (`matchRows(plans, rows)`, pure)
 
-1. **By txid.** A 64-hex-digit txid found in `import_hash` or
-   `description` matches the slot of that plan with the same direction.
-   For `out`, the fee slot when the row's amount equals the fee, else the
-   expense slot. Amounts are not compared — the txid is authoritative.
+1. **By txid.** A 64-hex-digit txid found in `description` matches the slot
+   of that plan with the same direction. For `out`, the fee slot when the
+   row's amount equals the fee, else the expense slot. Amounts are not
+   compared — the txid is authoritative. `import_hash` is never read for
+   this: a candidate row's `import_hash` is by definition not one of the
+   fetched plans' hashes (reconcile already filters those out), so it can
+   never name a fetched transaction — a statement-import hash happens to be
+   the same 64-hex shape and would only ever produce a false match.
 2. **Heuristic**, over what is left: same direction, amount equal to the
    slot amount (or the expense slot's `amount + fee`), `|date − plan.date|
    ≤ 3 days`. A match counts only when unique both ways: the row fits
@@ -140,8 +157,9 @@ left to other accounts).
   open `TUI_CONFIRM` before `update`:
   > **Sync from blockchain** — Existing transactions of this account will
   > be reconciled with the blockchain now: matching ones keep their
-  > category and description, the rest are removed; transfers to other
-  > accounts are left to those accounts. The start balance becomes 0.
+  > category and description, the rest are removed; transfers to accounts
+  > not synced from a blockchain are left to those accounts. The start
+  > balance becomes 0.
   > [Enable sync] [Cancel]
 
   Cancel keeps the form open and sends nothing. The form does not know the
@@ -163,7 +181,10 @@ left to other accounts).
 Test first for each piece.
 
 **`backend/src/test/chainAdopt.test.ts`** (`matchRows`):
-- txid in `description` and in `import_hash` matches regardless of amount;
+- txid in `description` matches regardless of amount, including upper-case;
+- a CSV `import_hash` (same 64-hex shape as a txid) is never read as one — the
+  row falls to the heuristic pass — even when its `description` also names
+  the real txid, which still matches by txid;
 - `out` with a txid goes to the fee slot when the amount equals the fee,
   else to the expense slot;
 - heuristic: exact amount within ±3 days; outside the window or a different
@@ -184,14 +205,18 @@ Test first for each piece.
 - transfer to an untracked account in another currency stays a transfer
   with the BTC side corrected and the other side unchanged; in the same
   currency both sides take the chain amount;
-- an unmatched transfer leaves Uncategorized to the other account; with a
-  tracked other account and no hash, the row is deleted;
+- an unmatched inbound transfer leaves Uncategorized expense to the other
+  account, an unmatched outbound one leaves Uncategorized income; with a
+  tracked other account and no hash, the row is deleted; with a hash, it is
+  detached instead — the tracked wallet keeps it as its own row;
 - no WRITE on the other account → 403, nothing changed, seen set empty;
 - empty address → hand rows removed;
 - a second sync does not reconcile again;
 - `updateAccount`: enabling on an account with transactions is allowed,
-  clears seen, zeroes `start_balance`; saving with the same address keeps
-  seen; changing the address is still 400;
+  clears seen, zeroes `start_balance`, and requires WRITE on every transfer
+  peer (403 and untracked otherwise); saving with the same address keeps
+  seen; changing the address is allowed and clears the seen set while it is
+  still empty, and 400 once the account has synced;
 - disable → delete a synced row → enable → sync: the row is back, other
   categories intact.
 

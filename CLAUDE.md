@@ -103,12 +103,14 @@ edit may change only the category, the other (untracked) account and its
 amount when currencies differ, and the description. A payment between two
 tracked wallets is one transfer, merged whichever side syncs first.
 
-An account that already has transactions can be made tracked: switching
-tracking on clears its `chain_seen_txids` and zeroes `start_balance`, and
-the first sync (`services/chainAdopt.ts`) adopts rows that match an
-on-chain transaction — by a txid in `import_hash`/`description`, else by
-exact amount and date ±3 days — keeping their category and description,
-and removes the rest (transfers are left to the other account).
+An account that already has transactions can be made tracked (requires WRITE
+on every transfer peer, checked up front): switching tracking on, or
+pointing an already-tracked, never-synced account at a different wallet,
+clears its `chain_seen_txids` and zeroes `start_balance`, and the first sync
+(`services/chainAdopt.ts`) adopts rows that match an on-chain transaction —
+by a txid in `description`, else by exact amount and date ±3 days — keeping
+their category and description, and removes the rest (transfers are left to
+the other account).
 
 #### Transactions — single table, double-entry style
 
