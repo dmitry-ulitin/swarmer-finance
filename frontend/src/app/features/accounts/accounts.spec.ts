@@ -54,3 +54,34 @@ describe('Accounts danger actions', () => {
     expect(screen.selectedId()).toBeNull();
   });
 });
+
+describe('Accounts sections', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('group by access level, highest first, and name the owner below admin', () => {
+    const shared = (id: number, name: string, level: 1 | 2 | 3) =>
+      ({ ...makeAccount(id, level), name, user_id: 7, owner_name: 'Bob' });
+    TestBed.configureTestingModule({
+      providers: [
+        Accounts,
+        {
+          provide: AccountsState, useValue: {
+            visibleAccounts: signal([
+              shared(1, 'b', 1), { ...makeAccount(2), name: 'Z' }, shared(3, 'c', 3),
+              shared(4, 'a', 1), { ...makeAccount(5, 4), name: 'y' },
+            ]),
+          },
+        },
+        { provide: AccountDialogService, useValue: {} },
+        { provide: AuthService, useValue: { user: signal(null) } },
+      ],
+    });
+    const sections = TestBed.inject(Accounts).sections();
+
+    expect(sections.map(s => [s.access_level, s.accounts.map(a => a.displayName)])).toEqual([
+      [4, ['y', 'Z']],
+      [3, ['c']],
+      [1, ['a (Bob)', 'b (Bob)']],
+    ]);
+  });
+});

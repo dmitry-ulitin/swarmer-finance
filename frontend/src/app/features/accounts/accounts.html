@@ -19,16 +19,20 @@
     }
 </div>
 <tui-loader [loading]="accountsState.loading()" class="list">
-    @if (accountsState.accounts().length === 0 && !accountsState.loading()) {
+    @if (accountsState.visibleAccounts().length === 0 && !accountsState.loading()) {
         <p class="empty">No accounts yet. Create one to get started.</p>
     }
-    @for (account of accountsState.accounts(); track account.id) {
-        <div class="account" [class.active]="account.id === selectedAccount()?.id"
-             (click)="setAsSelected(account)">
-            <span>{{ account.name }}</span>
-            <span class="account-meta">
-                {{ account.balance | money: account.currency : account.scale }}
-            </span>
+    @for (section of sections(); track section.access_level) {
+        <div class="section" [attr.data-level]="section.access_level">
+            @for (account of section.accounts; track account.id) {
+                <div class="account" [class.active]="account.id === selectedAccount()?.id"
+                     (click)="setAsSelected(account)">
+                    <span>{{ account.displayName }}</span>
+                    <span class="account-meta">
+                        {{ account.balance | money: account.currency : account.scale }}
+                    </span>
+                </div>
+            }
         </div>
     }
 </tui-loader>

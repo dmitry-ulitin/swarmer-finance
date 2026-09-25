@@ -19,6 +19,26 @@ export class Accounts {
   protected readonly auth = inject(AuthService);
   private readonly accountDialogs = inject(AccountDialogService);
 
+  /**
+   * Blocks per access level, highest first, sorted by name within, as in the
+   * side list; below admin an account is someone else's and says whose.
+   */
+  readonly sections = computed(() => {
+    const level = (a: Account) => a.access_level ?? 4;
+    const sorted = [...this.accountsState.visibleAccounts()].sort((a, b) =>
+      level(b) - level(a) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sections: { access_level: number; accounts: (Account & { displayName: string })[] }[] = [];
+    for (const account of sorted) {
+      const displayName = level(account) < 3 && account.owner_name
+        ? `${account.name} (${account.owner_name})`
+        : account.name;
+      const last = sections[sections.length - 1];
+      if (last?.access_level === level(account)) last.accounts.push({ ...account, displayName });
+      else sections.push({ access_level: level(account), accounts: [{ ...account, displayName }] });
+    }
+    return sections;
+  });
+
   readonly selectedId = signal<number | null>(null);
   readonly selectedAccount = computed(() => {
     const id = this.selectedId();
