@@ -92,15 +92,17 @@ All API responses use this envelope format consistently.
 #### Blockchain-synced (tracked) accounts
 
 A `crypto` account with `settings.address` and a supported
-`settings.blockchain` (today `bitcoin` and `tron`, see
+`settings.blockchain` (today `bitcoin`, `tron` and `ethereum`, see
 `services/chain/index.ts`) is *tracked*: `POST /api/accounts/:id/sync` loads
 its history through a chain provider (`services/chain/bitcoin.ts`, Esplora
 at `BITCOIN_ESPLORA_URL`; `services/chain/tron.ts`, TronGrid at
-`TRON_API_URL`) and
+`TRON_API_URL`; `services/chain/ethereum.ts`, Etherscan v2 when
+`ETHERSCAN_API_KEY` is set, else Blockscout at `ETHEREUM_API_URL`) and
 `services/chainSync.ts` writes it, identified by `import_hash` (`txid`,
 `txid:out`, `txid:fee`); `chain_seen_txids` (migration 013) records which
-txids each account's own sync has processed, which is what paging stops on. Tracked accounts start at 0 in one of the chain's currencies (TRON: `TRX`
-or `USDT`, each synced separately; TRON fees always land on the TRX account);
+txids each account's own sync has processed, which is what paging stops on. Tracked accounts start at 0 in one of the chain's currencies (TRON: `TRX` or `USDT`, Ethereum: `ETH` or `USDT`, each synced
+separately; fees always land on the TRX / ETH account; Ethereum addresses
+are stored lowercase and ETH amounts are rounded from wei to 1e-8);
 their transactions cannot be created, deleted or imported by hand, and an
 edit may change only the category, the other (untracked) account and its
 amount when currencies differ, and the description. A payment between two

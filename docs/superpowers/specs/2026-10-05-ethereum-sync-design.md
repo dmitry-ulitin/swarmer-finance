@@ -84,8 +84,8 @@ Only Ethereum implements it (`address.toLowerCase()`).
 - **Endpoint.** When env `ETHERSCAN_API_KEY` is set, requests go to
   `https://api.etherscan.io/v2/api?chainid=1&apikey=<key>&…`; otherwise to env
   `ETHEREUM_API_URL` (default `https://eth.blockscout.com/api`) with no key.
-- **Pacing.** Requests are spaced ≥ 250 ms apart with a key (Etherscan's free
-  tier allows 5/s) and ≥ 1.1 s without (across pages and across syncs in the
+- **Pacing.** Requests are spaced ≥ 500 ms apart with a key (Etherscan's free
+  tier allows 3/s) and ≥ 1.1 s without (across pages and across syncs in the
   same process), like TronGrid's keyless spacing.
 - **Errors.** Request timeout 10 s. Network error, timeout, non-2xx, a body
   that is not JSON, or `status` other than `"1"` → 502 "Blockchain API
@@ -114,8 +114,8 @@ Only Ethereum implements it (`address.toLowerCase()`).
 `action=tokentx&address=<addr>&contractaddress=0xdac17f958d2ee523a2206206994597c13d831ec7`.
 Records whose `contractAddress` differs are dropped in case the filter is
 ignored. Records are grouped by `hash` into one `ChainTx`: `to == addr` →
-`+value` from `from`; `from == addr` → `−value` to `to`; a transfer to itself
-is dropped. A transaction with nothing left is still returned, with no
+`+value` from `from`; `from == addr` → `−value` to `to`; a transfer to itself and a zero-value one (address
+poisoning) are dropped. A transaction with nothing left is still returned, with no
 transfers, so it is recorded as seen. `fee = 0` (decision 1).
 
 ### ETH account
@@ -181,7 +181,7 @@ account form already handles a chain with several currencies (TRON).
 
 ```
 # Ethereum sync: Etherscan v2 when ETHERSCAN_API_KEY is set (free key,
-# 5 requests/s); otherwise this Etherscan-compatible API without a key
+# 3 requests/s); otherwise this Etherscan-compatible API without a key
 # (default https://eth.blockscout.com/api — about 10 requests, then a pause).
 ETHEREUM_API_URL=https://eth.blockscout.com/api
 ETHERSCAN_API_KEY=

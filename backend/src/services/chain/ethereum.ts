@@ -42,7 +42,7 @@ export const weiToScale8 = (wei: bigint): number => Number((wei + 5_000_000_000n
 
 /**
  * USDT movements grouped by transaction. A transaction whose records are all
- * dropped (another token, a transfer to itself) still comes back, with no
+ * dropped (another token, a transfer to itself or of 0) still comes back, with no
  * transfers, so sync marks it seen and paging can stop on it. Values are read
  * as Numbers: one transfer would need 9e9 USDT to lose precision.
  */
@@ -54,8 +54,9 @@ export function tokenToChainTxs(records: TokenTransfer[], address: string): Chai
       tx = { txid: r.hash, date: toDate(r.timeStamp), fee: 0, transfers: [] };
       byTx.set(r.hash, tx);
     }
-    if (r.contractAddress !== USDT_CONTRACT || r.from === r.to) continue;
+    // Zero-value transfers are address poisoning; rows must be positive.
     const value = Number(r.value);
+    if (r.contractAddress !== USDT_CONTRACT || r.from === r.to || value === 0) continue;
     if (r.to === address) tx.transfers.push({ counterparty: r.from, amount: value });
     else if (r.from === address) tx.transfers.push({ counterparty: r.to, amount: -value });
   }
@@ -125,9 +126,11 @@ interface ApiResponse {
 
 const PAGE_SIZE = 1000;
 const TIMEOUT_MS = 10_000;
-// Etherscan's free tier allows 5 requests/s; keyless Blockscout allows only
-// about 10 before a several-minute ban, so it is paced like keyless TronGrid.
-const KEYED_INTERVAL_MS = 250;
+// Etherscan's free tier allows 3 requests/s (answering NOTOK past that),
+// counted as they arrive, so 400 ms starts still trip it now and then;
+// keyless Blockscout allows only about 10 before a several-minute ban, so it
+// is paced like keyless TronGrid.
+const KEYED_INTERVAL_MS = 500;
 const KEYLESS_INTERVAL_MS = 1_100;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 

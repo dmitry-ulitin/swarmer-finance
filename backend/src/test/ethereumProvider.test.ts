@@ -70,6 +70,10 @@ describe('tokenToChainTxs', () => {
     ]);
   });
 
+  it('drops a zero-value transfer (address poisoning) but keeps its tx', () => {
+    expect(byId('0x0ca65751')).toMatchObject({ fee: 0, transfers: [] });
+  });
+
   it('groups several transfers of one transaction and drops a transfer to itself', () => {
     expect(tokenToChainTxs([rec({ to: '0x1' }), rec({ to: '0x2', value: '7' }), rec({ to: ADDR, value: '9' })], ADDR))
       .toEqual([{
@@ -269,14 +273,14 @@ describe('ethereumProvider.fetchNewTxs', () => {
     }
   });
 
-  it('spaces keyed requests at least 200 ms apart', async () => {
+  it('spaces keyed requests at least 450 ms apart (Etherscan free tier: 3/s)', async () => {
     const at: number[] = [];
     fetchMock.mockImplementation(() => {
       at.push(Date.now());
       return ok(empty);
     });
     await ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set());
-    expect(at[1] - at[0]).toBeGreaterThanOrEqual(200);
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(450);
   });
 
   it.each(['0x123', 'f4f8d6fb5117cec024d135d91c012636b814cc07', 'TPJe9tgEJFsgVTQ4gLjzRTCrQ6pRJYc1aS'])(
