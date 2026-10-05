@@ -48,3 +48,18 @@
     font-size: 0.75rem;
     color: var(--tui-text-secondary);
 }
+
+.txid {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font: var(--tui-font-text-s);
+}
+
+.txid-label {
+    color: var(--tui-text-secondary);
+}
+
+.txid-value {
+    font-family: monospace;
+}

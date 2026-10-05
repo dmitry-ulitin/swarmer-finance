@@ -71,3 +71,10 @@ export const SYNCED_CHAINS: Readonly<Record<string, readonly string[]>> = {
   tron: ['TRX', 'USDT'],
   ethereum: ['ETH', 'USDT'],
 };
+
+/** A transaction's page on a block explorer, per synced chain. */
+export const TX_EXPLORERS: Readonly<Record<string, (txid: string) => string>> = {
+  bitcoin: txid => `https://mempool.space/tx/${txid}`,
+  tron: txid => `https://tronscan.org/#/transaction/${txid}`,
+  ethereum: txid => `https://etherscan.io/tx/${txid}`,
+};

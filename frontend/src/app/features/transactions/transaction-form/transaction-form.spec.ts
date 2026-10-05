@@ -169,6 +169,45 @@ describe('TransactionForm on a synced account', () => {
   });
 });
 
+describe('TransactionForm txid', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const BTC_TX = 'a'.repeat(64);
+  const crypto = (id: number, blockchain: string) =>
+    ({ id, name: `W${id}`, currency: 'X', scale: 8, type: 'crypto', settings: { address: 'addr', blockchain } }) as Partial<Account>;
+  const ref = (id: number) => ({ id, name: `W${id}`, currency: 'X', scale: 8 });
+
+  it.each([
+    ['bitcoin', BTC_TX, `https://mempool.space/tx/${BTC_TX}`],
+    ['tron', BTC_TX, `https://tronscan.org/#/transaction/${BTC_TX}`],
+    ['ethereum', `0x${BTC_TX}`, `https://etherscan.io/tx/0x${BTC_TX}`],
+  ])('links a %s txid to its explorer', (blockchain, txid, url) => {
+    const form = configure({ id: 5, debit_account: ref(1), txid }, [crypto(1, blockchain)], [1]);
+    expect(form.chainTx()).toEqual({ txid, short: `${txid.slice(0, 10)}…${txid.slice(-8)}`, url });
+  });
+
+  it('takes the chain from the synced side of a transfer', () => {
+    const exchange = { id: 3, name: 'Exchange', currency: 'X', scale: 8, type: 'crypto', settings: {} } as Partial<Account>;
+    const form = configure(
+      { id: 5, debit_account: ref(3), credit_account: ref(1), txid: BTC_TX }, [exchange, crypto(1, 'tron')], [1]
+    );
+    expect(form.chainTx()?.url).toBe(`https://tronscan.org/#/transaction/${BTC_TX}`);
+  });
+
+  it('shows the txid without a link when the account is not loaded', () => {
+    const form = configure({ id: 5, debit_account: ref(1), txid: BTC_TX }, [], [1]);
+    expect(form.chainTx()).toMatchObject({ txid: BTC_TX, url: null });
+  });
+
+  it('shows nothing for a synced row without a txid', () => {
+    expect(configure({ id: 5, debit_account: ref(1), txid: null }, [crypto(1, 'bitcoin')], [1]).chainTx()).toBeNull();
+  });
+
+  it('shows nothing for a new transaction', () => {
+    expect(configure({}, [], []).chainTx()).toBeNull();
+  });
+});
+
 describe('TransactionForm amount precision', () => {
   beforeEach(() => TestBed.resetTestingModule());
 

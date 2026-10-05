@@ -65,6 +65,19 @@
         <textarea tuiTextarea formControlName="description" placeholder="Optional"></textarea>
     </tui-textfield>
 
+    @if (chainTx(); as tx) {
+    <div class="txid">
+        <span class="txid-label">Transaction ID</span>
+        @if (tx.url) {
+        <a class="txid-value" [href]="tx.url" target="_blank" rel="noopener noreferrer" [title]="tx.txid">{{ tx.short }}</a>
+        } @else {
+        <span class="txid-value" [title]="tx.txid">{{ tx.short }}</span>
+        }
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
+            aria-label="Copy transaction ID" (click)="copyTxid(tx.txid)"></button>
+    </div>
+    }
+
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
         <button tuiButton size="s" type="submit">Save</button>

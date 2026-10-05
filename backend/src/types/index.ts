@@ -82,6 +82,8 @@ export interface TransactionDTO {
   date: string;
   description: string;
   payee: string | null;
+  /** The on-chain transaction this row was synced from, else null. */
+  txid: string | null;
   created_at: Date;
 }
 

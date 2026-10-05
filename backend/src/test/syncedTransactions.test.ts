@@ -64,6 +64,50 @@ describe('Transactions on synced accounts', () => {
   };
   const put = (id: number, body: object) => request(app).put(`/api/transactions/${id}`).set(auth()).send(body);
 
+  describe('txid', () => {
+    const TX = 'f'.repeat(64);
+    const seen = (accountId: number, txid: string) =>
+      pool.query('INSERT INTO chain_seen_txids (account_id, txid) VALUES ($1, $2)', [accountId, txid]);
+    const txidOf = async (id: number) => {
+      const res = await request(app).get('/api/transactions').set(auth());
+      return res.body.data.find((t: { id: number }) => t.id === id).txid;
+    };
+    afterEach(() => pool.query('DELETE FROM chain_seen_txids WHERE account_id = ANY($1::int[])', [[walletA, walletB]]));
+
+    it('gives the txid of a row its wallet synced', async () => {
+      await seen(walletA, TX);
+      const id = await row({ debit: walletA, amount: 100, category: 4, hash: TX });
+      expect(await txidOf(id)).toBe(TX);
+    });
+
+    it('gives the txid of a fee row and of the rest of a payment without the suffix', async () => {
+      await seen(walletA, TX);
+      const fee = await row({ debit: walletA, amount: 10, category: 5, hash: `${TX}:fee` });
+      const out = await row({ debit: walletA, amount: 20, category: 4, hash: `${TX}:out` });
+      expect(await txidOf(fee)).toBe(TX);
+      expect(await txidOf(out)).toBe(TX);
+    });
+
+    it('gives the txid of a transfer seen only by its other wallet', async () => {
+      await seen(walletB, TX);
+      const id = await row({ debit: walletA, credit: walletB, amount: 100, hash: TX });
+      expect(await txidOf(id)).toBe(TX);
+    });
+
+    it('gives null for a row whose hash no sync has seen (statement import, not yet adopted)', async () => {
+      const id = await row({ debit: walletA, amount: 100, category: 4, hash: TX });
+      expect(await txidOf(id)).toBeNull();
+    });
+
+    it('gives null for a row without a hash, or on an account that did not see it', async () => {
+      await seen(walletA, TX);
+      const plain = await row({ debit: exchange, amount: 100, category: 4 });
+      const other = await row({ debit: exchange, amount: 100, category: 4, hash: TX });
+      expect(await txidOf(plain)).toBeNull();
+      expect(await txidOf(other)).toBeNull();
+    });
+  });
+
   describe('create and delete', () => {
     it('refuses creating a transaction on a synced account', async () => {
       const res = await request(app).post('/api/transactions').set(auth())

@@ -21,6 +21,8 @@ export interface Transaction {
     date: string;
     description: string;
     payee: string | null;
+    /** The on-chain transaction a synced row came from, else null. */
+    txid: string | null;
     created_at: string;
 }
 

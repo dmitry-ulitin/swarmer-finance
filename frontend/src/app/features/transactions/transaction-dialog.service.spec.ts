@@ -25,6 +25,7 @@ function makeTransaction(overrides: Partial<Transaction>): Transaction {
     date: '2026-09-01',
     description: 'prior',
     payee: 'someone',
+    txid: null,
     created_at: '2026-09-01T00:00:00Z',
     ...overrides,
   };

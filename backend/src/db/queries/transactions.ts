@@ -64,6 +64,7 @@ interface TransactionRow extends Transaction {
   credit_account_name: string | null;
   credit_account_currency: string | null;
   credit_account_scale: number | null;
+  txid: string | null;
 }
 
 function toDTO(row: TransactionRow): TransactionDTO {
@@ -95,6 +96,7 @@ function toDTO(row: TransactionRow): TransactionDTO {
     date: row.date,
     description: row.description,
     payee: row.payee,
+    txid: row.txid,
     created_at: row.created_at,
   };
 }
@@ -108,7 +110,13 @@ const WITH_DETAILS_SQL = `
          cu.name as category_owner_name,
          cp.full_name as category_full_name, cp.root_id as category_root_id,
          da.name as debit_account_name, da.currency as debit_account_currency, da.scale as debit_account_scale,
-         ca.name as credit_account_name, ca.currency as credit_account_currency, ca.scale as credit_account_scale
+         ca.name as credit_account_name, ca.currency as credit_account_currency, ca.scale as credit_account_scale,
+         -- The on-chain txid, only for a row a sync of one of its accounts
+         -- wrote: a statement-import hash is never in chain_seen_txids.
+         (SELECT s.txid FROM chain_seen_txids s
+          WHERE s.account_id IN (t.debit_account_id, t.credit_account_id)
+            AND s.txid = split_part(t.import_hash, ':', 1)
+          LIMIT 1) as txid
   FROM transactions t
   LEFT JOIN categories c ON t.category_id = c.id
   LEFT JOIN users cu ON cu.id = c.user_id

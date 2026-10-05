@@ -11,7 +11,7 @@ import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
 import { TransactionType, type Transaction, type TransactionAccount } from '../../../models/transaction';
-import type { Account } from '../../../models/account';
+import { TX_EXPLORERS, type Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
@@ -53,6 +53,26 @@ export class TransactionForm {
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
   readonly lock = syncedLock(this.context.data, this.accountsState.trackedIds());
+  /** The on-chain transaction of a synced row, linked to its chain's explorer when that is known. */
+  readonly chainTx = computed(() => {
+    const { txid, debit_account, credit_account } = this.context.data;
+    if (!txid) return null;
+    const tracked = this.accountsState.trackedIds();
+    const sides = [debit_account?.id, credit_account?.id];
+    const chain = this.accountsState.accounts()
+      .flatMap(a => (a.type === 'crypto' && sides.includes(a.id) && tracked.has(a.id) ? [a.settings.blockchain] : []))
+      .find(b => b !== undefined && b in TX_EXPLORERS);
+    return { txid, short: `${txid.slice(0, 10)}…${txid.slice(-8)}`, url: chain ? TX_EXPLORERS[chain](txid) : null };
+  });
+  async copyTxid(txid: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(txid);
+      this.notifications.showSuccess('Transaction ID copied');
+    } catch (err) {
+      this.notifications.showError(err, 'Could not copy the transaction ID');
+    }
+  }
+
   /** Synced accounts are never picked by hand: sync alone writes to them. */
   readonly accountOptions = computed(() => {
     const tracked = this.accountsState.trackedIds();
