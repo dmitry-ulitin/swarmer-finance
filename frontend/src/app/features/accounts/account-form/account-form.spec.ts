@@ -134,6 +134,17 @@ describe('AccountForm tracked wallet', () => {
     expect(form.buildPayload()).toMatchObject({ currency: 'USDT' });
   });
 
+  it('offers ETH and USDT for an ethereum wallet and keeps currency editable', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ name: 'MetaMask', currency: 'EUR', startBalance: 5, type: 'crypto', address: '0xF4f8', blockchain: 'ethereum' });
+
+    expect(form.tracked()).toBe(true);
+    expect(form.blockchains).toContain('ethereum');
+    expect(form.currencyOptions()).toEqual(['ETH', 'USDT']);
+    expect(form.form.controls.currency.enabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 0, currency: 'ETH' });
+  });
+
   it('locks the currency of an already-tracked wallet while its address and chain stay', () => {
     const form = createForm({
       currency: 'USDT', type: 'crypto', tracked: true, settings: { address: 'TPJe9t', blockchain: 'tron' },

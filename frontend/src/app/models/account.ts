@@ -69,4 +69,5 @@ export interface AccountPurgeResult {
 export const SYNCED_CHAINS: Readonly<Record<string, readonly string[]>> = {
   bitcoin: ['BTC'],
   tron: ['TRX', 'USDT'],
+  ethereum: ['ETH', 'USDT'],
 };
