@@ -70,6 +70,16 @@ describe('matchRows', () => {
     expect(m.get(1)?.hash).toBe(TX1);
   });
 
+  it('matches an Ethereum txid written with or without 0x', () => {
+    const hash = `0x${'c'.repeat(64)}`;
+    const slots = buildSlots([income(hash, 5000)], none);
+    // Amount 1 keeps the heuristic pass from matching instead.
+    const row = (description: string) => incomeRow({ credit: 1, debit: 1, description });
+    expect(matchRows(A, slots, [row(`paid ${hash}`)]).get(1)?.hash).toBe(hash);
+    expect(matchRows(A, slots, [row(`0x${'C'.repeat(64)}`)]).get(1)?.hash).toBe(hash);
+    expect(matchRows(A, slots, [row('c'.repeat(64))]).get(1)?.hash).toBe(hash);
+  });
+
   it('ignores a CSV import_hash and falls back to the heuristic pass', () => {
     // A statement-imported row's import_hash is a bare sha256 hex — the same
     // shape as a txid, but never one, since reconcile only offers rows whose

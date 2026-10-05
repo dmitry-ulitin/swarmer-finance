@@ -26,7 +26,11 @@ export interface Slot {
   counterparty: string | null;
 }
 
-const TXID = /\b[0-9a-f]{64}\b/i;
+// Ethereum hashes carry a 0x prefix; without the optional group there is no
+// word boundary between the 'x' and the first hex digit.
+const TXID = /\b(?:0x)?[0-9a-f]{64}\b/i;
+/** A txid lowercase and without 0x, so either spelling matches. */
+const bare = (txid: string) => txid.toLowerCase().replace(/^0x/, '');
 const WINDOW_MS = 3 * 86_400_000;
 
 /** Every import_hash the sync can write for these plans. */
@@ -71,8 +75,10 @@ const rowAmount = (accountId: number, row: AccountTxRow): number =>
 // import_hash, by definition, is not one of the fetched plans' hashes, so a
 // txid read from it (a CSV hash happens to be the same shape) can never name
 // a real one. The description is the only place a row can carry a real txid.
-const txidOf = (row: AccountTxRow): string | undefined =>
-  row.description.match(TXID)?.[0].toLowerCase();
+const txidOf = (row: AccountTxRow): string | undefined => {
+  const found = row.description.match(TXID)?.[0];
+  return found === undefined ? undefined : bare(found);
+};
 
 /**
  * Which row stands in for which slot. A txid written on the row decides
@@ -88,7 +94,7 @@ export function matchRows(accountId: number, slots: Slot[], rows: AccountTxRow[]
     const txid = txidOf(row);
     if (txid === undefined) continue;
     const dir = rowDirection(accountId, row);
-    const own = slots.filter(s => s.txid === txid && s.direction === dir && !used.has(s));
+    const own = slots.filter(s => bare(s.txid) === txid && s.direction === dir && !used.has(s));
     const slot = dir === 'in'
       ? own[0]
       : own.find(s => s.kind === 'fee' && s.amount === rowAmount(accountId, row)) ?? own.find(s => s.kind === 'expense');
