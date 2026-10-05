@@ -26,7 +26,7 @@
 .date {
     flex-shrink: 0;
     width: 4rem;
-    font: var(--tui-font-text-s);
+    font: var(--tui-typography-body-s);
     color: var(--tui-text-secondary);
 }
 
@@ -45,7 +45,7 @@
 }
 
 .meta {
-    font: var(--tui-font-text-s);
+    font: var(--tui-typography-body-s);
     color: var(--tui-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -74,14 +74,14 @@
 }
 
 .balance {
-    font: var(--tui-font-text-s);
+    font: var(--tui-typography-body-s);
     color: var(--tui-text-secondary);
     font-variant-numeric: tabular-nums;
 }
 
 .empty {
     color: var(--tui-text-secondary);
-    font: var(--tui-font-text-s);
+    font: var(--tui-typography-body-s);
     padding: 2rem 1rem;
     text-align: center;
 }
