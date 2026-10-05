@@ -89,8 +89,9 @@ Only Ethereum implements it (`address.toLowerCase()`).
   same process), like TronGrid's keyless spacing.
 - **Errors.** Request timeout 10 s. Network error, timeout, non-2xx, a body
   that is not JSON, or `status` other than `"1"` → 502 "Blockchain API
-  unavailable" — except `status "0"` with message "No transactions found",
-  which is an empty list. This covers rate limits, Etherscan's "Result window
+  unavailable" — except `status "0"` with an empty array `result`, which is an
+  empty list (Etherscan says "No transactions found", Blockscout words it per
+  list, so the shape decides, not the message). This covers rate limits, Etherscan's "Result window
   is too large" (more than 10 000 records in one list) and Blockscout's
   `status "2"` ("internal transactions … not yet processed"), which must not
   be read as "nothing there" or the swap's payout would be lost once its hash
@@ -99,6 +100,11 @@ Only Ethereum implements it (`address.toLowerCase()`).
   address" before any request (the API answers "No transactions found" for a
   malformed one). All comparisons use the lowercase address; API addresses
   are lowercase already.
+- **Confirmations.** Each sync first asks for the head block
+  (`module=block&action=getblocknobytime&timestamp=<now>&closest=before`) and
+  reads every list with `startblock=0&endblock=<head − 12>`: records nearer the
+  head may still be reorged away or lack their indexed internal transfers, and
+  one fixed range keeps a transaction landing mid-paging from shifting pages.
 - **Paging.** `module=account&sort=desc&page=N&offset=1000`. Paging stops at
   a page with no unseen hash or one shorter than `offset`, as for TRON.
   Records come back oldest first.

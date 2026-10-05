@@ -133,6 +133,8 @@ const TIMEOUT_MS = 10_000;
 const KEYED_INTERVAL_MS = 500;
 const KEYLESS_INTERVAL_MS = 1_100;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+// About 2.5 minutes: past the usual reorg depth and internal-transfer indexing.
+const CONFIRMATIONS = 12;
 
 const unavailable = () => ({ statusCode: 502, message: 'Blockchain API unavailable' });
 
@@ -145,36 +147,61 @@ function endpoint(): string {
 
 let nextRequestAt = 0;
 
-async function getList<T>(query: string): Promise<T[]> {
+async function call(query: string): Promise<ApiResponse> {
   const wait = nextRequestAt - Date.now();
   if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
   nextRequestAt = Date.now() + (process.env.ETHERSCAN_API_KEY ? KEYED_INTERVAL_MS : KEYLESS_INTERVAL_MS);
 
-  let body: ApiResponse;
   try {
     const res = await fetch(`${endpoint()}${query}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) throw unavailable();
-    body = (await res.json()) as ApiResponse;
+    return (await res.json()) as ApiResponse;
   } catch {
     throw unavailable();
   }
+}
+
+async function getList<T>(query: string): Promise<T[]> {
+  const body = await call(query);
   if (body.status === '1' && Array.isArray(body.result)) return body.result as T[];
-  if (body.status === '0' && body.message === 'No transactions found') return [];
-  // Rate limits, the 10 000-record result window, and Blockscout's status
-  // '2' (internal transactions not yet indexed) — the last must not read as
-  // "nothing there", or a swap's payout is lost once its hash is seen.
+  // An empty list. Etherscan says "No transactions found"; Blockscout words
+  // it per list, so the shape decides, not the message.
+  if (body.status === '0' && Array.isArray(body.result) && body.result.length === 0) return [];
+  // Rate limits (result: a string or null), the 10 000-record result window,
+  // and Blockscout's status '2' (internal transactions not yet indexed) —
+  // the last must not read as "nothing there", or a swap's payout is lost
+  // once its hash is seen.
   throw unavailable();
 }
 
 /**
- * Every record of the list whose hash is not in `known`, oldest first.
- * Pages run newest first, and a sync records all of its txs as seen or
- * none, so a page with nothing new means everything older was seen too.
+ * The newest block a sync reads: CONFIRMATIONS below the head. Records
+ * nearer the head may still be reorged away, or have their internal
+ * transfers not indexed yet; pinning one block range for the whole sync
+ * also keeps a transaction landing mid-paging from shifting the pages.
  */
-async function fetchUnseen<T extends { hash: string }>(query: string, known: ReadonlySet<string>): Promise<T[]> {
+async function lastBlock(): Promise<number> {
+  const now = Math.floor(Date.now() / 1000);
+  const body = await call(`module=block&action=getblocknobytime&timestamp=${now}&closest=before`);
+  const head = Number(body.result);
+  if (body.status !== '1' || !Number.isInteger(head) || head <= CONFIRMATIONS) throw unavailable();
+  return head - CONFIRMATIONS;
+}
+
+/**
+ * Every record of the list up to `endBlock` whose hash is not in `known`,
+ * oldest first. Pages run newest first, and a sync records all of its txs
+ * as seen or none, so a page with nothing new means everything older was
+ * seen too.
+ */
+async function fetchUnseen<T extends { hash: string }>(
+  query: string, endBlock: number, known: ReadonlySet<string>
+): Promise<T[]> {
   const fresh: T[] = [];
   for (let page = 1; ; page++) {
-    const records = await getList<T>(`${query}&sort=desc&page=${page}&offset=${PAGE_SIZE}`);
+    const records = await getList<T>(
+      `${query}&startblock=0&endblock=${endBlock}&sort=desc&page=${page}&offset=${PAGE_SIZE}`
+    );
     const unseen = records.filter(r => !known.has(r.hash));
     fresh.push(...unseen);
     if (records.length < PAGE_SIZE || unseen.length === 0) break;
@@ -191,12 +218,13 @@ export const ethereumProvider: ChainProvider = {
     if (!ADDRESS.test(address)) throw { statusCode: 400, message: 'Invalid address' };
     const addr = address.toLowerCase();
     const base = `module=account&address=${addr}`;
+    const end = await lastBlock();
     if (currency === 'USDT') {
-      const records = await fetchUnseen<TokenTransfer>(`${base}&action=tokentx&contractaddress=${USDT_CONTRACT}`, known);
+      const records = await fetchUnseen<TokenTransfer>(`${base}&action=tokentx&contractaddress=${USDT_CONTRACT}`, end, known);
       return tokenToChainTxs(records, addr);
     }
-    const normal = await fetchUnseen<EthTx>(`${base}&action=txlist`, known);
-    const internal = await fetchUnseen<EthTx>(`${base}&action=txlistinternal`, known);
+    const normal = await fetchUnseen<EthTx>(`${base}&action=txlist`, end, known);
+    const internal = await fetchUnseen<EthTx>(`${base}&action=txlistinternal`, end, known);
     return ethToChainTxs(normal, internal, addr);
   },
 };
