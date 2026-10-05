@@ -110,8 +110,8 @@ describe('AccountForm tracked wallet', () => {
   });
 
   it('does not lock for an unsupported chain', () => {
-    const form = createForm({ currency: 'ETH' });
-    form.form.patchValue({ type: 'crypto', address: '0xabc', blockchain: 'ethereum' });
+    const form = createForm({ currency: 'SOL' });
+    form.form.patchValue({ type: 'crypto', address: 'So1abc', blockchain: 'solana' });
 
     expect(form.tracked()).toBe(false);
   });
