@@ -24,17 +24,20 @@ movements and gas, a `USDT` account syncs transfers of the USDT ERC20
 contract. One address may have two accounts, one per currency.
 
 Success, on address `0xF4f8d6fB5117CEc024d135d91C012636b814CC07` (entered in
-mixed case; 30 normal transactions, 1 internal, 19 USDT transfers on
-2026-10-05):
+mixed case). The wallet is live, so exact counts are pinned by fixtures
+recorded on 2026-10-05 (32 normal transactions, 1 internal, 20 USDT
+transfers):
 
-- a new ETH account on that address syncs 17 incomes (one of them the
-  internal transfer of 1000000000 wei from `0x2530…492d`), 7 expenses and 14
-  Network fees rows; its balance is 0.00017907 ETH, the chain's
-  179061538297443 wei within 1e-8 (rounding, decision 4);
-- a new USDT account on the same address syncs 19 rows, no fees; balance
-  1000.00005 USDT, the chain's balance exactly;
-- the stored address of both accounts is lowercase;
-- a second sync of either account reports "Up to date".
+- those fixtures give an ETH account 15 incomes, 7 expenses and 15 Network
+  fees rows; the internal transfer (1000000000 wei = 1e-9 ETH) rounds to 0
+  and files nothing (decision 4); the rows net to 0.00021651 ETH against the
+  chain's 216504585876843 wei = 0.00021650 ETH (rounding);
+- the same fixtures give a USDT account 20 rows, no fees, netting to
+  0.00005 USDT, the chain's balance exactly;
+- manually, on the live chain: the synced ETH account's balance is the
+  chain's within 0.5e-8 ETH per row, the USDT account's exactly; the stored
+  address of both accounts is lowercase; a second sync of either reports
+  "Up to date".
 
 ## Decisions
 
@@ -54,7 +57,9 @@ mixed case; 30 normal transactions, 1 internal, 19 USDT transfers on
 4. **Wei is rounded to the account's scale.** ETH is stored with scale 8
    (`currencyScale.ts`: JS numbers hold ~15 significant digits), so each
    amount and fee is rounded half-up from wei to 1e-8 ETH. The account's
-   balance can differ from the chain's by up to 0.5e-8 ETH per row.
+   balance can differ from the chain's by up to 0.5e-8 ETH per row. A
+   movement or fee that rounds to 0 is dropped (rows must be positive); its
+   transaction is still returned and recorded as seen.
 5. **Addresses are stored normalised.** An Ethereum address is lowercased on
    save, so a checksum address typed by the user and the lowercase one the API
    returns name the same wallet (`sameWallet`, sync peers, transfer merging).
@@ -100,6 +105,7 @@ Only Ethereum implements it (`address.toLowerCase()`).
 - **Date.** `timeStamp` (seconds) → UTC `YYYY-MM-DD`.
 - **Amounts.** Read as `BigInt` from the decimal strings. USDT (6 decimals)
   values are used as is; wei values become `Number((wei + 5·10⁹) / 10¹⁰)`.
+  A value or fee that becomes 0 is not added (decision 4).
 - **txid.** The hash as the API returns it: `0x` + 64 lowercase hex, the form
   Etherscan shows.
 
@@ -130,6 +136,13 @@ Normal transaction (`txlist`), `ok = isError === '0'`:
 
 Internal transaction (`txlistinternal`): `isError === '0'`, `to == addr`,
 `value > 0` → `+value` from `from`. Anything else is ignored (decision 2).
+
+`planTx` files a transaction as income when anything comes in, ignoring what
+went out (a Bitcoin or TRON transaction never does both for one address). An
+Ethereum transaction can — a DEX refunding excess ETH as an internal
+transfer — so one with both incoming and outgoing ETH is netted to a single
+transfer: the sum, with the counterparty of the largest movement on the
+winning side; a sum of 0 leaves no transfers.
 
 A transaction with no transfers and no fee is still returned, so it is
 recorded as seen. Hashes from both lists go into `chain_seen_txids` through
@@ -178,12 +191,16 @@ ETHERSCAN_API_KEY=
 
 **Backend (Jest)**, fetch mocked; fixtures in
 `backend/src/test/fixtures/chain/` recorded from Etherscan for
-`0xf4f8…cc07` (`txlist`, `txlistinternal`, `tokentx`), plus one synthetic
-failed transaction (`isError: '1'`) added in the test:
+`0xf4f8…cc07` (`txlist`, `txlistinternal`, `tokentx`), plus synthetic
+records added in the tests (a failed transaction, an internal payout of a
+swap sharing its hash with our own transaction, a record of another token):
 
-- provider: USDT list → 19 `ChainTx`, a record of another contract dropped;
-  ETH lists → 17 incomes (internal one merged by hash), 7 expenses, 14 fees;
-  the failed transaction yields its fee only; wei rounding half-up;
+- provider: USDT list → 20 `ChainTx` netting to 50, a record of another
+  contract dropped; ETH lists → 33 `ChainTx`: 15 incomes, 7 expenses, 15
+  fees, the 1e-9 ETH internal transfer as an empty `ChainTx`; a swap's
+  internal payout merged into our transaction with its fee; a refund netted
+  against what was sent; the failed
+  transaction yields its fee only; wei rounding half-up;
   paging stops on a known page and on a short page; "No transactions found"
   is empty; `status "2"`, `NOTOK`, non-JSON and 429 → 502; malformed address
   → 400 without a request; Etherscan URL and key used when the key is set,
@@ -192,8 +209,9 @@ failed transaction (`isError: '1'`) added in the test:
   the same wallet as its lowercase form; a TRON address keeps its case.
 - adopt: a description with `0x<hash>` and one with the bare hash both adopt
   the matching Ethereum slot; Bitcoin txid matching unchanged.
-- sync: two tracked ETH wallets of one user merge a payment between them into
-  one transfer.
+- sync: two ETH wallets created with mixed-case addresses merge a payment
+  between them (counterparties lowercase, as the API gives them) into one
+  transfer.
 
 **Frontend (Vitest)**: `ethereum` offers ETH/USDT and keeps the currency
 control enabled.
