@@ -52,6 +52,13 @@ function assertTrackedShape(provider: ChainProvider, currency: string, startBala
   }
 }
 
+/** Settings with the address in the provider's canonical form, so one wallet has one spelling. */
+function normalizeSettings(provider: ChainProvider | null, settings: Record<string, unknown>): Record<string, unknown> {
+  return provider?.normalizeAddress
+    ? { ...settings, address: provider.normalizeAddress(settings.address as string) }
+    : settings;
+}
+
 async function withConvertedBalances(user: User, accounts: Account[]): Promise<Account[]> {
   const rates = await getRatesTo(user.currency, accounts.map(a => a.currency));
   return accounts.map(account => {
@@ -84,6 +91,7 @@ export const createAccount = async (
   if (provider) {
     assertTrackedShape(provider, currency, startBalance);
   }
+  settings = normalizeSettings(provider, settings);
   const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
@@ -127,6 +135,7 @@ export const updateAccount = async (
   }
 
   const provider = isTracked(data) ? getProvider(data.settings.blockchain) : null;
+  data = { ...data, settings: normalizeSettings(provider, data.settings) };
   const wasTracked = isTracked(existing);
   // A wallet is an address on a chain in one currency: TRON's TRX and USDT
   // at the same address are separate histories.

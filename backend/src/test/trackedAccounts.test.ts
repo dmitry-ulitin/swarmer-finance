@@ -2,6 +2,8 @@ import request from 'supertest';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
 import { bitcoinProvider } from '../services/chain/bitcoin';
+import { ethereumProvider } from '../services/chain/ethereum';
+import { syncAccount } from '../services/chainSync';
 
 const app = createTestApp();
 const WALLET = { type: 'crypto', settings: { address: 'bc1qtracked', blockchain: 'bitcoin' } };
@@ -76,7 +78,7 @@ describe('Tracked (blockchain-synced) accounts', () => {
 
     it('leaves an unsupported chain untracked', async () => {
       const res = await create({
-        name: 'Eth', currency: 'ETH', startBalance: 5, type: 'crypto', settings: { address: '0xabc', blockchain: 'ethereum' },
+        name: 'Sol', currency: 'SOL', startBalance: 5, type: 'crypto', settings: { address: 'So1abc', blockchain: 'solana' },
       });
       expect(res.status).toBe(200);
       expect(res.body.data.tracked).toBe(false);
@@ -243,6 +245,69 @@ describe('Tracked (blockchain-synced) accounts', () => {
       expect(res.body.data.tracked).toBe(false);
       const count = await pool.query('SELECT COUNT(*)::int AS n FROM transactions WHERE credit_account_id = $1', [w.body.data.id]);
       expect(count.rows[0].n).toBe(1);
+    });
+  });
+
+  describe('ethereum', () => {
+    const MIXED = '0xF4f8d6fB5117CEc024d135d91C012636b814CC07';
+    const LOWER = MIXED.toLowerCase();
+    const eth = (address: string) => ({ type: 'crypto', settings: { address, blockchain: 'ethereum' } });
+    const seenCount = async (id: number) =>
+      (await pool.query('SELECT COUNT(*)::int AS n FROM chain_seen_txids WHERE account_id = $1', [id])).rows[0].n;
+
+    it('stores a mixed-case address lowercase', async () => {
+      const res = await create({ name: 'E1', currency: 'ETH', startBalance: 0, ...eth(MIXED) });
+      expect(res.status).toBe(200);
+      expect(res.body.data.tracked).toBe(true);
+      expect(res.body.data.scale).toBe(8);
+      expect(res.body.data.settings.address).toBe(LOWER);
+    });
+
+    it('rejects a currency other than ETH or USDT', async () => {
+      const res = await create({ name: 'E2', currency: 'BTC', startBalance: 0, ...eth(MIXED) });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('A blockchain-synced account must be in ETH or USDT');
+    });
+
+    it('treats another spelling of the address as the same wallet after a sync', async () => {
+      const w = await create({ name: 'E3', currency: 'USDT', startBalance: 0, ...eth(LOWER) });
+      await pool.query(`INSERT INTO chain_seen_txids (account_id, txid) VALUES ($1, 'seen1')`, [w.body.data.id]);
+      const res = await update(w.body.data.id, { name: 'E3', currency: 'USDT', startBalance: 0, ...eth(MIXED) });
+      expect(res.status).toBe(200);
+      expect(res.body.data.settings.address).toBe(LOWER);
+      expect(await seenCount(w.body.data.id)).toBe(1);
+    });
+
+    it('keeps the case of a TRON address', async () => {
+      const res = await create({
+        name: 'T1', currency: 'TRX', startBalance: 0,
+        type: 'crypto', settings: { address: 'TPJe9tgEJFsgVTQ4gLjzRTCrQ6pRJYc1aS', blockchain: 'tron' },
+      });
+      expect(res.body.data.settings.address).toBe('TPJe9tgEJFsgVTQ4gLjzRTCrQ6pRJYc1aS');
+    });
+
+    it('merges a payment between two wallets entered in mixed case into one transfer', async () => {
+      const from = '0xAbC0000000000000000000000000000000000001';
+      const to = '0xDeF0000000000000000000000000000000000002';
+      const a = (await create({ name: 'EA', currency: 'ETH', startBalance: 0, ...eth(from) })).body.data.id;
+      const b = (await create({ name: 'EB', currency: 'ETH', startBalance: 0, ...eth(to) })).body.data.id;
+      const txid = `0x${'1'.repeat(64)}`;
+      // The API gives lowercase addresses, and is asked with the stored one.
+      const spy = jest.spyOn(ethereumProvider, 'fetchNewTxs').mockImplementation(async address =>
+        address === from.toLowerCase()
+          ? [{ txid, date: '2026-10-05', fee: 21, transfers: [{ counterparty: to.toLowerCase(), amount: -500 }] }]
+          : [{ txid, date: '2026-10-05', fee: 0, transfers: [{ counterparty: from.toLowerCase(), amount: 500 }] }]
+      );
+      try {
+        await expect(syncAccount(userId, a)).resolves.toMatchObject({ added: 1, fees: 1 });
+        await expect(syncAccount(userId, b)).resolves.toMatchObject({ added: 0, merged: 0 });
+        const rows = (await pool.query(
+          `SELECT debit_account_id, credit_account_id, debit::int FROM transactions WHERE import_hash = $1`, [txid]
+        )).rows;
+        expect(rows).toEqual([{ debit_account_id: a, credit_account_id: b, debit: 500 }]);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });
