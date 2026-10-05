@@ -1,4 +1,4 @@
-import { ChainTransfer, ChainTx } from './types';
+import { ChainProvider, ChainTransfer, ChainTx } from './types';
 
 /** Tether's USDT on Ethereum; transfers of any other token are ignored. */
 export const USDT_CONTRACT = '0xdac17f958d2ee523a2206206994597c13d831ec7';
@@ -116,3 +116,84 @@ export function ethToChainTxs(normal: EthTx[], internal: EthTx[], address: strin
     .sort((a, b) => a.block - b.block)
     .map(({ txid, date, fee, transfers }) => ({ txid, date, fee, transfers: net(transfers) }));
 }
+
+interface ApiResponse {
+  status: string;
+  message: string;
+  result: unknown;
+}
+
+const PAGE_SIZE = 1000;
+const TIMEOUT_MS = 10_000;
+// Etherscan's free tier allows 5 requests/s; keyless Blockscout allows only
+// about 10 before a several-minute ban, so it is paced like keyless TronGrid.
+const KEYED_INTERVAL_MS = 250;
+const KEYLESS_INTERVAL_MS = 1_100;
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+const unavailable = () => ({ statusCode: 502, message: 'Blockchain API unavailable' });
+
+/** Etherscan v2 with a key; any Etherscan-compatible API (Blockscout) without. */
+function endpoint(): string {
+  const key = process.env.ETHERSCAN_API_KEY;
+  if (key) return `https://api.etherscan.io/v2/api?chainid=1&apikey=${encodeURIComponent(key)}&`;
+  return `${process.env.ETHEREUM_API_URL || 'https://eth.blockscout.com/api'}?`;
+}
+
+let nextRequestAt = 0;
+
+async function getList<T>(query: string): Promise<T[]> {
+  const wait = nextRequestAt - Date.now();
+  if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+  nextRequestAt = Date.now() + (process.env.ETHERSCAN_API_KEY ? KEYED_INTERVAL_MS : KEYLESS_INTERVAL_MS);
+
+  let body: ApiResponse;
+  try {
+    const res = await fetch(`${endpoint()}${query}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!res.ok) throw unavailable();
+    body = (await res.json()) as ApiResponse;
+  } catch {
+    throw unavailable();
+  }
+  if (body.status === '1' && Array.isArray(body.result)) return body.result as T[];
+  if (body.status === '0' && body.message === 'No transactions found') return [];
+  // Rate limits, the 10 000-record result window, and Blockscout's status
+  // '2' (internal transactions not yet indexed) — the last must not read as
+  // "nothing there", or a swap's payout is lost once its hash is seen.
+  throw unavailable();
+}
+
+/**
+ * Every record of the list whose hash is not in `known`, oldest first.
+ * Pages run newest first, and a sync records all of its txs as seen or
+ * none, so a page with nothing new means everything older was seen too.
+ */
+async function fetchUnseen<T extends { hash: string }>(query: string, known: ReadonlySet<string>): Promise<T[]> {
+  const fresh: T[] = [];
+  for (let page = 1; ; page++) {
+    const records = await getList<T>(`${query}&sort=desc&page=${page}&offset=${PAGE_SIZE}`);
+    const unseen = records.filter(r => !known.has(r.hash));
+    fresh.push(...unseen);
+    if (records.length < PAGE_SIZE || unseen.length === 0) break;
+  }
+  return fresh.reverse();
+}
+
+export const ethereumProvider: ChainProvider = {
+  currencies: { ETH: 8, USDT: 6 },
+  normalizeAddress: address => address.toLowerCase(),
+
+  async fetchNewTxs(address, currency, known) {
+    // The API answers "No transactions found" for a malformed address.
+    if (!ADDRESS.test(address)) throw { statusCode: 400, message: 'Invalid address' };
+    const addr = address.toLowerCase();
+    const base = `module=account&address=${addr}`;
+    if (currency === 'USDT') {
+      const records = await fetchUnseen<TokenTransfer>(`${base}&action=tokentx&contractaddress=${USDT_CONTRACT}`, known);
+      return tokenToChainTxs(records, addr);
+    }
+    const normal = await fetchUnseen<EthTx>(`${base}&action=txlist`, known);
+    const internal = await fetchUnseen<EthTx>(`${base}&action=txlistinternal`, known);
+    return ethToChainTxs(normal, internal, addr);
+  },
+};

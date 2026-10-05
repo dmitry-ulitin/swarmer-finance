@@ -29,6 +29,12 @@ export interface ChainProvider {
    * carry several assets (TRON: TRX and USDT); an account syncs one.
    */
   currencies: Readonly<Record<string, number>>;
+  /**
+   * The canonical form of an address, stored on the account so that one
+   * wallet has one spelling (Ethereum: lowercase, as its API returns it).
+   * Absent where case matters (base58).
+   */
+  normalizeAddress?(address: string): string;
   /** Confirmed transactions of `address` in `currency` not in `known`, oldest first. */
   fetchNewTxs(address: string, currency: string, known: ReadonlySet<string>): Promise<ChainTx[]>;
 }

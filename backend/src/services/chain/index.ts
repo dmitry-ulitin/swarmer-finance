@@ -2,6 +2,7 @@ import type { Account } from '../../types';
 import type { ChainProvider } from './types';
 import { bitcoinProvider } from './bitcoin';
 import { tronProvider } from './tron';
+import { ethereumProvider } from './ethereum';
 
 export type { ChainProvider, ChainTx, ChainTransfer } from './types';
 
@@ -9,6 +10,7 @@ export type { ChainProvider, ChainTx, ChainTransfer } from './types';
 const PROVIDERS = new Map<string, ChainProvider>([
   ['bitcoin', bitcoinProvider],
   ['tron', tronProvider],
+  ['ethereum', ethereumProvider],
 ]);
 
 /** The provider for a `settings.blockchain` value, or null when unsupported. */

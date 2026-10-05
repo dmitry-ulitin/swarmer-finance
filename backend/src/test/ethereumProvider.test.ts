@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { getProvider } from '../services/chain';
 import {
-  ethToChainTxs, tokenToChainTxs, weiToScale8, EthTx, TokenTransfer, USDT_CONTRACT,
+  ethereumProvider, ethToChainTxs, tokenToChainTxs, weiToScale8, EthTx, TokenTransfer, USDT_CONTRACT,
 } from '../services/chain/ethereum';
 
 const ADDR = '0xf4f8d6fb5117cec024d135d91c012636b814cc07';
@@ -153,5 +154,164 @@ describe('ethToChainTxs', () => {
       { txid: '0xs', date: '2026-09-18', fee: 2100, transfers: [] },
       { txid: '0xi', date: '2026-09-18', fee: 0, transfers: [] },
     ]);
+  });
+});
+
+describe('ethereumProvider.fetchNewTxs', () => {
+  const originalFetch = global.fetch;
+  let fetchMock: jest.Mock;
+  const raw = (name: string) => fixture<unknown>(name);
+  const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body } as Response);
+  const empty = { status: '0', message: 'No transactions found', result: [] };
+  const KEYED = 'https://api.etherscan.io/v2/api?chainid=1&apikey=test-key&module=account';
+
+  beforeEach(() => {
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    process.env.ETHERSCAN_API_KEY = 'test-key';
+    delete process.env.ETHEREUM_API_URL;
+  });
+  afterEach(() => {
+    delete process.env.ETHERSCAN_API_KEY;
+  });
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('is registered for ethereum, syncs ETH and USDT, and stores addresses lowercase', () => {
+    expect(getProvider('ethereum')).toBe(ethereumProvider);
+    expect(ethereumProvider.currencies).toEqual({ ETH: 8, USDT: 6 });
+    expect(ethereumProvider.normalizeAddress!('0xF4f8d6fB5117CEc024d135d91C012636b814CC07')).toBe(ADDR);
+  });
+
+  it('reads the USDT list of the official contract from Etherscan with the key', async () => {
+    fetchMock.mockImplementation(() => ok(raw('eth-usdt-0xf4f8.json')));
+    const txs = await ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${KEYED}&address=${ADDR}&action=tokentx&contractaddress=${USDT_CONTRACT}&sort=desc&page=1&offset=1000`
+    );
+    expect(txs).toHaveLength(20);
+    expect(txs[0].txid.startsWith('0x5e5a9762')).toBe(true);
+  });
+
+  it('reads the normal and internal lists for ETH, lowercasing the address', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      ok(raw(url.includes('action=txlistinternal') ? 'eth-internal-0xf4f8.json' : 'eth-txlist-0xf4f8.json')));
+    const txs = await ethereumProvider.fetchNewTxs('0xF4f8d6fB5117CEc024d135d91C012636b814CC07', 'ETH', new Set());
+    expect(fetchMock.mock.calls.map(c => c[0])).toEqual([
+      `${KEYED}&address=${ADDR}&action=txlist&sort=desc&page=1&offset=1000`,
+      `${KEYED}&address=${ADDR}&action=txlistinternal&sort=desc&page=1&offset=1000`,
+    ]);
+    expect(txs).toHaveLength(33);
+  });
+
+  it('skips known hashes in both lists', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      ok(raw(url.includes('action=txlistinternal') ? 'eth-internal-0xf4f8.json' : 'eth-txlist-0xf4f8.json')));
+    const known = new Set([...normal.slice(0, 30), ...internal].map(r => r.hash));
+    const txs = await ethereumProvider.fetchNewTxs(ADDR, 'ETH', known);
+    expect(txs.map(t => t.txid)).toEqual(normal.slice(30).map(r => r.hash));
+  });
+
+  it('reads "No transactions found" as an empty list', async () => {
+    fetchMock.mockImplementation(() => ok(empty));
+    await expect(ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set())).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  const fullPage = (prefix: string) => ({
+    status: '1', message: 'OK',
+    result: Array.from({ length: 1000 }, (_, i) => ({ ...normal[0], hash: `${prefix}${i}` })),
+  });
+
+  it('pages on while a full page has something new', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      ok(url.includes('page=1&') ? fullPage('0xnew') : raw('eth-usdt-0xf4f8.json')));
+    const txs = await ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set());
+    expect(fetchMock.mock.calls.map(c => c[0])).toEqual([
+      expect.stringContaining('&page=1&offset=1000'),
+      expect.stringContaining('&page=2&offset=1000'),
+    ]);
+    expect(txs).toHaveLength(1020);
+  });
+
+  it('stops at a full page with nothing new', async () => {
+    const page = fullPage('0xold');
+    fetchMock.mockImplementation(() => ok(page));
+    await ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set(page.result.map(r => r.hash)));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses Blockscout without a key, spacing requests a second apart', async () => {
+    delete process.env.ETHERSCAN_API_KEY;
+    const at: number[] = [];
+    fetchMock.mockImplementation(() => {
+      at.push(Date.now());
+      return ok(empty);
+    });
+    await ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set());
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `https://eth.blockscout.com/api?module=account&address=${ADDR}&action=txlist&sort=desc&page=1&offset=1000`
+    );
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('uses ETHEREUM_API_URL without a key', async () => {
+    delete process.env.ETHERSCAN_API_KEY;
+    process.env.ETHEREUM_API_URL = 'https://eth.test/api';
+    fetchMock.mockImplementation(() => ok(empty));
+    try {
+      await ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set());
+      expect(fetchMock.mock.calls[0][0]).toMatch(/^https:\/\/eth\.test\/api\?module=account&/);
+    } finally {
+      delete process.env.ETHEREUM_API_URL;
+    }
+  });
+
+  it('spaces keyed requests at least 200 ms apart', async () => {
+    const at: number[] = [];
+    fetchMock.mockImplementation(() => {
+      at.push(Date.now());
+      return ok(empty);
+    });
+    await ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set());
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(200);
+  });
+
+  it.each(['0x123', 'f4f8d6fb5117cec024d135d91c012636b814cc07', 'TPJe9tgEJFsgVTQ4gLjzRTCrQ6pRJYc1aS'])(
+    'refuses %s without asking the API', async address => {
+      await expect(ethereumProvider.fetchNewTxs(address, 'ETH', new Set()))
+        .rejects.toEqual({ statusCode: 400, message: 'Invalid address' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  const unavailable = { statusCode: 502, message: 'Blockchain API unavailable' };
+
+  it.each([
+    ['Blockscout status 2', { status: '2', message: 'Some internal transactions within this block range have not yet been processed', result: [] }],
+    ['NOTOK', { status: '0', message: 'NOTOK', result: 'Max calls per sec rate limit reached (5/sec)' }],
+    ['result window', { status: '0', message: 'Result window is too large, PageNo x Offset size must be less than or equal to 10000', result: null }],
+  ])('maps %s to 502', async (_name, body) => {
+    fetchMock.mockImplementation(() => ok(body));
+    await expect(ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set())).rejects.toEqual(unavailable);
+  });
+
+  it.each([429, 500])('maps HTTP %i to 502', async status => {
+    fetchMock.mockImplementation(() => Promise.resolve({ ok: false, status, json: async () => ({}) } as Response));
+    await expect(ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set())).rejects.toEqual(unavailable);
+  });
+
+  it('maps a body that is not JSON to 502', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve({
+      ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token <'); },
+    } as unknown as Response));
+    await expect(ethereumProvider.fetchNewTxs(ADDR, 'USDT', new Set())).rejects.toEqual(unavailable);
+  });
+
+  it('maps a network error to 502', async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new Error('ECONNREFUSED')));
+    await expect(ethereumProvider.fetchNewTxs(ADDR, 'ETH', new Set())).rejects.toEqual(unavailable);
   });
 });
