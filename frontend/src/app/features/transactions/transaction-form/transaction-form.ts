@@ -80,6 +80,14 @@ export class TransactionForm {
       url: chain ? ADDRESS_EXPLORERS[chain](payee) : null,
     };
   });
+  /** Moves the date by `days`, counting from today when it is empty. */
+  shiftDate(days: number): void {
+    const c = this.form.controls.date;
+    c.setValue((c.value ?? TuiDay.currentLocal()).append({ day: days }));
+  }
+  setToday(): void {
+    this.form.controls.date.setValue(TuiDay.currentLocal());
+  }
   async copy(value: string, what: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(value);

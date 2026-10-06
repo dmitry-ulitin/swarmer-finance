@@ -9,11 +9,21 @@
     </tui-segmented>
 
     <!-- Date -->
-    <tui-textfield>
-        <label tuiLabel>Date</label>
-        <input tuiInputDate formControlName="date" />
-        <tui-calendar *tuiDropdown />
-    </tui-textfield>
+    <div class="row date-row">
+        <tui-textfield>
+            <label tuiLabel>Date</label>
+            <input tuiInputDate formControlName="date" />
+            <tui-calendar *tuiDropdown />
+        </tui-textfield>
+        @if (!lock.synced) {
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.chevron-left'"
+            aria-label="Previous day" title="Previous day" (click)="shiftDate(-1)"></button>
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.calendar'"
+            aria-label="Today" title="Today" (click)="setToday()"></button>
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.chevron-right'"
+            aria-label="Next day" title="Next day" (click)="shiftDate(1)"></button>
+        }
+    </div>
 
     <!-- From / To accounts -->
     @if (isExpense() || isTransfer()) {

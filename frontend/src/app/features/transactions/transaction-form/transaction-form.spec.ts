@@ -11,6 +11,7 @@ import { NotificationService } from '../../../core/notification.service';
 import type { Category } from '../../../models/category';
 import type { Transaction } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
+import { TuiDay } from '@taiga-ui/cdk/date-time';
 
 const ME = 1;
 const OTHER = 2;
@@ -238,6 +239,28 @@ describe('TransactionForm payee', () => {
     const form = configure({ id: 5, debit_account: ref(1), payee: ADDR }, [], []);
     expect(form.chainPayee()).toBeNull();
     expect(form.form.controls.payee.enabled).toBe(true);
+  });
+});
+
+describe('TransactionForm date buttons', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('steps the date back and forward a day, across a month boundary', () => {
+    const form = configure({ date: '2026-03-01' });
+    form.shiftDate(-1);
+    expect(form.form.controls.date.value?.toJSON()).toBe('2026-02-28');
+    form.shiftDate(1);
+    form.shiftDate(1);
+    expect(form.form.controls.date.value?.toJSON()).toBe('2026-03-02');
+  });
+
+  it('sets today, and steps from today when the date is empty', () => {
+    const form = configure({ date: '2020-01-01' });
+    form.setToday();
+    expect(form.form.controls.date.value?.toJSON()).toBe(TuiDay.currentLocal().toJSON());
+    form.form.controls.date.setValue(null);
+    form.shiftDate(1);
+    expect(form.form.controls.date.value?.toJSON()).toBe(TuiDay.currentLocal().append({ day: 1 }).toJSON());
   });
 });
 
