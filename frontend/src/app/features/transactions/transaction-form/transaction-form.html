@@ -56,27 +56,40 @@
     }
 
     <!-- Optional fields -->
+    @if (!lock.synced) {
     <tui-textfield>
         <label tuiLabel>Payee</label>
         <input tuiInput formControlName="payee" placeholder="Optional" />
     </tui-textfield>
+    } @else if (chainPayee(); as p) {
+    <div class="chain-ref">
+        <span class="chain-ref-label">Payee</span>
+        @if (p.url) {
+        <a class="chain-ref-value" [href]="p.url" target="_blank" rel="noopener noreferrer" [title]="p.value">{{ p.short }}</a>
+        } @else {
+        <span class="chain-ref-value" [title]="p.value">{{ p.short }}</span>
+        }
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
+            aria-label="Copy payee" (click)="copy(p.value, 'payee')"></button>
+    </div>
+    }
+    @if (chainTx(); as tx) {
+    <div class="chain-ref">
+        <span class="chain-ref-label">Transaction ID</span>
+        @if (tx.url) {
+        <a class="chain-ref-value" [href]="tx.url" target="_blank" rel="noopener noreferrer" [title]="tx.txid">{{ tx.short }}</a>
+        } @else {
+        <span class="chain-ref-value" [title]="tx.txid">{{ tx.short }}</span>
+        }
+        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
+            aria-label="Copy transaction ID" (click)="copy(tx.txid, 'transaction ID')"></button>
+    </div>
+    }
+
     <tui-textfield>
         <label tuiLabel>Description</label>
         <textarea tuiTextarea formControlName="description" placeholder="Optional"></textarea>
     </tui-textfield>
-
-    @if (chainTx(); as tx) {
-    <div class="txid">
-        <span class="txid-label">Transaction ID</span>
-        @if (tx.url) {
-        <a class="txid-value" [href]="tx.url" target="_blank" rel="noopener noreferrer" [title]="tx.txid">{{ tx.short }}</a>
-        } @else {
-        <span class="txid-value" [title]="tx.txid">{{ tx.short }}</span>
-        }
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
-            aria-label="Copy transaction ID" (click)="copyTxid(tx.txid)"></button>
-    </div>
-    }
 
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>

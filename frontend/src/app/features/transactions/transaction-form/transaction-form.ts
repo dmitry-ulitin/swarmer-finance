@@ -11,7 +11,7 @@ import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
 import { TransactionType, type Transaction, type TransactionAccount } from '../../../models/transaction';
-import { TX_EXPLORERS, type Account } from '../../../models/account';
+import { ADDRESS_EXPLORERS, TX_EXPLORERS, type Account } from '../../../models/account';
 import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
@@ -53,23 +53,39 @@ export class TransactionForm {
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
   readonly lock = syncedLock(this.context.data, this.accountsState.trackedIds());
-  /** The on-chain transaction of a synced row, linked to its chain's explorer when that is known. */
-  readonly chainTx = computed(() => {
-    const { txid, debit_account, credit_account } = this.context.data;
-    if (!txid) return null;
+  /** The blockchain of the row's synced side, when its account is loaded. */
+  private readonly chain = computed(() => {
+    const { debit_account, credit_account } = this.context.data;
     const tracked = this.accountsState.trackedIds();
     const sides = [debit_account?.id, credit_account?.id];
-    const chain = this.accountsState.accounts()
+    return this.accountsState.accounts()
       .flatMap(a => (a.type === 'crypto' && sides.includes(a.id) && tracked.has(a.id) ? [a.settings.blockchain] : []))
       .find(b => b !== undefined && b in TX_EXPLORERS);
+  });
+  /** The on-chain transaction of a synced row, linked to its chain's explorer when that is known. */
+  readonly chainTx = computed(() => {
+    const { txid } = this.context.data;
+    if (!txid) return null;
+    const chain = this.chain();
     return { txid, short: `${txid.slice(0, 10)}…${txid.slice(-8)}`, url: chain ? TX_EXPLORERS[chain](txid) : null };
   });
-  async copyTxid(txid: string): Promise<void> {
+  /** The counterparty address the chain wrote as a synced row's payee, linked to its explorer page. */
+  readonly chainPayee = computed(() => {
+    const { payee } = this.context.data;
+    if (!this.lock.synced || !payee) return null;
+    const chain = this.chain();
+    return {
+      value: payee,
+      short: payee.length > 20 ? `${payee.slice(0, 10)}…${payee.slice(-8)}` : payee,
+      url: chain ? ADDRESS_EXPLORERS[chain](payee) : null,
+    };
+  });
+  async copy(value: string, what: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(txid);
-      this.notifications.showSuccess('Transaction ID copied');
+      await navigator.clipboard.writeText(value);
+      this.notifications.showSuccess(`${what[0].toUpperCase()}${what.slice(1)} copied`);
     } catch (err) {
-      this.notifications.showError(err, 'Could not copy the transaction ID');
+      this.notifications.showError(err, `Could not copy the ${what}`);
     }
   }
 

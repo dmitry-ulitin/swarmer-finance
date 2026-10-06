@@ -208,6 +208,39 @@ describe('TransactionForm txid', () => {
   });
 });
 
+describe('TransactionForm payee', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const ADDR = 'T' + 'b'.repeat(33);
+  const crypto = (id: number, blockchain: string) =>
+    ({ id, name: `W${id}`, currency: 'X', scale: 8, type: 'crypto', settings: { address: 'addr', blockchain } }) as Partial<Account>;
+  const ref = (id: number) => ({ id, name: `W${id}`, currency: 'X', scale: 8 });
+
+  it.each([
+    ['bitcoin', `https://mempool.space/address/${ADDR}`],
+    ['tron', `https://tronscan.org/#/address/${ADDR}`],
+    ['ethereum', `https://etherscan.io/address/${ADDR}`],
+  ])('links a synced %s payee to its explorer', (blockchain, url) => {
+    const form = configure({ id: 5, credit_account: ref(1), payee: ADDR }, [crypto(1, blockchain)], [1]);
+    expect(form.chainPayee()).toEqual({ value: ADDR, short: `${ADDR.slice(0, 10)}…${ADDR.slice(-8)}`, url });
+  });
+
+  it('keeps a short payee whole and unlinked when the account is not loaded', () => {
+    const form = configure({ id: 5, debit_account: ref(1), payee: 'Shop' }, [], [1]);
+    expect(form.chainPayee()).toEqual({ value: 'Shop', short: 'Shop', url: null });
+  });
+
+  it('shows nothing for a synced row without a payee', () => {
+    expect(configure({ id: 5, debit_account: ref(1), payee: null }, [crypto(1, 'tron')], [1]).chainPayee()).toBeNull();
+  });
+
+  it('leaves the payee editable on an unsynced row', () => {
+    const form = configure({ id: 5, debit_account: ref(1), payee: ADDR }, [], []);
+    expect(form.chainPayee()).toBeNull();
+    expect(form.form.controls.payee.enabled).toBe(true);
+  });
+});
+
 describe('TransactionForm amount precision', () => {
   beforeEach(() => TestBed.resetTestingModule());
 

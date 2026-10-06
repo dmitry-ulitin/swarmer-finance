@@ -49,17 +49,22 @@
     color: var(--tui-text-secondary);
 }
 
-.txid {
+.chain-ref {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     font: var(--tui-typography-body-s);
 }
 
-.txid-label {
+// Payee and txid of a synced row read as one block: cancel the form's gap between them.
+.chain-ref + .chain-ref {
+    margin-top: -1rem;
+}
+
+.chain-ref-label {
     color: var(--tui-text-secondary);
 }
 
-.txid-value {
+.chain-ref-value {
     font-family: monospace;
 }

@@ -78,3 +78,10 @@ export const TX_EXPLORERS: Readonly<Record<string, (txid: string) => string>> = 
   tron: txid => `https://tronscan.org/#/transaction/${txid}`,
   ethereum: txid => `https://etherscan.io/tx/${txid}`,
 };
+
+/** An address's page on a block explorer, per synced chain. */
+export const ADDRESS_EXPLORERS: Readonly<Record<string, (address: string) => string>> = {
+  bitcoin: address => `https://mempool.space/address/${address}`,
+  tron: address => `https://tronscan.org/#/address/${address}`,
+  ethereum: address => `https://etherscan.io/address/${address}`,
+};
