@@ -53,6 +53,8 @@ export class TransactionForm {
   readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
   readonly lock = syncedLock(this.context.data, this.accountsState.trackedIds());
+  /** Network fees are written by sync only: neither category nor type can change. */
+  readonly isNetworkFee = this.context.data.category?.id === TransactionType.NetworkFees;
   /** The blockchain of the row's synced side, when its account is loaded. */
   private readonly chain = computed(() => {
     const { debit_account, credit_account } = this.context.data;
@@ -160,6 +162,9 @@ export class TransactionForm {
       c.toAccount.disable();
       c.creditAmount.disable();
     }
+    if (this.isNetworkFee) {
+      c.category.disable();
+    }
 
     effect(() => {
       const index = this.activeTypeIndex();
@@ -205,6 +210,7 @@ export class TransactionForm {
 
   /** 0 Expense, 1 Income, 2 Transfer. A locked side must stay filled. */
   typeAllowed(index: 0 | 1 | 2): boolean {
+    if (this.isNetworkFee) return index === 0;
     const { debitLocked, creditLocked } = this.lock;
     if (debitLocked && creditLocked) return false;
     if (debitLocked) return index !== 1;

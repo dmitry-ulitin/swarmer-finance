@@ -39,6 +39,8 @@ const foreignCategory = makeCategory({
   owner_name: 'Other User',
 });
 
+const uncategorizedExpense = makeCategory({ id: 4, name: 'Uncategorized', user_id: null });
+
 const tree: Category[] = [
   makeCategory({ id: 1, name: 'Income', user_id: null, parent_id: null, root_id: 1, children: [] }),
   makeCategory({
@@ -46,7 +48,7 @@ const tree: Category[] = [
     name: 'Expenses',
     user_id: null,
     parent_id: null,
-    children: [myCategory, foreignCategory],
+    children: [uncategorizedExpense, myCategory, foreignCategory],
   }),
 ];
 
@@ -110,12 +112,12 @@ describe('TransactionForm category initialisation', () => {
     expect(form.form.controls.category.value?.id).toBe(myCategory.id);
   });
 
-  it('falls back to the first visible category for a new transaction', () => {
+  it('falls back to Uncategorized for a new transaction', () => {
     const form = configure({
       debit_account: { id: 1, name: 'Mine', currency: 'USD', scale: 2 },
     });
 
-    expect(form.form.controls.category.value?.id).toBe(myCategory.id);
+    expect(form.form.controls.category.value?.id).toBe(uncategorizedExpense.id);
   });
 
   // Path-matching, foreign-category flagging and the tree rendering moved to
@@ -156,6 +158,14 @@ describe('TransactionForm on a synced account', () => {
     expect(c.description.enabled).toBe(true);
     expect(c.toAccount.enabled).toBe(true);
     expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([true, false, true]);
+  });
+
+  it('locks the category and type of a network fee', () => {
+    const fees = makeCategory({ id: 5, name: 'Network fees', user_id: null });
+    const form = configure({ id: 7, debit_account: wallet, debit: 0.0001, credit: 0.0001, category: fees }, [wallet], [1]);
+    expect(form.form.controls.category.disabled).toBe(true);
+    expect(form.form.getRawValue().category?.id).toBe(5);
+    expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([true, false, false]);
   });
 
   it('offers only ordinary accounts to pick', () => {
