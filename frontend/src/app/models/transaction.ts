@@ -38,7 +38,10 @@ export interface TransactionFilters {
 export enum TransactionType {
     Transfer = 0,
     Income,
-    Expense
+    Expense,
+    UncategorizedIncome,
+    UncategorizedExpense,
+    NetworkFees
 }
 
 export interface TransactionView extends Transaction {

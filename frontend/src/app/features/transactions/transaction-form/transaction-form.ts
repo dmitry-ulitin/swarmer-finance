@@ -107,10 +107,8 @@ export class TransactionForm {
   readonly isIncome = computed(() => this.activeTypeIndex() === 1);
   readonly isTransfer = computed(() => this.activeTypeIndex() === 2);
   /** 1 = Income, 2 = Expenses; drives which branch the picker offers. */
-  readonly categoryRootId = computed(() => (this.isIncome() ? 1 : 2));
-  readonly visibleCategories = computed(
-    () => this.categoriesState.categories().find(c => c.id === this.categoryRootId())?.children || []
-  );
+  readonly categoryRootId = computed(() => (this.isIncome() ? TransactionType.Income : TransactionType.Expense));
+  readonly uncategorized = computed(() => this.categoriesState.categories().find(c => c.id === this.categoryRootId())?.children?.find(c => c.id === (this.isIncome() ? TransactionType.UncategorizedIncome : TransactionType.UncategorizedExpense)) || null);
 
   readonly form = new FormGroup({
     date: new FormControl<TuiDay | null>(this.context.data.date ? TuiDay.jsonParse(this.context.data.date) : TuiDay.currentLocal(), [Validators.required]),
@@ -122,7 +120,7 @@ export class TransactionForm {
     // it is not in this user's own branch of the tree — using it directly
     // keeps it visible instead of silently resetting to the first category.
     category: new FormControl<Category | null>(
-      this.context.data.category ?? this.visibleCategories()[0],
+      this.context.data.category ?? this.uncategorized(),
       { nonNullable: true }
     ),
     debitAmount: new FormControl<number | null>(this.context.data.debit ? this.context.data.debit : null),
@@ -171,7 +169,7 @@ export class TransactionForm {
         let category = this.form.controls.category.value;
         if (index === 0) {
           if (category?.root_id !== TransactionType.Expense) {
-            this.form.controls.category.setValue(this.visibleCategories()[0]);
+            this.form.controls.category.setValue(this.uncategorized());
           }
           this.form.controls.toAccount.setValue(null);
           this.form.controls.creditAmount.setValue(this.form.controls.debitAmount.value);
@@ -180,7 +178,7 @@ export class TransactionForm {
           }
         } else if (index === 1) {
           if (category?.root_id !== TransactionType.Income) {
-            this.form.controls.category.setValue(this.visibleCategories()[0]);
+            this.form.controls.category.setValue(this.uncategorized());
           } 
           this.form.controls.fromAccount.setValue(null);
           this.form.controls.debitAmount.setValue(this.form.controls.creditAmount.value);
