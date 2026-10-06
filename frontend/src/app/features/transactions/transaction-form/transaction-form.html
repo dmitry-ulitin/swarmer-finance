@@ -16,11 +16,11 @@
             <tui-calendar *tuiDropdown />
         </tui-textfield>
         @if (!lock.synced) {
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.chevron-left'"
+        <button tuiIconButton type="button" appearance="gray" size="s" [iconStart]="'@tui.chevron-left'"
             aria-label="Previous day" title="Previous day" (click)="shiftDate(-1)"></button>
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.calendar'"
+        <button tuiIconButton type="button" appearance="gray" size="s" [iconStart]="'@tui.calendar'"
             aria-label="Today" title="Today" (click)="setToday()"></button>
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="s" [iconStart]="'@tui.chevron-right'"
+        <button tuiIconButton type="button" appearance="gray" size="s" [iconStart]="'@tui.chevron-right'"
             aria-label="Next day" title="Next day" (click)="shiftDate(1)"></button>
         }
     </div>
@@ -79,7 +79,7 @@
         } @else {
         <span class="chain-ref-value" [title]="p.value">{{ p.short }}</span>
         }
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
+        <button tuiIconButton type="button" appearance="gray" size="xs" [iconStart]="'@tui.copy'"
             aria-label="Copy payee" (click)="copy(p.value, 'payee')"></button>
     </div>
     }
@@ -91,7 +91,7 @@
         } @else {
         <span class="chain-ref-value" [title]="tx.txid">{{ tx.short }}</span>
         }
-        <button tuiIconButton type="button" appearance="flat-grayscale" size="xs" [iconStart]="'@tui.copy'"
+        <button tuiIconButton type="button" appearance="gray" size="xs" [iconStart]="'@tui.copy'"
             aria-label="Copy transaction ID" (click)="copy(tx.txid, 'transaction ID')"></button>
     </div>
     }

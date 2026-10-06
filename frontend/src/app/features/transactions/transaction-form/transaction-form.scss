@@ -72,3 +72,13 @@
 .chain-ref-value {
     font-family: monospace;
 }
+
+button[tuiAppearance][data-appearance='gray'] {
+    color: var(--tui-text-tertiary);
+    scale: 1.0;
+    &[data-state='hover'],
+    &:hover:not(._no-hover):not(:disabled){
+        color: var(--tui-text-primary);
+        background: var(--tui-background-neutral-1-hover);
+    };
+}
