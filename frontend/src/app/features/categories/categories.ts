@@ -20,7 +20,7 @@ export class Categories {
   private readonly categoryDialogs = inject(CategoryDialogService);
   private readonly auth = inject(AuthService);
 
-  protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => item.children ?? [];
+  protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => (item.children ?? []).filter((c: Category) => c.user_id !== null);
   protected readonly map = new Map<Category, boolean>();
   readonly categories = computed(() => {
     const newCategories = this.categoriesState.categories().map(c => ({ ...c }));

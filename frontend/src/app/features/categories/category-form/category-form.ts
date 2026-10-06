@@ -60,7 +60,7 @@ export class CategoryForm {
   readonly parent = toSignal(this.form.controls.parent.valueChanges, { initialValue: this.form.controls.parent.value });
 
   readonly stringifyCategory: TuiStringHandler<Category | null> = (item) => {
-    return item?.fullName ?? 'None (top-level)';
+    return item?.fullName || item?.name || 'None (top-level)';
   };
   readonly identityMatcher = (a: Category | null, b: Category | null): boolean => a?.id === b?.id;
 
