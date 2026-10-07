@@ -23,9 +23,3 @@ tui-icon {
 [tuiButtonX] {
   margin-inline-start: 0.25rem;
 }
-
-// Taiga caps the range calendar at 20.25rem, a few px short of a six-week month here,
-// which made the dropdown scroll.
-tui-calendar-range:not(._mobile) {
-  max-block-size: none;
-}

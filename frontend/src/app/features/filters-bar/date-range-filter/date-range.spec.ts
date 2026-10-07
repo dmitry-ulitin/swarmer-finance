@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TuiDay, TuiDayRange } from '@taiga-ui/cdk/date-time';
-import { datePresets, periodKind, rangeLabel, shiftPeriod } from './date-range';
+import { datePresets, periodKind, rangeLabel, sameRange, shiftPeriod } from './date-range';
 
 const range = (from: string, to: string) => new TuiDayRange(TuiDay.jsonParse(from), TuiDay.jsonParse(to));
 const json = (r: TuiDayRange) => [r.from.toJSON(), r.to.toJSON()];
@@ -59,13 +59,27 @@ describe('rangeLabel', () => {
 });
 
 describe('datePresets', () => {
-  it('builds this/last month and year around today', () => {
-    const presets = datePresets(TuiDay.jsonParse('2026-01-15'));
-    expect(presets.map(p => [String(p), ...json(p.range)])).toEqual([
-      ['This month', '2026-01-01', '2026-01-31'],
-      ['Last month', '2025-12-01', '2025-12-31'],
-      ['This year', '2026-01-01', '2026-12-31'],
-      ['Last year', '2025-01-01', '2025-12-31'],
+  const presets = (today: string) =>
+    datePresets(TuiDay.jsonParse(today)).map(p => [p.label, ...json(p.range)]);
+
+  it('builds rolling month and year up to today, then the current month and year', () => {
+    expect(presets('2026-10-07')).toEqual([
+      ['Last month', '2026-09-08', '2026-10-07'],
+      ['Last year', '2025-10-08', '2026-10-07'],
+      ['Oct 2026', '2026-10-01', '2026-10-31'],
+      ['2026', '2026-01-01', '2026-12-31'],
     ]);
+  });
+
+  it('starts the rolling month after the clamped day a month ago at a month end', () => {
+    expect(presets('2026-03-31')[0]).toEqual(['Last month', '2026-03-01', '2026-03-31']);
+  });
+});
+
+describe('sameRange', () => {
+  it('compares both ends', () => {
+    expect(sameRange(range('2026-09-01', '2026-09-30'), range('2026-09-01', '2026-09-30'))).toBe(true);
+    expect(sameRange(range('2026-09-01', '2026-09-30'), range('2026-09-01', '2026-09-29'))).toBe(false);
+    expect(sameRange(range('2026-09-01', '2026-09-30'), null)).toBe(false);
   });
 });

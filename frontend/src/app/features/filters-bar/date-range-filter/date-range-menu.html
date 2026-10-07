@@ -1,0 +1,24 @@
+@if (custom()) {
+  <div class="custom">
+    <button tuiButton type="button" appearance="flat" size="s" iconStart="@tui.chevron-left"
+      aria-label="Back" (click)="custom.set(false)">Back</button>
+    <tui-calendar-range [defaultViewedMonth]="lastMonth" [value]="range()" (valueChange)="select($event)" />
+  </div>
+} @else {
+  <tui-data-list size="s">
+    @for (preset of presets; track preset.label) {
+      <button tuiOption type="button" (click)="select(preset.range)">
+        {{ preset.label }}
+        @if (preset === activePreset()) {
+          <tui-icon icon="@tui.check" />
+        }
+      </button>
+    }
+    <button tuiOption type="button" (click)="custom.set(true)">
+      Other date…
+      @if (range() && !activePreset()) {
+        <tui-icon icon="@tui.check" />
+      }
+    </button>
+  </tui-data-list>
+}

@@ -3,7 +3,7 @@
     aria-label="Previous period" (click)="shift(-1)">Previous period</button>
 }
 <span tuiChip size="s">
-  <button type="button" class="label" aria-haspopup="dialog"
+  <button type="button" class="label"
     [tuiDropdown]="calendar" [tuiDropdownOpen]="open()" (tuiDropdownOpenChange)="open.set($event)">
     <tui-icon icon="@tui.calendar" />
     {{ label() }}
@@ -17,5 +17,5 @@
     aria-label="Next period" (click)="shift(1)">Next period</button>
 }
 <ng-template #calendar>
-  <tui-calendar-range [items]="presets" [value]="range()" (valueChange)="select($event)" />
+  <app-date-range-menu [range]="range()" (selected)="select($event)" />
 </ng-template>

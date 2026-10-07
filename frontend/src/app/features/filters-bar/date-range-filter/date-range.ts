@@ -1,9 +1,13 @@
 import { TuiDay, TuiDayRange } from '@taiga-ui/cdk/date-time';
-import { TuiDayRangePeriod } from '@taiga-ui/kit';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export type PeriodKind = 'month' | 'year';
+
+export interface DatePreset {
+  label: string;
+  range: TuiDayRange;
+}
 
 function monthRange(year: number, month: number): TuiDayRange {
   const from = new TuiDay(year, 0, 1).append({ month });
@@ -41,11 +45,20 @@ export function rangeLabel(range: TuiDayRange): string {
   return `${start} – ${day(to)} ${to.year}`;
 }
 
-export function datePresets(today: TuiDay): TuiDayRangePeriod[] {
+export function sameRange(a: TuiDayRange, b: TuiDayRange | null): boolean {
+  return !!b && a.from.daySame(b.from) && a.to.daySame(b.to);
+}
+
+/** Rolling month and year ending today, then the current calendar month and year. */
+export function datePresets(today: TuiDay): DatePreset[] {
+  const since = (back: { month?: number; year?: number }) =>
+    new TuiDayRange(today.append(back).append({ day: 1 }), today);
+  const month = monthRange(today.year, today.month);
+  const year = yearRange(today.year);
   return [
-    new TuiDayRangePeriod(monthRange(today.year, today.month), 'This month'),
-    new TuiDayRangePeriod(monthRange(today.year, today.month - 1), 'Last month'),
-    new TuiDayRangePeriod(yearRange(today.year), 'This year'),
-    new TuiDayRangePeriod(yearRange(today.year - 1), 'Last year'),
+    { label: 'Last month', range: since({ month: -1 }) },
+    { label: 'Last year', range: since({ year: -1 }) },
+    { label: rangeLabel(month), range: month },
+    { label: rangeLabel(year), range: year },
   ];
 }

@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+tui-data-list {
+  min-inline-size: 12rem;
+}
+
+tui-icon {
+  font-size: 1rem;
+  margin-inline-start: auto;
+}
+
+.custom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-block-start: 0.25rem;
+}
+
+// Taiga caps the range calendar at 20.25rem, a few px short of a six-week month here,
+// which made the dropdown scroll.
+tui-calendar-range:not(._mobile) {
+  max-block-size: none;
+}

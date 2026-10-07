@@ -1,20 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TuiDay, TuiDayRange } from '@taiga-ui/cdk/date-time';
 import { TuiButton, TuiButtonX, TuiDropdown, TuiIcon } from '@taiga-ui/core';
-import { TuiCalendarRange, TuiChip } from '@taiga-ui/kit';
+import { TuiChip } from '@taiga-ui/kit';
 import { TransactionsState } from '../../../core/transactions.state';
-import { datePresets, periodKind, rangeLabel, shiftPeriod } from './date-range';
+import { periodKind, rangeLabel, shiftPeriod } from './date-range';
+import { DateRangeMenu } from './date-range-menu';
 
 @Component({
   selector: 'app-date-range-filter',
-  imports: [TuiButton, TuiButtonX, TuiCalendarRange, TuiChip, TuiDropdown, TuiIcon],
+  imports: [DateRangeMenu, TuiButton, TuiButtonX, TuiChip, TuiDropdown, TuiIcon],
   templateUrl: './date-range-filter.html',
   styleUrl: './date-range-filter.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DateRangeFilter {
   private readonly transactions = inject(TransactionsState);
-  protected readonly presets = datePresets(TuiDay.currentLocal());
   protected readonly open = signal(false);
   protected readonly range = computed(() => {
     const range = this.transactions.dateRange();
@@ -29,9 +29,7 @@ export class DateRangeFilter {
     return range ? rangeLabel(range) : 'Any time';
   });
 
-  /** The calendar emits null when "Other date…" is picked over a preset; the dropdown stays open for it. */
-  protected select(range: TuiDayRange | null): void {
-    if (!range) return;
+  protected select(range: TuiDayRange): void {
     this.open.set(false);
     this.apply(range);
   }
