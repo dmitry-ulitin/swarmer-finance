@@ -126,6 +126,10 @@
 }
 
 .status {
+    // Block display, like the checkbox, so both centre on the row instead of
+    // the icon sitting on the text baseline below it.
+    display: block;
+    margin-inline: auto;
     font-size: 1rem;
 }
 
