@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, AccountGroupItem } from './accounts.state';
+import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, selectedAccountChips, AccountGroupItem } from './accounts.state';
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
@@ -377,5 +377,51 @@ describe('collectUserBalance', () => {
   it('returns null if any account in the subtree has no user_balance', () => {
     const group: AccountGroupItem = { kind: 'group', displayName: 'G', fullPath: 'G', key: 'G', access_level: 4, children: [accountItem(1, 100), accountItem(2, null)] };
     expect(collectUserBalance(group)).toBeNull();
+  });
+});
+
+describe('selectedAccountChips', () => {
+  const tree = buildAccountTree([
+    makeAccount(1, 'Cash'),
+    makeAccount(2, 'Bank/A'),
+    makeAccount(3, 'Bank/B'),
+    makeAccount(4, 'Bank/Sav/X'),
+    makeAccount(5, 'Bank/Sav/Y'),
+    makeSharedAccount(6, 'Joint/P', 1, 'Bob'),
+    makeSharedAccount(7, 'Joint/Q', 1, 'Bob'),
+  ]);
+  const chips = (ids: number[]) =>
+    selectedAccountChips(tree, new Set(ids)).map(c => ({ label: c.label, ids: c.ids }));
+
+  it('returns no chips when nothing is selected', () => {
+    expect(chips([])).toEqual([]);
+  });
+
+  it('labels an account with its full name', () => {
+    expect(chips([1, 2])).toEqual([
+      { label: 'Bank/A', ids: [2] },
+      { label: 'Cash', ids: [1] },
+    ]);
+  });
+
+  it('collapses a fully selected group into one chip', () => {
+    expect(chips([2, 3, 4, 5])).toEqual([{ label: 'Bank', ids: [2, 3, 4, 5] }]);
+  });
+
+  it('collapses a fully selected nested group inside a partially selected one', () => {
+    expect(chips([5, 2, 4])).toEqual([
+      { label: 'Bank/A', ids: [2] },
+      { label: 'Bank/Sav', ids: [4, 5] },
+    ]);
+  });
+
+  it('adds the owner to shared groups and accounts', () => {
+    expect(chips([6, 7])).toEqual([{ label: 'Joint (Bob)', ids: [6, 7] }]);
+    expect(chips([6])).toEqual([{ label: 'Joint/P (Bob)', ids: [6] }]);
+  });
+
+  it('gives every chip a distinct key', () => {
+    const keys = selectedAccountChips(tree, new Set([1, 4, 5, 6])).map(c => c.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

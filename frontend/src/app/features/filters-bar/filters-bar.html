@@ -2,3 +2,10 @@
   <input tuiInput [formControl]="details"
     placeholder="Search transactions" aria-label="Search transactions" />
 </tui-textfield>
+@for (chip of accountChips(); track chip.key) {
+  <span tuiChip size="s" [style.background-color]="chip.label | tuiAutoColor">
+    {{ chip.label }}
+    <button tuiButtonX appearance="icon" size="xs" [attr.aria-label]="'Remove ' + chip.label"
+      (click)="transactions.toggleAccounts(chip.ids)">Remove</button>
+  </span>
+}

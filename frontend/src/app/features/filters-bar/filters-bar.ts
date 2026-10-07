@@ -1,22 +1,25 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { TuiIcon, TuiInput } from '@taiga-ui/core';
+import { TuiButtonX, TuiInput } from '@taiga-ui/core';
+import { TuiAutoColorPipe, TuiChip } from '@taiga-ui/kit';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
 import { TransactionsState } from '../../core/transactions.state';
+import { AccountsState, selectedAccountChips } from '../../core/accounts.state';
 
 @Component({
   selector: 'app-filters-bar',
-  imports: [ReactiveFormsModule, TuiIcon, TuiInput],
+  imports: [ReactiveFormsModule, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
   templateUrl: './filters-bar.html',
-  styles: `
-    :host { display: flex; gap: 1rem; }
-    .search { width: 20rem; max-width: 100%; }
-  `,
+  styleUrl: './filters-bar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FiltersBar {
-  private readonly transactions = inject(TransactionsState);
+  protected readonly transactions = inject(TransactionsState);
+  private readonly accounts = inject(AccountsState);
+  protected readonly accountChips = computed(() =>
+    selectedAccountChips(this.accounts.groupedAccounts(), new Set(this.transactions.selectedAccountIds()))
+  );
   protected readonly details = new FormControl('', { nonNullable: true });
 
   constructor() {

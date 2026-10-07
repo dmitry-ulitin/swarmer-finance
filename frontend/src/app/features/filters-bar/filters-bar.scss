@@ -1,0 +1,15 @@
+:host {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search {
+  width: 20rem;
+  max-width: 100%;
+}
+
+[tuiButtonX] {
+  margin-inline-start: 0.25rem;
+}

@@ -203,6 +203,42 @@ export function collectAccountIds(group: AccountGroupItem): number[] {
   return ids;
 }
 
+/** One chip of the active account filter: a single account or a whole group. */
+export interface AccountChip {
+  key: string;
+  label: string;
+  ids: number[];
+}
+
+/**
+ * Turns the selected account ids into chips, in tree order. A group whose
+ * accounts are all selected becomes one chip; a partially selected one is
+ * broken down into its children. Labels are full paths, since a leaf's
+ * displayName is relative to its group and means little outside the tree.
+ */
+export function selectedAccountChips(items: AccountTreeItem[], selected: ReadonlySet<number>): AccountChip[] {
+  const chips: AccountChip[] = [];
+  for (const item of items) {
+    const owner = levelOf(item) < 3
+      ? (item.kind === 'account' ? item.account.owner_name : ownerOf(item))
+      : undefined;
+    const suffix = owner ? ` (${owner})` : '';
+    if (item.kind === 'account') {
+      if (selected.has(item.account.id)) {
+        chips.push({ key: `a${item.account.id}`, label: item.account.name + suffix, ids: [item.account.id] });
+      }
+      continue;
+    }
+    const ids = collectAccountIds(item);
+    if (ids.every(id => selected.has(id))) {
+      chips.push({ key: item.key, label: item.fullPath + suffix, ids });
+    } else {
+      chips.push(...selectedAccountChips(item.children, selected));
+    }
+  }
+  return chips;
+}
+
 // Sums user_balance across all accounts in a subtree. Returns null if any
 // account's user_balance is null (rate unavailable), rather than silently
 // showing a total that's missing part of its data.
