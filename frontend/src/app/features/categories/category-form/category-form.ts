@@ -2,16 +2,32 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiDataList, TuiDropdown, TuiIcon, TuiInput } from '@taiga-ui/core';
 import { TuiChevron, TuiInputColor, TuiSelect, TuiTree } from '@taiga-ui/kit';
-import { TuiAutoFocus, type TuiHandler, type TuiStringHandler } from '@taiga-ui/cdk';
+import { TuiAutoFocus, type TuiStringHandler } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
+import { firstValueFrom } from 'rxjs';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { CategoriesState } from '../../../core/categories.state';
 import { NotificationService } from '../../../core/notification.service';
-import type { Category } from '../../../models/category';
-import { findCategoryById } from '../../../models/category';
-import { firstValueFrom, pipe } from 'rxjs';
+import { findAncestors, findCategoryById, type Category } from '../../../models/category';
 import { TransactionType } from '../../../models/transaction';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+
+/** What the category dialog works on: an existing category, or a new one. */
+export interface CategoryFormData {
+  /** The category to edit; absent when creating one. */
+  category?: Category;
+  /** The parent a new category starts under; defaults to the root. */
+  parent?: Category | null;
+  /** Keeps a new category under one root (1 = Income, 2 = Expenses). */
+  rootId?: number;
+}
+
+const PREDEFINED_ICONS = [
+  'home', 'car', 'shopping-cart', 'heart-pulse', 'briefcase',
+  'graduation-cap', 'plane', 'gift', 'music', 'gamepad-2',
+  'coffee', 'zap', 'droplets', 'pill', 'briefcase-medical',
+  'dumbbell', 'wallet', 'utensils', 'baby', 'star', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
+];
 
 @Component({
   selector: 'app-category-form',
@@ -21,84 +37,82 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CategoryForm {
-  private readonly context = inject<TuiDialogContext<Category | null, Category>>(POLYMORPHEUS_CONTEXT);
+  private readonly context = inject<TuiDialogContext<Category | null, CategoryFormData>>(POLYMORPHEUS_CONTEXT);
   private readonly categoriesState = inject(CategoriesState);
   private readonly notifications = inject(NotificationService);
 
-  readonly categories = this.categoriesState.categories;
+  private readonly editing = this.context.data.category ?? null;
+  readonly isEdit = this.editing !== null;
+  private readonly rootId = this.editing?.root_id ?? this.context.data.rootId ?? null;
+  private readonly categories = this.categoriesState.categories;
 
-  readonly treeHandler = computed(() => {
-    const currentId = this.context.data?.id;
-    return (item: Category): readonly Category[] =>
-      (item.children || []).filter((c: Category) => c.id !== currentId && c.user_id !== null);
-  });
-
+  /** The roots a parent can be picked under: just the category's own when it is fixed. */
+  readonly parentOptions = computed(() =>
+    this.rootId === null ? this.categories() : this.categories().filter(c => c.id === this.rootId)
+  );
+  /** User categories only, and never the edited one itself. */
+  readonly treeHandler = (item: Category): readonly Category[] =>
+    (item.children ?? []).filter(c => c.id !== this.editing?.id && c.user_id !== null);
   readonly treeMap = new Map<Category, boolean>();
 
-  readonly parentOptions = computed(() => {
-    if (!this.context.data?.id) return this.categories();
-    const root_id = this.context.data.root_id;
-    return this.categories().filter(c => c.root_id === root_id);
-  });
+  private readonly initialParent = this.editing
+    ? findCategoryById(this.editing.parent_id ?? undefined, this.categories())
+    : this.context.data.parent ?? findCategoryById(this.rootId ?? TransactionType.Expense, this.categories());
 
   readonly form = new FormGroup({
-    parent: new FormControl<Category | null>(findCategoryById(this.context.data?.parent_id ?? TransactionType.Expense, this.categories()), { nonNullable: true, validators: [Validators.required] }),
-    name: new FormControl<string>(this.context.data?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
-    color: new FormControl<string>(this.context.data?.color ?? '#14aa00', { nonNullable: true }),
-    icon: new FormControl<string>(this.context.data?.icon ?? 'circle', { nonNullable: true }),
+    parent: new FormControl<Category | null>(this.initialParent, { nonNullable: true, validators: [Validators.required] }),
+    name: new FormControl<string>(this.editing?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
+    color: new FormControl<string>(this.editing?.color ?? this.initialParent?.color ?? '#14aa00', { nonNullable: true }),
+    icon: new FormControl<string>(this.editing?.icon ?? this.initialParent?.icon ?? 'circle', { nonNullable: true }),
   });
 
-  readonly predefinedIcons = [
-    'home', 'car', 'shopping-cart', 'heart-pulse', 'briefcase',
-    'graduation-cap', 'plane', 'gift', 'music', 'gamepad-2',
-    'coffee', 'zap', 'droplets', 'pill', 'briefcase-medical',
-    'dumbbell', 'wallet', 'utensils', 'baby', 'star', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
-  ] as const;
-
   readonly loading = signal(false);
-  readonly categoryId = signal(this.context.data?.id ?? null);
-  readonly parent = toSignal(this.form.controls.parent.valueChanges, { initialValue: this.form.controls.parent.value });
+  private readonly parent = toSignal(this.form.controls.parent.valueChanges, { initialValue: this.form.controls.parent.value });
+  /** The predefined icons, led by the plus / minus sign of the parent's root. */
+  readonly icons = computed(() => {
+    const root = this.parent()?.root_id;
+    const sign = root === TransactionType.Income ? ['circle-plus'] : root === TransactionType.Expense ? ['circle-minus'] : [];
+    return [...sign, ...PREDEFINED_ICONS];
+  });
 
-  readonly stringifyCategory: TuiStringHandler<Category | null> = (item) => {
-    return item?.fullName || item?.name || 'None (top-level)';
-  };
+  readonly stringifyCategory: TuiStringHandler<Category | null> = item => item?.fullName || item?.name || 'None (top-level)';
   readonly identityMatcher = (a: Category | null, b: Category | null): boolean => a?.id === b?.id;
 
   constructor() {
-    this.form.controls.parent.valueChanges.pipe(takeUntilDestroyed()).subscribe(parent => this.onParentChange(parent));
-
-    let parent_id = this.form.controls.parent.value?.parent_id;
-    while (parent_id) {
-      const parent = findCategoryById(parent_id, this.categories());
-      if (!parent) break;
-      this.treeMap.set(parent, true);
-      parent_id = parent.parent_id;
+    const c = this.form.controls;
+    // An edit keeps the category where it is: the API cannot move it.
+    if (this.isEdit) {
+      c.parent.disable();
+    } else {
+      // A new category takes its parent's look until the user picks one.
+      c.parent.valueChanges.pipe(takeUntilDestroyed()).subscribe(parent => {
+        if (!parent) return;
+        c.color.setValue(parent.color);
+        c.icon.setValue(parent.icon);
+      });
     }
-  }
 
-  onParentChange(parent: Category | null): void {
-    if (!!this.context.data?.id || !parent) return;
-    this.form.controls.color.setValue(parent.color);
-    this.form.controls.icon.setValue(parent.icon);
+    const parent = c.parent.value;
+    for (const ancestor of (parent && findAncestors(parent.id, this.categories())) ?? []) {
+      this.treeMap.set(ancestor, true);
+    }
   }
 
   cancel(): void {
     this.context.completeWith(null);
   }
 
-  async onSubmit() {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) return;
 
     try {
       this.loading.set(true);
-
-      const id = this.context.data?.id;
       const { parent, name, color, icon } = this.form.getRawValue();
-      const obs = !!id
-        ? this.categoriesState.update(id, { name, color, icon })
+      const request = this.editing
+        ? this.categoriesState.update(this.editing.id, { name, color, icon })
         : this.categoriesState.create({ name, parentId: parent?.id ?? TransactionType.Expense, color, icon });
-      const responce = await firstValueFrom(obs);
-      this.context.completeWith(responce.data);
+      const response = await firstValueFrom(request);
+      this.context.completeWith(response.data);
     } catch (e) {
       this.notifications.showError(e, 'Failed to save category');
     } finally {

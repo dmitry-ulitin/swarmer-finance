@@ -62,7 +62,13 @@
     }
     <!-- Category (Expense / Income only) -->
     @if (!isTransfer()) {
-    <app-category-select [rootId]="categoryRootId()" formControlName="category" />
+    <div class="row category-row">
+        <app-category-select [rootId]="categoryRootId()" formControlName="category" />
+        @if (!isNetworkFee) {
+        <button tuiIconButton type="button" appearance="gray" size="s" [iconStart]="'@tui.plus'"
+            aria-label="New category" title="New category" (click)="addCategory()"></button>
+        }
+    </div>
     }
 
     <!-- Optional fields -->

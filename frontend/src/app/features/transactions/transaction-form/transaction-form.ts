@@ -16,6 +16,7 @@ import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { CategorySelect } from '../../categories/category-select/category-select';
+import { CategoryDialogService } from '../../categories/category-dialog.service';
 import { syncedLock } from '../synced-lock';
 
 /** The type selector's segments, in order: Expense, Income, Transfer. */
@@ -56,6 +57,7 @@ export class TransactionForm {
   private readonly notifications = inject(NotificationService);
   private readonly transactionsState = inject(TransactionsState);
   private readonly categoriesState = inject(CategoriesState);
+  private readonly categoryDialogs = inject(CategoryDialogService);
   readonly accountsState = inject(AccountsState);
 
   private readonly data = this.context.data;
@@ -202,6 +204,14 @@ export class TransactionForm {
       this.notifications.showSuccess(`${what[0].toUpperCase()}${what.slice(1)} copied`);
     } catch (err) {
       this.notifications.showError(err, `Could not copy the ${what}`);
+    }
+  }
+
+  /** Creates a category in the current type's branch and selects it. */
+  async addCategory(): Promise<void> {
+    const category = await this.categoryDialogs.openCreate(null, this.categoryRootId());
+    if (category) {
+      this.form.controls.category.setValue(category);
     }
   }
 

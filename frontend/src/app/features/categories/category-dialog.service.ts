@@ -4,6 +4,7 @@ import { tuiDialog, TuiDialogService } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import type { Category } from '../../models/category';
+import type { CategoryFormData } from './category-form/category-form';
 import { CategoriesState } from '../../core/categories.state';
 import { NotificationService } from '../../core/notification.service';
 
@@ -26,17 +27,15 @@ export class CategoryDialogService {
     }
   }
 
-  async openCreate(parent: Category | null): Promise<Category | null> {
+  /** Creates a category under `parent`; `rootId` keeps it to Income (1) or Expenses (2). */
+  async openCreate(parent: Category | null, rootId?: number): Promise<Category | null> {
     try {
       const { CategoryForm } = await import('./category-form/category-form');
+      const data: CategoryFormData = { parent, rootId };
       return await firstValueFrom(
         this.dialogs.open<Category | null>(
           new PolymorpheusComponent(CategoryForm, this.injector),
-          {
-            data: { ...parent, id: null, name: '', parent_id: parent?.id, children: [] },
-            label: 'Add Category',
-            size: 's',
-          }
+          { data, label: 'Add Category', size: 's' }
         ),
         { defaultValue: null }
       );
@@ -52,7 +51,7 @@ export class CategoryDialogService {
       await firstValueFrom(
         this.dialogs.open<Category | null>(
           new PolymorpheusComponent(CategoryForm, this.injector),
-          { data: category, label: 'Edit Category', size: 's' }
+          { data: { category } satisfies CategoryFormData, label: 'Edit Category', size: 's' }
         ),
         { defaultValue: null }
       );

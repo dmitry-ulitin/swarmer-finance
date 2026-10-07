@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
@@ -8,6 +8,7 @@ import { AccountsState } from '../../../core/accounts.state';
 import { TransactionsState } from '../../../core/transactions.state';
 import { AuthService } from '../../../core/auth.service';
 import { NotificationService } from '../../../core/notification.service';
+import { CategoryDialogService } from '../../categories/category-dialog.service';
 import type { Category } from '../../../models/category';
 import type { Transaction } from '../../../models/transaction';
 import type { Account } from '../../../models/account';
@@ -52,7 +53,12 @@ const tree: Category[] = [
   }),
 ];
 
-function configure(data: Partial<Transaction>, accounts: Partial<Account>[] = [], trackedIds: number[] = []) {
+function configure(
+  data: Partial<Transaction>,
+  accounts: Partial<Account>[] = [],
+  trackedIds: number[] = [],
+  openCreateCategory: (parent: Category | null, rootId?: number) => Promise<Category | null> = async () => null
+) {
   TestBed.configureTestingModule({
     providers: [
       TransactionForm,
@@ -62,6 +68,7 @@ function configure(data: Partial<Transaction>, accounts: Partial<Account>[] = []
       { provide: TransactionsState, useValue: { transactions: signal([]) } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
       { provide: NotificationService, useValue: { showError: () => {} } },
+      { provide: CategoryDialogService, useValue: { openCreate: openCreateCategory } },
     ],
   });
   return TestBed.inject(TransactionForm);
@@ -283,5 +290,31 @@ describe('TransactionForm amount precision', () => {
     const form = configure({ debit_account: btc, credit_account: eur, debit: 0.00146435, credit: 90 }, [btc, eur]);
     expect(form.debitPrecision()).toBe(8);
     expect(form.creditPrecision()).toBe(2);
+  });
+});
+
+describe('TransactionForm new category', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const account = { id: 1, name: 'Mine', currency: 'USD', scale: 2 };
+
+  it.each([
+    ['an expense', { debit_account: account }, 2],
+    ['an income', { credit_account: account }, 1],
+  ])("creates it in %s's branch and selects it", async (_, data, rootId) => {
+    const created = makeCategory({ id: 50, name: 'New', root_id: rootId });
+    const openCreate = vi.fn(async () => created);
+    const form = configure(data, [], [], openCreate);
+
+    await form.addCategory();
+
+    expect(openCreate).toHaveBeenCalledWith(null, rootId);
+    expect(form.form.controls.category.value).toBe(created);
+  });
+
+  it('keeps the category when the dialog is cancelled', async () => {
+    const form = configure({ debit_account: account, category: myCategory });
+    await form.addCategory();
+    expect(form.form.controls.category.value).toBe(myCategory);
   });
 });
