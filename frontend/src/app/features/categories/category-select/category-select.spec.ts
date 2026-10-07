@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
 import { CategorySelect } from './category-select';
 import { CategoriesState } from '../../../core/categories.state';
@@ -115,5 +116,35 @@ describe('CategorySelect', () => {
     it('renders null as Uncategorized', () => {
       expect(create(2).stringify(null)).toBe('Uncategorized');
     });
+  });
+});
+
+@Component({
+  imports: [ReactiveFormsModule, CategorySelect],
+  template: `<app-category-select [rootId]="2" [formControl]="control" />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class Host {
+  readonly control = new FormControl<Category | null>(myExpense);
+}
+
+describe('CategorySelect in a form', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('shows a value set from outside without being touched', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CategoriesState, useValue: { categories: signal(tree) } },
+        { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Host);
+    await fixture.whenStable();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('input')!;
+    expect(input.value).toBe('Groceries');
+
+    fixture.componentInstance.control.setValue(foreignExpense);
+    await fixture.whenStable();
+    expect(input.value).toBe('Their Groceries');
   });
 });

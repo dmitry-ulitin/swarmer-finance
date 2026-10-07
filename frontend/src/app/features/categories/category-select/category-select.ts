@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, forwardRef, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, forwardRef, inject, input, signal } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { TuiDataList, TuiIcon, TuiTextfield } from '@taiga-ui/core';
 import { TuiChevron, TuiSelect, TuiTree } from '@taiga-ui/kit';
@@ -39,8 +39,10 @@ export class CategorySelect implements ControlValueAccessor {
   private readonly categoriesState = inject(CategoriesState);
   private readonly auth = inject(AuthService);
 
-  protected value: Category | null = null;
-  protected disabled = false;
+  // Signals, so a value written by the form (e.g. a programmatic setValue)
+  // re-renders this OnPush view without waiting for an event inside it.
+  protected readonly value = signal<Category | null>(null);
+  protected readonly disabled = signal(false);
   private onChange: (value: Category | null) => void = () => {};
   protected onTouched: () => void = () => {};
 
@@ -69,7 +71,7 @@ export class CategorySelect implements ControlValueAccessor {
   readonly treeHandler = (item: Category): readonly Category[] => item.children ?? [];
 
   writeValue(value: Category | null): void {
-    this.value = value;
+    this.value.set(value);
   }
 
   registerOnChange(fn: (value: Category | null) => void): void {
@@ -81,11 +83,11 @@ export class CategorySelect implements ControlValueAccessor {
   }
 
   setDisabledState(disabled: boolean): void {
-    this.disabled = disabled;
+    this.disabled.set(disabled);
   }
 
   protected onValueChange(value: Category | null): void {
-    this.value = value;
+    this.value.set(value);
     this.onChange(value);
   }
 }
