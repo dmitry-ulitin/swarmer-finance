@@ -12,7 +12,8 @@
 
 .tree {
     width: 100%;
-    flex-grow: 1;
+    flex: 1;
+    min-height: 0;
     overflow: auto;
 }
 
