@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
+import { TuiTextfieldComponent } from '@taiga-ui/core';
 import { CategorySelect } from './category-select';
 import { CategoriesState } from '../../../core/categories.state';
 import { AuthService } from '../../../core/auth.service';
@@ -146,5 +147,29 @@ describe('CategorySelect in a form', () => {
     fixture.componentInstance.control.setValue(foreignExpense);
     await fixture.whenStable();
     expect(input.value).toBe('Their Groceries');
+  });
+
+  it('shows the selected category with its coloured icon and full path', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CategoriesState, useValue: { categories: signal(tree) } },
+        { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Host);
+    fixture.componentInstance.control.setValue(
+      makeCategory({ id: 11, name: 'Fruit', fullName: 'Groceries / Fruit', color: '#ff0000' }),
+    );
+    await fixture.whenStable();
+    // Under TestBed the textfield's OnPush view is not re-checked after
+    // ngModel's deferred write, so its [content] slot stays empty; the app
+    // renders it without help. Refresh it by hand to check our template.
+    fixture.debugElement
+      .query(e => e.componentInstance instanceof TuiTextfieldComponent)
+      .injector.get(ChangeDetectorRef)
+      .detectChanges();
+    const selected = (fixture.nativeElement as HTMLElement).querySelector('.selected-option')!;
+    expect(selected.textContent?.trim()).toBe('Groceries / Fruit');
+    expect(selected.querySelector('tui-icon')!.getAttribute('style')).toContain('color: rgb(255, 0, 0)');
   });
 });

@@ -1,5 +1,5 @@
 <tui-textfield tuiChevron [tuiTextfieldCleaner]="cleaner()" [stringify]="stringify"
-    [identityMatcher]="categoryMatcher" [tuiTextfieldSize]="size()">
+    [identityMatcher]="categoryMatcher" [tuiTextfieldSize]="size()" [content]="value() && selectedContent">
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
@@ -12,6 +12,12 @@
         }
     </tui-data-list>
 </tui-textfield>
+<ng-template #selectedContent let-item>
+    <span class="selected-option">
+        <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />
+        {{ stringify(item) }}
+    </span>
+</ng-template>
 <ng-template #treeNodeContent let-item>
     <button new tuiOption type="button" [value]="item" class="tree-option">
         <tui-icon [icon]="'@tui.' + item.icon" [style.color]="item.color" />

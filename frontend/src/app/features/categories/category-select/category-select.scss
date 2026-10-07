@@ -2,6 +2,20 @@
     display: block;
 }
 
+.selected-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    tui-icon {
+        font-size: 1em;
+    }
+}
+
 .tree-option {
     display: flex;
     align-items: center;
