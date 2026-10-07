@@ -23,10 +23,11 @@ export interface CategoryFormData {
 }
 
 const PREDEFINED_ICONS = [
-  'home', 'car', 'shopping-cart', 'heart-pulse', 'briefcase',
-  'graduation-cap', 'plane', 'gift', 'music', 'gamepad-2',
-  'coffee', 'zap', 'droplets', 'pill', 'briefcase-medical',
-  'dumbbell', 'wallet', 'utensils', 'baby', 'star', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
+  'home', 'car', 'fuel', 'wrench', 'shopping-cart', 'shirt', 'shopping-basket', 'percent', 'briefcase',
+  'graduation-cap', 'bus','plane', 'ship', 'tree-palm', 'gift', 'music', 'gamepad-2',
+  'zap', 'droplets', 'heart-pulse', 'pill', 'briefcase-medical',
+  'dumbbell', 'cat', 'wallet', 'hand-coins', 'utensils', 'coffee', 'soup', 'bottle-wine', 'baby', 'fish',
+  'star', 'playing-cards-fan', 'party-popper', 'cake', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
 ];
 
 @Component({
