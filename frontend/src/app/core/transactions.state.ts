@@ -7,6 +7,12 @@ import { AccountsState } from './accounts.state';
 
 const PAGE_SIZE = 20;
 
+/** Inclusive `YYYY-MM-DD` bounds of the transaction date filter. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
 function sameAccountFilter(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   const setA = new Set(a);
@@ -30,6 +36,10 @@ export class TransactionsState {
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
   readonly selectedAccountIds = computed(() => this._filters().account ?? []);
+  readonly dateRange = computed<DateRange | null>(() => {
+    const { from, to } = this._filters();
+    return from && to ? { from, to } : null;
+  });
   readonly selectedTransaction = this._selectedTransaction.asReadonly();
   readonly viewTransactions = computed<TransactionView[]>(() => {
     const accountFilter = this._filters().account;
@@ -50,6 +60,13 @@ export class TransactionsState {
   setDetails(details: string | undefined): void {
     if (this._filters().details === details) return;
     this._filters.update(f => ({ ...f, details }));
+    this.reload();
+  }
+
+  setDateRange(range: DateRange | null): void {
+    const current = this.dateRange();
+    if (current?.from === range?.from && current?.to === range?.to) return;
+    this._filters.update(f => ({ ...f, from: range?.from, to: range?.to }));
     this.reload();
   }
 

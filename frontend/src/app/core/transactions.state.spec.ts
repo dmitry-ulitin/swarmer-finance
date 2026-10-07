@@ -44,3 +44,45 @@ describe('TransactionsState.setDetails', () => {
     expect(getTransactions.mock.lastCall![0].details).toBeUndefined();
   });
 });
+
+describe('TransactionsState.setDateRange', () => {
+  let state: TransactionsState;
+  let getTransactions: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    getTransactions = vi.fn(() => of({ data: [], error: null }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+      ],
+    });
+    state = TestBed.inject(TransactionsState);
+  });
+
+  it('reloads with the dates, keeping the other filters', () => {
+    state.setDetails('coffee');
+    state.setDateRange({ from: '2026-09-01', to: '2026-09-30' });
+    expect(getTransactions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ details: 'coffee', from: '2026-09-01', to: '2026-09-30', offset: 0 }),
+    );
+    expect(state.dateRange()).toEqual({ from: '2026-09-01', to: '2026-09-30' });
+  });
+
+  it('does not reload when the dates are unchanged', () => {
+    state.setDateRange({ from: '2026-09-01', to: '2026-09-30' });
+    getTransactions.mockClear();
+    state.setDateRange({ from: '2026-09-01', to: '2026-09-30' });
+    expect(getTransactions).not.toHaveBeenCalled();
+  });
+
+  it('clears the dates with null', () => {
+    state.setDateRange({ from: '2026-09-01', to: '2026-09-30' });
+    state.setDateRange(null);
+    const filters = getTransactions.mock.lastCall![0];
+    expect(filters.from).toBeUndefined();
+    expect(filters.to).toBeUndefined();
+    expect(state.dateRange()).toBeNull();
+  });
+});

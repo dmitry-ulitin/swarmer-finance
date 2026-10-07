@@ -6,10 +6,11 @@ import { TuiAutoColorPipe, TuiChip } from '@taiga-ui/kit';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState, selectedAccountChips } from '../../core/accounts.state';
+import { DateRangeFilter } from './date-range-filter/date-range-filter';
 
 @Component({
   selector: 'app-filters-bar',
-  imports: [ReactiveFormsModule, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
+  imports: [DateRangeFilter, ReactiveFormsModule, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
   templateUrl: './filters-bar.html',
   styleUrl: './filters-bar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

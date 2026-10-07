@@ -30,7 +30,7 @@ describe('FiltersBar', () => {
     ]));
     TestBed.configureTestingModule({
       providers: [
-        { provide: TransactionsState, useValue: { setDetails, toggleAccounts, selectedAccountIds } },
+        { provide: TransactionsState, useValue: { setDetails, toggleAccounts, selectedAccountIds, dateRange: signal(null) } },
         { provide: AccountsState, useValue: { groupedAccounts } },
       ],
     });
@@ -72,7 +72,7 @@ describe('FiltersBar', () => {
 
   function chips(): HTMLElement[] {
     fixture.detectChanges();
-    return Array.from(fixture.nativeElement.querySelectorAll('[tuiChip]'));
+    return Array.from(fixture.nativeElement.querySelectorAll(':scope > [tuiChip]'));
   }
 
   it('shows no account chips without an account filter', () => {

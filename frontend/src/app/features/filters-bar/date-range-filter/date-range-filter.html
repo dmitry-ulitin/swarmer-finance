@@ -1,0 +1,21 @@
+@if (steppable()) {
+  <button tuiIconButton type="button" appearance="flat" size="xs" iconStart="@tui.chevron-left"
+    aria-label="Previous period" (click)="shift(-1)">Previous period</button>
+}
+<span tuiChip size="s">
+  <button type="button" class="label" aria-haspopup="dialog"
+    [tuiDropdown]="calendar" [tuiDropdownOpen]="open()" (tuiDropdownOpenChange)="open.set($event)">
+    <tui-icon icon="@tui.calendar" />
+    {{ label() }}
+  </button>
+  @if (range()) {
+    <button tuiButtonX appearance="icon" size="xs" aria-label="Clear dates" (click)="clear()">Clear dates</button>
+  }
+</span>
+@if (steppable()) {
+  <button tuiIconButton type="button" appearance="flat" size="xs" iconStart="@tui.chevron-right"
+    aria-label="Next period" (click)="shift(1)">Next period</button>
+}
+<ng-template #calendar>
+  <tui-calendar-range [items]="presets" [value]="range()" (valueChange)="select($event)" />
+</ng-template>

@@ -2,6 +2,7 @@
   <input tuiInput [formControl]="details"
     placeholder="Search transactions" aria-label="Search transactions" />
 </tui-textfield>
+<app-date-range-filter />
 @for (chip of accountChips(); track chip.key) {
   <span tuiChip size="s" [style.background-color]="chip.label | tuiAutoColor">
     {{ chip.label }}
