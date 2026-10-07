@@ -47,6 +47,12 @@ export class TransactionsState {
     this.reload();
   }
 
+  setDetails(details: string | undefined): void {
+    if (this._filters().details === details) return;
+    this._filters.update(f => ({ ...f, details }));
+    this.reload();
+  }
+
   selectAllAccounts(): void {
     if (!this._filters().account) return;
     this._filters.update(f => ({ ...f, account: undefined }));
