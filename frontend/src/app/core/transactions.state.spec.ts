@@ -31,6 +31,13 @@ describe('TransactionsState.setDetails', () => {
     );
   });
 
+  it('bumps the revision on every reload', () => {
+    const before = state.revision();
+    state.setDetails('coffee');
+    state.reload();
+    expect(state.revision()).toBe(before + 2);
+  });
+
   it('does not reload when the text is unchanged', () => {
     state.setDetails('coffee');
     getTransactions.mockClear();

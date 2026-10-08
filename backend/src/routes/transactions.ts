@@ -64,6 +64,25 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
   }
 });
 
+const summarySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  account: arrayOfIds,
+});
+
+router.get('/summary', validate(summarySchema, 'query'), async (req: AuthRequest, res, next) => {
+  try {
+    const result = await transactionService.getCategorySummary(req.userId!, {
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      account: toIntArray(req.query.account),
+    });
+    res.json({ data: result, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/', validate(createTransactionSchema), async (req: AuthRequest, res, next) => {
   try {
     const transaction = await transactionService.createTransaction(req.userId!, req.body);

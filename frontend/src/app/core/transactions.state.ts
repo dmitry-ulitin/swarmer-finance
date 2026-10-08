@@ -31,6 +31,7 @@ export class TransactionsState {
   private readonly _hasMore = signal(true);
   private readonly _filters = signal<TransactionFilters>({});
   private readonly _selectedTransaction = signal<Transaction | null>(null);
+  private readonly _revision = signal(0);
 
   readonly transactions = this._transactions.asReadonly();
   readonly loading = this._loading.asReadonly();
@@ -41,6 +42,8 @@ export class TransactionsState {
     return from && to ? { from, to } : null;
   });
   readonly selectedTransaction = this._selectedTransaction.asReadonly();
+  /** Bumped on every reload, so views derived from the transactions refetch too. */
+  readonly revision = this._revision.asReadonly();
   readonly viewTransactions = computed<TransactionView[]>(() => {
     const accountFilter = this._filters().account;
     return this._transactions().map(t => ({
@@ -126,6 +129,7 @@ export class TransactionsState {
   }
 
   reload(): void {
+    this._revision.update(r => r + 1);
     this._selectedTransaction.set(null);
     this._transactions.set([]);
     this._hasMore.set(true);

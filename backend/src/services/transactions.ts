@@ -3,7 +3,8 @@ import * as accountQueries from '../db/queries/accounts';
 import { resolveCategoryForOwner } from './categories';
 import { expandCategoryFilter } from '../db/queries/categories';
 import { getRelatedUserIds } from '../db/queries/accountShares';
-import { toDecimal, toCents } from './currency';
+import * as userQueries from '../db/queries/users';
+import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, Transaction, TransactionDTO } from '../types';
 import { isTracked } from './chain';
 import { LEVEL, getAccessibleAccountIds, requireLevelOnAll } from './access';
@@ -363,4 +364,64 @@ export const getAccountBalances = async (
   accountIds: number[]
 ): Promise<transactionQueries.AccountBalance[]> => {
   return transactionQueries.getAccountBalances(accountIds);
+};
+
+export interface CategorySummaryItem {
+  category_id: number;
+  name: string;
+  color: string;
+  icon: string;
+  /** In the user's currency at today's rate; null when a rate is missing. */
+  total: number | null;
+  /** The unconverted sums, one per account currency. */
+  amounts: { currency: string; scale: number; amount: number }[];
+}
+
+export interface CategorySummary {
+  currency: string;
+  scale: number;
+  income: CategorySummaryItem[];
+  expense: CategorySummaryItem[];
+}
+
+export const getCategorySummary = async (
+  userId: number,
+  filters: Pick<transactionQueries.TransactionFilters, 'account' | 'from' | 'to'>
+): Promise<CategorySummary> => {
+  const user = await userQueries.getUserById(userId);
+  if (!user) throw { statusCode: 401, message: 'User not found' };
+
+  const accessibleIds = await getAccessibleAccountIds(userId);
+  const accountIds = filters.account?.length
+    ? filters.account.filter(id => accessibleIds.includes(id))
+    : accessibleIds;
+
+  const rows = await transactionQueries.getCategorySummary({ ...filters, account: accountIds });
+  const rates = await getRatesTo(user.currency, rows.map(r => r.currency));
+
+  // One item per type + name; the query splits each by currency.
+  const items = new Map<string, CategorySummaryItem & { type: 'income' | 'expense'; cents: number | null }>();
+  for (const row of rows) {
+    const key = `${row.type}:${row.name}`;
+    let item = items.get(key);
+    if (!item) {
+      item = { type: row.type, category_id: row.category_id, name: row.name, color: row.color, icon: row.icon, total: null, cents: 0, amounts: [] };
+      items.set(key, item);
+    } else if (row.category_id < item.category_id) {
+      Object.assign(item, { category_id: row.category_id, color: row.color, icon: row.icon });
+    }
+    const converted = convertAmount(row.amount, row.scale, rates.get(row.currency) ?? null, user.currency_scale);
+    item.cents = item.cents === null || converted === null ? null : item.cents + converted;
+    item.amounts.push({ currency: row.currency, scale: row.scale, amount: toDecimal(row.amount, row.scale) });
+  }
+
+  const result: CategorySummary = { currency: user.currency, scale: user.currency_scale, income: [], expense: [] };
+  for (const { type, cents, ...item } of items.values()) {
+    result[type].push({ ...item, total: cents === null ? null : toDecimal(cents, user.currency_scale) });
+  }
+  // Largest first; a category without a total cannot be ranked and goes last.
+  for (const list of [result.income, result.expense]) {
+    list.sort((a, b) => Number(a.total === null) - Number(b.total === null) || (b.total ?? 0) - (a.total ?? 0));
+  }
+  return result;
 };

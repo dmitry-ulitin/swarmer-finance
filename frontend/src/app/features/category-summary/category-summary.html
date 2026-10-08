@@ -1,0 +1,32 @@
+@for (block of blocks(); track block.type) {
+  <section class="block" [attr.data-type]="block.type" [attr.aria-label]="block.title">
+    <header class="block-header">
+      <span class="block-title">{{ block.title }}</span>
+      @if (block.total !== null) {
+        <span class="block-total">{{ block.total | money: currency() : scale() }}</span>
+      }
+    </header>
+    @for (row of block.rows; track row.category_id) {
+      <div class="row">
+        <tui-icon class="icon" [icon]="'@tui.' + row.icon" [style.color]="row.color" />
+        <span class="name">{{ row.name }}</span>
+        @if (row.hint) {
+          <span class="amount" tabindex="0" [tuiHint]="row.hint" [attr.aria-label]="row.hint">
+            {{ row.total === null ? '—' : (row.total | money: currency() : scale()) }}
+          </span>
+        } @else {
+          <span class="amount">{{ row.total | money: currency() : scale() }}</span>
+        }
+        <span class="bar" aria-hidden="true">
+          <span class="bar-fill" [style.width.%]="row.share" [style.background]="row.color"></span>
+        </span>
+      </div>
+    }
+  </section>
+}
+
+@if (loading()) {
+  <tui-loader class="loader" />
+} @else if (blocks().length === 0) {
+  <p class="empty">No income or expenses.</p>
+}

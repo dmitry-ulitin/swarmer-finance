@@ -35,6 +35,25 @@ export interface TransactionFilters {
     type?: 'income' | 'expense' | 'transfer';
 }
 
+/** One top-level category's income or expense, subcategories included. */
+export interface CategorySummaryItem {
+    category_id: number;
+    name: string;
+    color: string;
+    icon: string;
+    /** In the user's currency; null when an exchange rate is missing. */
+    total: number | null;
+    /** The unconverted sums, one per account currency. */
+    amounts: { currency: string; scale: number; amount: number }[];
+}
+
+export interface CategorySummary {
+    currency: string;
+    scale: number;
+    income: CategorySummaryItem[];
+    expense: CategorySummaryItem[];
+}
+
 export enum TransactionType {
     Transfer = 0,
     Income,

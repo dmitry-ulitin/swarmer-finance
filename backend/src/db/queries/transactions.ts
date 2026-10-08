@@ -334,6 +334,74 @@ export const getAccountBalances = async (
   return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
 };
 
+export interface CategorySummaryRow {
+  type: 'income' | 'expense';
+  category_id: number;
+  name: string;
+  color: string;
+  icon: string;
+  currency: string;
+  scale: number;
+  amount: number;
+}
+
+/**
+ * Income and expense sums per top-level category and account currency.
+ * Transfers are left out. A row with no category counts as the system
+ * Uncategorized (3 / 4) of its side. Top-level categories are grouped by
+ * root and name, as the category tree merges co-owners' rows at one path;
+ * `category_id` is the lowest id behind that name.
+ */
+export const getCategorySummary = async (
+  filters: Pick<TransactionQueryFilters, 'account' | 'from' | 'to'>
+): Promise<CategorySummaryRow[]> => {
+  // Same access gate as getTransactions: an empty list matches nothing.
+  if (filters.account.length === 0) return [];
+
+  const conditions = [
+    '(t.debit_account_id IS NULL) <> (t.credit_account_id IS NULL)',
+    'COALESCE(t.debit_account_id, t.credit_account_id) = ANY($1::int[])',
+  ];
+  const params: unknown[] = [filters.account];
+  if (filters.from) {
+    params.push(filters.from);
+    conditions.push(`t.date >= $${params.length}`);
+  }
+  if (filters.to) {
+    params.push(filters.to);
+    conditions.push(`t.date <= $${params.length}`);
+  }
+
+  const rows = await query<Omit<CategorySummaryRow, 'amount'> & { amount: string }>(
+    `WITH RECURSIVE tops AS (
+       SELECT c.id, c.id AS top_id, c.parent_id AS root_id
+       FROM categories c JOIN categories r ON r.id = c.parent_id
+       WHERE r.parent_id IS NULL
+       UNION ALL
+       SELECT c.id, t.top_id, t.root_id FROM categories c JOIN tops t ON c.parent_id = t.id
+     ),
+     grouped AS (
+       SELECT CASE WHEN t.debit_account_id IS NOT NULL THEN 'expense' ELSE 'income' END AS type,
+              top.root_id, tc.name, MIN(tc.id) AS category_id,
+              a.currency, a.scale,
+              SUM(CASE WHEN t.debit_account_id IS NOT NULL THEN t.debit ELSE t.credit END) AS amount
+       FROM transactions t
+       JOIN accounts a ON a.id = COALESCE(t.debit_account_id, t.credit_account_id)
+       JOIN tops top ON top.id = COALESCE(
+         t.category_id,
+         CASE WHEN t.debit_account_id IS NOT NULL THEN 4 ELSE 3 END
+       )
+       JOIN categories tc ON tc.id = top.top_id
+       WHERE ${conditions.join(' AND ')}
+       GROUP BY 1, top.root_id, tc.name, a.currency, a.scale
+     )
+     SELECT g.type, g.category_id, g.name, c.color, c.icon, g.currency, g.scale, g.amount
+     FROM grouped g JOIN categories c ON c.id = g.category_id`,
+    params
+  );
+  return rows.map(r => ({ ...r, amount: Number(r.amount) }));
+};
+
 /**
  * Which of `hashes` already exist on this account.
  *

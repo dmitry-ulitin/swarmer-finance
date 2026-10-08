@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category } from '../models/category';
 import { Account, AccountPayload, AccountPurgeResult, AccountSyncResult } from '../models/account';
-import { Transaction, TransactionFilters } from '../models/transaction';
+import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { Observable } from 'rxjs';
 
@@ -90,6 +90,14 @@ export class ApiService {
     filters.category?.forEach(id => { params = params.append('category', id); });
     filters.account?.forEach(id => { params = params.append('account', id); });
     return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
+  }
+
+  getCategorySummary(filters: Pick<TransactionFilters, 'account' | 'from' | 'to'>): Observable<ApiResponse<CategorySummary>> {
+    let params = new HttpParams();
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    filters.account?.forEach(id => { params = params.append('account', id); });
+    return this.http.get<ApiResponse<CategorySummary>>('/api/transactions/summary', { params });
   }
 
   updateTransaction(id: number, data: Partial<TransactionRequest>): Observable<ApiResponse<Transaction>> {
