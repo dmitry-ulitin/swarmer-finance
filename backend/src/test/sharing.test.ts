@@ -116,7 +116,7 @@ describe('Account sharing', () => {
       );
 
       const res = await request(app)
-        .get(`/api/transactions?account=${a2}`)
+        .get(`/api/transactions?accounts=${a2}`)
         .set({ Authorization: `Bearer ${tokenB}` });
 
       expect(res.status).toBe(200);
@@ -136,7 +136,7 @@ describe('Account sharing', () => {
       );
 
       const res = await request(app)
-        .get(`/api/transactions?account=${a1}&account=${a2}`)
+        .get(`/api/transactions?accounts=${a1}&accounts=${a2}`)
         .set({ Authorization: `Bearer ${tokenB}` });
 
       const descriptions = res.body.data.map((t: { description: string }) => t.description);

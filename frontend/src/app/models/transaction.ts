@@ -29,8 +29,8 @@ export interface Transaction {
 export interface TransactionFilters {
     from?: string;
     to?: string;
-    category?: number[];
-    account?: number[];
+    categories?: number[];
+    accounts?: number[];
     details?: string;
     type?: 'income' | 'expense' | 'transfer';
 }

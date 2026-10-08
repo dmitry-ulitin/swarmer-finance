@@ -37,13 +37,13 @@ export class CategorySummaryPanel {
 
   private readonly summary = resource({
     params: () => ({
-      account: this.transactions.selectedAccountIds(),
+      accounts: this.transactions.selectedAccountIds(),
       range: this.transactions.dateRange(),
       revision: this.transactions.revision(),
     }),
     loader: async ({ params }) => {
       const r = await firstValueFrom(this.api.getCategorySummary({
-        account: params.account,
+        accounts: params.accounts,
         from: params.range?.from,
         to: params.range?.to,
       }));

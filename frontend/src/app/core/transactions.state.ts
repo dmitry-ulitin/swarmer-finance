@@ -70,8 +70,8 @@ export class TransactionsState {
   readonly transactions = this._transactions.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
-  readonly selectedAccountIds = computed(() => this._filters().account ?? []);
-  readonly selectedCategoryIds = computed(() => this._filters().category ?? []);
+  readonly selectedAccountIds = computed(() => this._filters().accounts ?? []);
+  readonly selectedCategoryIds = computed(() => this._filters().categories ?? []);
   readonly dateRange = computed<DateRange | null>(() => {
     const { from, to } = this._filters();
     return from && to ? { from, to } : null;
@@ -101,8 +101,8 @@ export class TransactionsState {
   }
 
   selectAllAccounts(): void {
-    if (!this._filters().account) return;
-    this.patchFilters({ account: undefined });
+    if (!this._filters().accounts) return;
+    this.patchFilters({ accounts: undefined });
   }
 
   selectAccount(id: number): void {
@@ -110,20 +110,20 @@ export class TransactionsState {
   }
 
   toggleAccount(id: number): void {
-    const current = this._filters().account ?? [];
+    const current = this._filters().accounts ?? [];
     const next = current.includes(id) ? current.filter(a => a !== id) : [...current, id];
     this.selectAccounts(next);
   }
 
   selectAccounts(ids: number[]): void {
-    const current = this._filters().account ?? [];
+    const current = this._filters().accounts ?? [];
     const next = this.accounts.accounts().every(a => ids.includes(a.id)) ? [] : ids;
     if (sameAccountFilter(current, next)) return;
-    this.patchFilters({ account: next.length ? next : undefined });
+    this.patchFilters({ accounts: next.length ? next : undefined });
   }
 
   toggleAccounts(ids: number[]): void {
-    const current = this._filters().account ?? [];
+    const current = this._filters().accounts ?? [];
     const allSelected = ids.every(id => current.includes(id));
     const next = allSelected
       ? current.filter(id => !ids.includes(id))
@@ -143,7 +143,7 @@ export class TransactionsState {
   }
 
   private setCategories(ids: number[]): void {
-    this.patchFilters({ category: ids.length ? ids : undefined });
+    this.patchFilters({ categories: ids.length ? ids : undefined });
   }
 
   private patchFilters(patch: Partial<TransactionFilters>): void {

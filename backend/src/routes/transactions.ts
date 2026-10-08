@@ -30,8 +30,8 @@ const arrayOfIds = z.preprocess(
 const filtersSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
-  category: arrayOfIds,
-  account: arrayOfIds,
+  categories: arrayOfIds,
+  accounts: arrayOfIds,
   details: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']).optional(),
   offset: z.coerce.number().int().min(0).optional(),
@@ -50,8 +50,8 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
     const filters: TransactionFilters = {
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
-      category: toIntArray(req.query.category),
-      account: toIntArray(req.query.account),
+      categories: toIntArray(req.query.categories),
+      accounts: toIntArray(req.query.accounts),
       details: req.query.details as string | undefined,
       type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
@@ -67,7 +67,7 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
 const summarySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
-  account: arrayOfIds,
+  accounts: arrayOfIds,
 });
 
 router.get('/summary', validate(summarySchema, 'query'), async (req: AuthRequest, res, next) => {
@@ -75,7 +75,7 @@ router.get('/summary', validate(summarySchema, 'query'), async (req: AuthRequest
     const result = await transactionService.getCategorySummary(req.userId!, {
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
-      account: toIntArray(req.query.account),
+      accounts: toIntArray(req.query.accounts),
     });
     res.json({ data: result, error: null });
   } catch (error) {

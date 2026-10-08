@@ -723,7 +723,7 @@ describe('Shared categories', () => {
 
     const filterBy = async (token: string, categoryId: number) => {
       const res = await request(app)
-        .get(`/api/transactions?category=${categoryId}`)
+        .get(`/api/transactions?categories=${categoryId}`)
         .set({ Authorization: `Bearer ${token}` });
       expect(res.status).toBe(200);
       return res.body.data as any[];
@@ -836,7 +836,7 @@ describe('Shared categories', () => {
       // An id that exists for nobody: the expansion is empty, which must
       // mean "no match", never "no filter".
       const res = await request(app)
-        .get('/api/transactions?category=99999999')
+        .get('/api/transactions?categories=99999999')
         .set({ Authorization: `Bearer ${tokenA}` });
 
       expect(res.status).toBe(200);

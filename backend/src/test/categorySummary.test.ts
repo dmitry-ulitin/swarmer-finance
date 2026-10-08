@@ -135,7 +135,7 @@ describe('GET /api/transactions/summary', () => {
     await insertExpense(userId, food, eurAccount, 2000, '2026-04-01');
     await insertExpense(userId, food, fxAccount, 100, '2026-03-01');
 
-    const res = await summary(`?account=${eurAccount}&from=2026-03-01&to=2026-03-31`);
+    const res = await summary(`?accounts=${eurAccount}&from=2026-03-01&to=2026-03-31`);
 
     expect(res.body.data.expense).toEqual([expect.objectContaining({ total: 10 })]);
   });
@@ -143,7 +143,7 @@ describe('GET /api/transactions/summary', () => {
   it('ignores accounts the caller cannot reach', async () => {
     await insertExpense(otherUserId, 4, otherAccount, 1000, '2026-03-01');
 
-    const res = await summary(`?account=${otherAccount}`);
+    const res = await summary(`?accounts=${otherAccount}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data.expense).toEqual([]);

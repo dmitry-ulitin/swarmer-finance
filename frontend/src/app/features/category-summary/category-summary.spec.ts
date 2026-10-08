@@ -56,7 +56,7 @@ describe('CategorySummaryPanel', () => {
     selectedAccountIds.set([3]);
     dateRange.set({ from: '2026-03-01', to: '2026-03-31' });
     await render();
-    expect(getCategorySummary).toHaveBeenLastCalledWith({ account: [3], from: '2026-03-01', to: '2026-03-31' });
+    expect(getCategorySummary).toHaveBeenLastCalledWith({ accounts: [3], from: '2026-03-01', to: '2026-03-31' });
   });
 
   it('refetches when the filters change or the transactions reload', async () => {

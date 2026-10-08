@@ -27,7 +27,7 @@ describe('TransactionsState.setDetails', () => {
     state.selectAccount(1);
     state.setDetails('coffee');
     expect(getTransactions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ account: [1], details: 'coffee', offset: 0 }),
+      expect.objectContaining({ accounts: [1], details: 'coffee', offset: 0 }),
     );
   });
 
@@ -116,7 +116,7 @@ describe('TransactionsState category filter', () => {
     state.selectCategory(9);
     expect(state.selectedCategoryIds()).toEqual([9]);
     expect(getTransactions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ account: [1], category: [9], offset: 0 }),
+      expect.objectContaining({ accounts: [1], categories: [9], offset: 0 }),
     );
   });
 
@@ -124,7 +124,7 @@ describe('TransactionsState category filter', () => {
     state.selectCategory(9);
     state.selectCategory(9);
     expect(state.selectedCategoryIds()).toEqual([]);
-    expect(getTransactions.mock.lastCall![0].category).toBeUndefined();
+    expect(getTransactions.mock.lastCall![0].categories).toBeUndefined();
   });
 
   it('toggles categories in and out of the filter', () => {
@@ -134,7 +134,7 @@ describe('TransactionsState category filter', () => {
     state.toggleCategory(7);
     expect(state.selectedCategoryIds()).toEqual([9]);
     state.toggleCategory(9);
-    expect(getTransactions.mock.lastCall![0].category).toBeUndefined();
+    expect(getTransactions.mock.lastCall![0].categories).toBeUndefined();
   });
 });
 

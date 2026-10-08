@@ -197,20 +197,20 @@ export const getTransactions = async (
   filters: transactionQueries.TransactionFilters
 ) => {
   const accessibleIds = await getAccessibleAccountIds(userId);
-  // A supplied `account` filter is intersected with what the user may see,
-  // never trusted on its own. The result replaces `account` wholesale, so the
+  // A supplied `accounts` filter is intersected with what the user may see,
+  // never trusted on its own. The result replaces `accounts` wholesale, so the
   // query receives one list that is both the access gate and the filter.
-  const accountIds = filters.account?.length
-    ? filters.account.filter(id => accessibleIds.includes(id))
+  const accountIds = filters.accounts?.length
+    ? filters.accounts.filter(id => accessibleIds.includes(id))
     : accessibleIds;
 
   // The tree shows one node per path, backed by a row per user, and a node
   // stands for its subtree — so a filter on one id must match every row
   // behind that node. Expanding here keeps the query a plain id match.
-  let categoryIds = filters.category;
-  if (filters.category?.length) {
+  let categoryIds = filters.categories;
+  if (filters.categories?.length) {
     const relatedUserIds = await getRelatedUserIds(userId);
-    categoryIds = await expandCategoryFilter(filters.category, relatedUserIds);
+    categoryIds = await expandCategoryFilter(filters.categories, relatedUserIds);
     // An expansion that matched nothing means no transaction can match. The
     // query treats an empty list as "no category filter", so returning early
     // is what keeps that from widening into every transaction.
@@ -219,10 +219,10 @@ export const getTransactions = async (
 
   const transactions = await transactionQueries.getTransactions({
     ...filters,
-    account: accountIds,
-    category: categoryIds,
+    accounts: accountIds,
+    categories: categoryIds,
   });
-  const sequential = !filters.details && !filters.category?.length && !filters.type;
+  const sequential = !filters.details && !filters.categories?.length && !filters.type;
   const result = sequential && transactions.length > 0
     ? await attachRunningBalances(transactions, accessibleIds)
     : transactions;
@@ -386,17 +386,17 @@ export interface CategorySummary {
 
 export const getCategorySummary = async (
   userId: number,
-  filters: Pick<transactionQueries.TransactionFilters, 'account' | 'from' | 'to'>
+  filters: Pick<transactionQueries.TransactionFilters, 'accounts' | 'from' | 'to'>
 ): Promise<CategorySummary> => {
   const user = await userQueries.getUserById(userId);
   if (!user) throw { statusCode: 401, message: 'User not found' };
 
   const accessibleIds = await getAccessibleAccountIds(userId);
-  const accountIds = filters.account?.length
-    ? filters.account.filter(id => accessibleIds.includes(id))
+  const accountIds = filters.accounts?.length
+    ? filters.accounts.filter(id => accessibleIds.includes(id))
     : accessibleIds;
 
-  const rows = await transactionQueries.getCategorySummary({ ...filters, account: accountIds });
+  const rows = await transactionQueries.getCategorySummary({ ...filters, accounts: accountIds });
   const rates = await getRatesTo(user.currency, rows.map(r => r.currency));
 
   // One item per type + name; the query splits each by currency.

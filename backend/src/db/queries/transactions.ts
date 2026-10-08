@@ -2,12 +2,12 @@ import { query, queryOne, execute, Tx } from '../index';
 import { Transaction, TransactionDTO } from '../../types';
 import { CATEGORY_PATHS_CTE } from './categories';
 
-/** What the client may ask for. `account` is an optional narrowing filter. */
+/** What the client may ask for. `accounts` is an optional narrowing filter. */
 export interface TransactionFilters {
   from?: string;
   to?: string;
-  category?: number[];
-  account?: number[];
+  categories?: number[];
+  accounts?: number[];
   details?: string;
   type?: 'income' | 'expense' | 'transfer';
   offset?: number;
@@ -15,13 +15,13 @@ export interface TransactionFilters {
 }
 
 /**
- * What the query actually runs with. `account` is REQUIRED here and carries
+ * What the query actually runs with. `accounts` is REQUIRED here and carries
  * the accounts the caller may reach — it is the access gate, not a filter.
- * The service builds it by intersecting any client-supplied `account` with
+ * The service builds it by intersecting any client-supplied `accounts` with
  * the caller's accessible set, so it can only ever narrow.
  */
-export type TransactionQueryFilters = Omit<TransactionFilters, 'account'> & {
-  account: number[];
+export type TransactionQueryFilters = Omit<TransactionFilters, 'accounts'> & {
+  accounts: number[];
 };
 
 export interface CreateTransactionData {
@@ -142,18 +142,18 @@ export const getTransactions = async (
   // and any future refactor that made the predicate conditional would turn
   // an empty list into "no filter at all" — i.e. every transaction in the
   // database. Keep the guard even if the predicate looks sufficient.
-  if (filters.account.length === 0) return [];
+  if (filters.accounts.length === 0) return [];
 
   // A transaction is visible when the user can reach at least one of its
   // accounts. t.user_id records who entered it and is NOT an access filter.
   //
-  // This predicate is UNCONDITIONAL — it is the access gate. `filters.account`
+  // This predicate is UNCONDITIONAL — it is the access gate. `filters.accounts`
   // has already been intersected with the caller's accessible set by the
   // service, so it can only narrow, never widen. Do not make it conditional.
   const conditions: string[] = [
     '(t.debit_account_id = ANY($1::int[]) OR t.credit_account_id = ANY($1::int[]))',
   ];
-  const params: unknown[] = [filters.account];
+  const params: unknown[] = [filters.accounts];
   let paramIndex = 2;
 
   if (filters.from) {
@@ -166,9 +166,9 @@ export const getTransactions = async (
     params.push(filters.to);
   }
 
-  if (filters.category?.length) {
+  if (filters.categories?.length) {
     conditions.push(`t.category_id = ANY($${paramIndex++}::int[])`);
-    params.push(filters.category);
+    params.push(filters.categories);
   }
 
   if (filters.details) {
@@ -352,16 +352,16 @@ export interface CategorySummaryRow {
  * `category_id` is the lowest id behind that name.
  */
 export const getCategorySummary = async (
-  filters: Pick<TransactionQueryFilters, 'account' | 'from' | 'to'>
+  filters: Pick<TransactionQueryFilters, 'accounts' | 'from' | 'to'>
 ): Promise<CategorySummaryRow[]> => {
   // Same access gate as getTransactions: an empty list matches nothing.
-  if (filters.account.length === 0) return [];
+  if (filters.accounts.length === 0) return [];
 
   const conditions = [
     '(t.debit_account_id IS NULL) <> (t.credit_account_id IS NULL)',
     'COALESCE(t.debit_account_id, t.credit_account_id) = ANY($1::int[])',
   ];
-  const params: unknown[] = [filters.account];
+  const params: unknown[] = [filters.accounts];
   if (filters.from) {
     params.push(filters.from);
     conditions.push(`t.date >= $${params.length}`);

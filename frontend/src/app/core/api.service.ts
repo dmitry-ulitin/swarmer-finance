@@ -87,16 +87,16 @@ export class ApiService {
     if (filters.details) params = params.set('details', filters.details);
     if (filters.offset != null) params = params.set('offset', filters.offset);
     if (filters.limit != null) params = params.set('limit', filters.limit);
-    filters.category?.forEach(id => { params = params.append('category', id); });
-    filters.account?.forEach(id => { params = params.append('account', id); });
+    filters.categories?.forEach(id => { params = params.append('categories', id); });
+    filters.accounts?.forEach(id => { params = params.append('accounts', id); });
     return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
   }
 
-  getCategorySummary(filters: Pick<TransactionFilters, 'account' | 'from' | 'to'>): Observable<ApiResponse<CategorySummary>> {
+  getCategorySummary(filters: Pick<TransactionFilters, 'accounts' | 'from' | 'to'>): Observable<ApiResponse<CategorySummary>> {
     let params = new HttpParams();
     if (filters.from) params = params.set('from', filters.from);
     if (filters.to) params = params.set('to', filters.to);
-    filters.account?.forEach(id => { params = params.append('account', id); });
+    filters.accounts?.forEach(id => { params = params.append('accounts', id); });
     return this.http.get<ApiResponse<CategorySummary>>('/api/transactions/summary', { params });
   }
 

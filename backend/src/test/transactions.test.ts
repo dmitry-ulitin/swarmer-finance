@@ -97,7 +97,7 @@ describe('Transactions API', () => {
 
     it('should filter by single account', async () => {
       const res = await request(app)
-        .get(`/api/transactions?account=${testAccountId}`)
+        .get(`/api/transactions?accounts=${testAccountId}`)
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
@@ -107,7 +107,7 @@ describe('Transactions API', () => {
 
     it('should filter by multiple accounts (OR logic)', async () => {
       const res = await request(app)
-        .get(`/api/transactions?account=${testAccountId}&account=${secondAccountId}`)
+        .get(`/api/transactions?accounts=${testAccountId}&accounts=${secondAccountId}`)
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
@@ -116,7 +116,7 @@ describe('Transactions API', () => {
 
     it('should filter by multiple categories (OR logic)', async () => {
       const res = await request(app)
-        .get(`/api/transactions?category=${incomeCategoryId}&category=${expenseCategoryId}`)
+        .get(`/api/transactions?categories=${incomeCategoryId}&categories=${expenseCategoryId}`)
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
@@ -125,7 +125,7 @@ describe('Transactions API', () => {
 
     it('should filter by single category', async () => {
       const res = await request(app)
-        .get(`/api/transactions?category=${expenseCategoryId}`)
+        .get(`/api/transactions?categories=${expenseCategoryId}`)
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);
@@ -519,7 +519,7 @@ describe('Transactions API', () => {
       );
 
       const res = await request(app)
-        .get(`/api/transactions?category=${incomeCategoryId}`)
+        .get(`/api/transactions?categories=${incomeCategoryId}`)
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(200);

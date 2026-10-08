@@ -117,7 +117,8 @@ All endpoints except `/api/auth/*` require a `Bearer` JWT token.
 | POST | `/api/accounts` | Create an account |
 | PUT | `/api/accounts/:id` | Update an account |
 | DELETE | `/api/accounts/:id` | Delete an account |
-| GET | `/api/transactions` | List transactions (supports `?from=&to=&category=&type=&page=&limit=`) |
+| GET | `/api/transactions` | List transactions (supports `?from=&to=&accounts=&categories=&details=&type=&offset=&limit=`; `accounts`/`categories` repeat for several ids) |
+| GET | `/api/transactions/summary` | Income/expense totals by top-level category (supports `?from=&to=&accounts=`) |
 | POST | `/api/transactions` | Create a transaction |
 | PUT | `/api/transactions/:id` | Update a transaction |
 | DELETE | `/api/transactions/:id` | Delete a transaction |
