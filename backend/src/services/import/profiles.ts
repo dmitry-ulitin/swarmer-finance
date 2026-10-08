@@ -1,4 +1,4 @@
-export type ProfileId = 'lhv' | 'boc' | 'alfa';
+export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa';
 
 /**
  * One bank's layout, as data. Everything that differs between statements is
@@ -7,8 +7,8 @@ export type ProfileId = 'lhv' | 'boc' | 'alfa';
 export interface Profile {
   id: ProfileId;
   name: string;
-  /** Container format. Only 'csv' is implemented; 'xls' is deferred. */
-  reader: 'csv';
+  /** Container format: CSV text, or an Excel workbook (its first sheet). */
+  reader: 'csv' | 'xls';
   encoding: 'utf8';
   delimiter: string;
   /** Lines of preamble before the header row. */
@@ -21,17 +21,22 @@ export interface Profile {
    * bank that exports the same layout in several languages.
    */
   headerAliases?: Record<string, string>;
-  dateFormat: 'iso' | 'dd/mm/yyyy' | 'dd.mm.yyyy';
+  /** 'excel' is a workbook date cell's serial day number. */
+  dateFormat: 'iso' | 'dd/mm/yyyy' | 'dd.mm.yyyy' | 'excel';
   /** 'comma' implies '.' groups thousands, as in "39.384,54". */
   decimal: 'dot' | 'comma';
   amount:
     | { kind: 'signed'; column: string; directionColumn?: string; debitFlag?: string }
     | { kind: 'split'; debitColumn: string; creditColumn: string };
   columns: { date: string; description: string; payee?: string };
+  /**
+   * A preamble currency follows `after` in the line's first cell, or sits
+   * in the next cell when `after` fills the first. `aliases` maps the
+   * bank's names to our codes, e.g. the obsolete RUR to RUB.
+   */
   currency:
-    /** `aliases` maps the bank's codes to ours, e.g. the obsolete RUR to RUB. */
     | { from: 'column'; column: string; aliases?: Record<string, string> }
-    | { from: 'preamble'; line: number; after: string };
+    | { from: 'preamble'; line: number; after: string; aliases?: Record<string, string> };
   identity:
     | { kind: 'reference'; columns: string[] }
     | { kind: 'content' };
@@ -149,6 +154,24 @@ export const PROFILES: Record<ProfileId, Profile> = {
     // One export spans every account the customer holds (current, savings,
     // deposits, metal), which are imported into one account.
     internalTransfers: { accountColumn: 'accountNumber' },
+  },
+  caixa: {
+    id: 'caixa',
+    name: 'CaixaBank',
+    reader: 'xls',
+    encoding: 'utf8',
+    delimiter: ',',
+    skipLines: 2,
+    headerSignature: ['Date', 'Value date', 'Transaction', 'More data', 'Amount', 'Balance'],
+    dateFormat: 'excel',
+    decimal: 'dot',
+    amount: { kind: 'signed', column: 'Amount' },
+    // "Transaction" names the counterparty or the kind of charge ("ONEBILL
+    // MYBOX", "CUOTA T. Visa Déb"); "More data" is its free-text detail.
+    columns: { date: 'Date', description: 'More data', payee: 'Transaction' },
+    currency: { from: 'preamble', line: 1, after: 'Amounts expressed in', aliases: { euros: 'EUR' } },
+    // No per-row reference in the export.
+    identity: { kind: 'content' },
   },
 };
 

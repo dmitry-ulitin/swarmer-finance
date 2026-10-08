@@ -87,6 +87,20 @@ describe('parseStatement', () => {
     expect(result.rows).toHaveLength(10);
   });
 
+  it('auto-detects a CaixaBank Excel statement', async () => {
+    const result = await parseStatement(
+      userId, eurAccountId, fixtureB64('caixabank', 'statement.xls')
+    );
+    expect(result.format).toBe('caixa');
+    expect(result.rows).toHaveLength(5);
+  });
+
+  it('rejects a CSV file given as CaixaBank with 400', async () => {
+    await expect(
+      parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'), 'caixa')
+    ).rejects.toMatchObject({ statusCode: 400, message: 'CaixaBank statements are Excel files' });
+  });
+
   it('honours an explicit format', async () => {
     const result = await parseStatement(
       userId, eurAccountId, fixtureB64('lhv', 'statement.csv'), 'lhv'

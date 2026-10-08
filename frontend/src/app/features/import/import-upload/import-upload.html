@@ -13,7 +13,7 @@
         <tui-loader size="l" [textContent]="'Reading statement…'" />
     } @else {
         <label tuiInputFiles>
-            <input accept=".csv,text/csv" tuiInputFiles [formControl]="form.controls.file" />
+            <input accept=".csv,text/csv,.xls,application/vnd.ms-excel" tuiInputFiles [formControl]="form.controls.file" />
         </label>
     }
 

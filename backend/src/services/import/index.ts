@@ -7,6 +7,7 @@ import { readStatement } from './rows';
 import { computeImportHashes } from './hash';
 import { suggestCategories, SuggestionSource } from './categorize';
 import { parseCsv } from './csv';
+import { isWorkbook, parseWorkbook } from './workbook';
 import { getTreeCategoryIds, resolveCategoryForOwner } from '../categories';
 import { isTracked } from '../chain';
 
@@ -69,12 +70,15 @@ export const parseStatement = async (
 ): Promise<ParseResult> => {
   const account = await loadWritableAccount(accountId, userId);
 
-  const text = Buffer.from(contentBase64, 'base64').toString('utf8');
-  // Detection needs the grid, and the grid needs a delimiter — every profile
-  // today uses ',', so a plain read is enough to find the header.
-  const profile = resolveProfile(parseCsv(text), format);
+  const content = Buffer.from(contentBase64, 'base64');
+  // Detection needs the grid, and the grid needs a delimiter — every CSV
+  // profile today uses ',', so a plain read is enough to find the header.
+  const profile = resolveProfile(
+    isWorkbook(content) ? parseWorkbook(content) : parseCsv(content.toString('utf8')),
+    format
+  );
 
-  const { rows } = readStatement(text, profile, account.currency);
+  const { rows } = readStatement(content, profile, account.currency);
 
   const hashes = computeImportHashes(rows, profile);
 

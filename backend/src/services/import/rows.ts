@@ -1,4 +1,5 @@
 import { parseCsv } from './csv';
+import { isWorkbook, parseWorkbook } from './workbook';
 import { headerRow, Profile } from './profiles';
 
 export interface ParsedRow {
@@ -20,6 +21,14 @@ function parseDate(value: string, format: Profile['dateFormat']): string {
       throw { statusCode: 400, message: `Unreadable date '${value}'` };
     }
     return v;
+  }
+  if (format === 'excel') {
+    const serial = Number(v);
+    if (v === '' || !Number.isInteger(serial)) {
+      throw { statusCode: 400, message: `Unreadable date '${value}'` };
+    }
+    // Day 0 is 1899-12-30, which absorbs Lotus's phantom 1900-02-29.
+    return new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000).toISOString().slice(0, 10);
   }
   const m = v.match(
     format === 'dd.mm.yyyy' ? /^(\d{2})\.(\d{2})\.(\d{4})$/ : /^(\d{2})\/(\d{2})\/(\d{4})$/
@@ -77,12 +86,21 @@ function dropInternalTransfers(rows: Candidate[]): Candidate[] {
  * but a statement with nothing in that currency is refused, since it is
  * almost certainly the wrong file.
  */
+/** The statement's cells, read the way its profile's container needs. */
+export function readGrid(content: Buffer, profile: Profile): string[][] {
+  if (profile.reader === 'csv') return parseCsv(content.toString('utf8'), profile.delimiter);
+  if (!isWorkbook(content)) {
+    throw { statusCode: 400, message: `${profile.name} statements are Excel files` };
+  }
+  return parseWorkbook(content);
+}
+
 export function readStatement(
-  text: string,
+  content: Buffer | string,
   profile: Profile,
   accountCurrency: string
 ): { rows: ParsedRow[] } {
-  const grid = parseCsv(text, profile.delimiter);
+  const grid = readGrid(typeof content === 'string' ? Buffer.from(content) : content, profile);
   const header = headerRow(grid, profile);
   if (!header) {
     throw { statusCode: 400, message: 'Statement has no header row' };
@@ -103,10 +121,11 @@ export function readStatement(
   if (profile.currency.from === 'preamble') {
     const line = grid[profile.currency.line];
     const label = profile.currency.after;
-    if (!line || line[0] !== label) {
+    if (!line || !(line[0] ?? '').startsWith(label)) {
       throw { statusCode: 400, message: `Statement preamble is missing '${label}'` };
     }
-    const currency = (line[1] || '').trim();
+    const name = line[0].slice(label.length).trim() || (line[1] || '').trim();
+    const currency = profile.currency.aliases?.[name] ?? name;
     if (!currency) {
       throw { statusCode: 400, message: 'Could not determine the statement currency' };
     }

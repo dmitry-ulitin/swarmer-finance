@@ -2,9 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseCsv } from '../services/import/csv';
 import { PROFILES, detectProfile, getProfile } from '../services/import/profiles';
+import { readGrid } from '../services/import/rows';
+import { parseWorkbook } from '../services/import/workbook';
 
-const fixture = (...p: string[]) =>
-  fs.readFileSync(path.join(__dirname, 'fixtures', 'banks', ...p), 'utf8');
+const fixtureBytes = (...p: string[]) =>
+  fs.readFileSync(path.join(__dirname, 'fixtures', 'banks', ...p));
+const fixture = (...p: string[]) => fixtureBytes(...p).toString('utf8');
 
 describe('profiles', () => {
   it('detects LHV from its header signature', () => {
@@ -22,6 +25,11 @@ describe('profiles', () => {
     expect(detectProfile(grid)?.id).toBe('alfa');
   });
 
+  it('detects CaixaBank in an Excel workbook past its preamble', () => {
+    const grid = parseWorkbook(fixtureBytes('caixabank', 'statement.xls'));
+    expect(detectProfile(grid)?.id).toBe('caixa');
+  });
+
   it('returns null for an unrecognised file', () => {
     expect(detectProfile([['foo', 'bar'], ['1', '2']])).toBeNull();
   });
@@ -37,13 +45,14 @@ describe('profiles', () => {
       lhv: ['lhv', 'statement.csv'],
       boc: ['bank_of_cyprus', 'statement.csv'],
       alfa: ['alfabank', 'statement.csv'],
+      caixa: ['caixabank', 'statement.xls'],
     };
 
     for (const profile of Object.values(PROFILES)) {
       const fixturePath = fixturePaths[profile.id];
       expect(fixturePath).toBeDefined();
 
-      const grid = parseCsv(fixture(...fixturePath));
+      const grid = readGrid(fixtureBytes(...fixturePath), profile);
       const header = grid[profile.skipLines];
       expect(header).toBeDefined();
 
@@ -51,7 +60,6 @@ describe('profiles', () => {
         expect(header.includes(col)).toBe(true);
       }
 
-      expect(profile.reader).toBe('csv');
     }
   });
 });

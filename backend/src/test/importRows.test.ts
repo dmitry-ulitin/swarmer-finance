@@ -199,3 +199,29 @@ describe('readStatement — Alfa-Bank', () => {
     expect(rows.map(r => r.index)).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });
+
+describe('readStatement — CaixaBank (Excel)', () => {
+  const bytes = () => fs.readFileSync(path.join(__dirname, 'fixtures', 'banks', 'caixabank', 'statement.xls'));
+  const result = () => readStatement(bytes(), PROFILES.caixa, 'EUR');
+
+  it('reads the data rows past the two-line preamble', () => {
+    expect(result().rows.map(r => r.amount)).toEqual([-306, -36, -53.31, -23.3, 1250.5]);
+  });
+
+  it('turns Excel date serials into ISO dates', () => {
+    expect(result().rows.map(r => r.date)).toEqual([
+      '2026-09-01', '2026-05-12', '2025-12-31', '2025-12-31', '2025-12-19',
+    ]);
+  });
+
+  it('reads "Transaction" as payee and "More data" as description', () => {
+    expect(result().rows[0]).toMatchObject({ payee: 'MERCHANT 001', description: 'Description 1' });
+    expect(result().rows[1]).toMatchObject({ payee: 'MERCHANT 002', description: '' });
+  });
+
+  it('reads the currency from "Amounts expressed in euros"', () => {
+    expect(() => readStatement(bytes(), PROFILES.caixa, 'USD')).toThrow(
+      expect.objectContaining({ statusCode: 400, message: 'Statement is in EUR but the account is in USD' })
+    );
+  });
+});
