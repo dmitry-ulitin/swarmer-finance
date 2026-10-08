@@ -37,6 +37,7 @@ export class TransactionsState {
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
   readonly selectedAccountIds = computed(() => this._filters().account ?? []);
+  readonly selectedCategoryIds = computed(() => this._filters().category ?? []);
   readonly dateRange = computed<DateRange | null>(() => {
     const { from, to } = this._filters();
     return from && to ? { from, to } : null;
@@ -104,6 +105,22 @@ export class TransactionsState {
       ? current.filter(id => !ids.includes(id))
       : [...new Set([...current, ...ids])];
     this.selectAccounts(next);
+  }
+
+  /** Filters by this category alone; selecting the sole selected category clears the filter. */
+  selectCategory(id: number): void {
+    const current = this.selectedCategoryIds();
+    this.setCategories(current.length === 1 && current[0] === id ? [] : [id]);
+  }
+
+  toggleCategory(id: number): void {
+    const current = this.selectedCategoryIds();
+    this.setCategories(current.includes(id) ? current.filter(c => c !== id) : [...current, id]);
+  }
+
+  private setCategories(ids: number[]): void {
+    this._filters.update(f => ({ ...f, category: ids.length ? ids : undefined }));
+    this.reload();
   }
 
   loadMore(): void {

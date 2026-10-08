@@ -16,6 +16,9 @@ describe('CategorySummaryPanel', () => {
   let selectedAccountIds: ReturnType<typeof signal<number[]>>;
   let dateRange: ReturnType<typeof signal<DateRange | null>>;
   let revision: ReturnType<typeof signal<number>>;
+  let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
+  let selectCategory: ReturnType<typeof vi.fn>;
+  let toggleCategory: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<CategorySummaryPanel>;
 
   function respond(summary: Partial<CategorySummary>): void {
@@ -37,10 +40,13 @@ describe('CategorySummaryPanel', () => {
     selectedAccountIds = signal<number[]>([]);
     dateRange = signal<DateRange | null>(null);
     revision = signal(0);
+    selectedCategoryIds = signal<number[]>([]);
+    selectCategory = vi.fn();
+    toggleCategory = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: ApiService, useValue: { getCategorySummary } },
-        { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision } },
+        { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision, selectedCategoryIds, selectCategory, toggleCategory } },
       ],
     });
     fixture = TestBed.createComponent(CategorySummaryPanel);
@@ -88,5 +94,30 @@ describe('CategorySummaryPanel', () => {
   it('says so when there is nothing to show', async () => {
     const el = await render();
     expect(el.querySelector('.empty')).not.toBeNull();
+  });
+
+  it('filters by a category on click and toggles it on ctrl- or meta-click', async () => {
+    respond({ expense: [item('Food', 75)] });
+    const el = await render();
+    const row = el.querySelector('.row') as HTMLButtonElement;
+
+    row.dispatchEvent(new MouseEvent('click'));
+    row.dispatchEvent(new MouseEvent('click', { ctrlKey: true }));
+    row.dispatchEvent(new MouseEvent('click', { metaKey: true }));
+
+    expect(selectCategory).toHaveBeenCalledExactlyOnceWith(4);
+    expect(toggleCategory).toHaveBeenCalledTimes(2);
+    expect(toggleCategory).toHaveBeenCalledWith(4);
+  });
+
+  it('marks the selected categories', async () => {
+    respond({ expense: [item('Food', 75), item('Transport', 25)] });
+    selectedCategoryIds.set([9]);
+    const el = await render();
+    const rows = el.querySelectorAll('.row');
+
+    expect(rows[1].classList).toContain('selected');
+    expect(rows[1].getAttribute('aria-pressed')).toBe('true');
+    expect(rows[0].getAttribute('aria-pressed')).toBe('false');
   });
 });

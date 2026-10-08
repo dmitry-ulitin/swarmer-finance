@@ -6,6 +6,8 @@ import { TuiAutoColorPipe, TuiChip } from '@taiga-ui/kit';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState, selectedAccountChips } from '../../core/accounts.state';
+import { CategoriesState } from '../../core/categories.state';
+import { findCategoryById } from '../../models/category';
 import { DateRangeFilter } from './date-range-filter/date-range-filter';
 
 @Component({
@@ -18,9 +20,14 @@ import { DateRangeFilter } from './date-range-filter/date-range-filter';
 export class FiltersBar {
   protected readonly transactions = inject(TransactionsState);
   private readonly accounts = inject(AccountsState);
+  private readonly categories = inject(CategoriesState);
   protected readonly accountChips = computed(() =>
     selectedAccountChips(this.accounts.groupedAccounts(), new Set(this.transactions.selectedAccountIds()))
   );
+  protected readonly categoryChips = computed(() => {
+    const tree = this.categories.categories();
+    return this.transactions.selectedCategoryIds().map(id => ({ id, label: findCategoryById(id, tree)?.fullName ?? `#${id}` }));
+  });
   protected readonly details = new FormControl('', { nonNullable: true });
 
   constructor() {

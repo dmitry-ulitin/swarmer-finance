@@ -7,11 +7,18 @@
       }
     </header>
     @for (row of block.rows; track row.category_id) {
-      <div class="row">
+      <button
+        type="button"
+        class="row"
+        [class.selected]="selected().has(row.category_id)"
+        [attr.aria-pressed]="selected().has(row.category_id)"
+        [attr.aria-description]="row.hint"
+        (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleCategory(row.category_id) : transactions.selectCategory(row.category_id)"
+      >
         <tui-icon class="icon" [icon]="'@tui.' + row.icon" [style.color]="row.color" />
         <span class="name">{{ row.name }}</span>
         @if (row.hint) {
-          <span class="amount" tabindex="0" [tuiHint]="row.hint" [attr.aria-label]="row.hint">
+          <span class="amount" [tuiHint]="row.hint">
             {{ row.total === null ? '—' : (row.total | money: currency() : scale()) }}
           </span>
         } @else {
@@ -20,7 +27,7 @@
         <span class="bar" aria-hidden="true">
           <span class="bar-fill" [style.width.%]="row.share" [style.background]="row.color"></span>
         </span>
-      </div>
+      </button>
     }
   </section>
 }

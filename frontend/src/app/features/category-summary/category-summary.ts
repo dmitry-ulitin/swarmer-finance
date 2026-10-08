@@ -32,7 +32,7 @@ interface SummaryBlock {
 })
 export class CategorySummaryPanel {
   private readonly api = inject(ApiService);
-  private readonly transactions = inject(TransactionsState);
+  protected readonly transactions = inject(TransactionsState);
   private readonly money = inject(MoneyPipe);
 
   private readonly summary = resource({
@@ -52,6 +52,7 @@ export class CategorySummaryPanel {
   });
 
   protected readonly loading = this.summary.isLoading;
+  protected readonly selected = computed(() => new Set(this.transactions.selectedCategoryIds()));
   protected readonly currency = computed(() => this.summary.value()?.currency ?? '');
   protected readonly scale = computed(() => this.summary.value()?.scale ?? 2);
 

@@ -5,6 +5,8 @@ import { FiltersBar } from './filters-bar';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState, buildAccountTree } from '../../core/accounts.state';
 import { Account } from '../../models/account';
+import { CategoriesState } from '../../core/categories.state';
+import { Category } from '../../models/category';
 
 function makeAccount(id: number, name: string): Account {
   return {
@@ -16,6 +18,8 @@ function makeAccount(id: number, name: string): Account {
 describe('FiltersBar', () => {
   let setDetails: ReturnType<typeof vi.fn>;
   let toggleAccounts: ReturnType<typeof vi.fn>;
+  let toggleCategory: ReturnType<typeof vi.fn>;
+  let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectedAccountIds: ReturnType<typeof signal<number[]>>;
   let fixture: ComponentFixture<FiltersBar>;
   let input: HTMLInputElement;
@@ -24,14 +28,19 @@ describe('FiltersBar', () => {
     vi.useFakeTimers();
     setDetails = vi.fn();
     toggleAccounts = vi.fn();
+    toggleCategory = vi.fn();
+    selectedCategoryIds = signal<number[]>([]);
     selectedAccountIds = signal<number[]>([]);
     const groupedAccounts = signal(buildAccountTree([
       makeAccount(1, 'Cash'), makeAccount(2, 'Bank/A'), makeAccount(3, 'Bank/B'),
     ]));
     TestBed.configureTestingModule({
       providers: [
-        { provide: TransactionsState, useValue: { setDetails, toggleAccounts, selectedAccountIds, dateRange: signal(null) } },
+        { provide: TransactionsState, useValue: {
+          setDetails, toggleAccounts, selectedAccountIds, dateRange: signal(null), toggleCategory, selectedCategoryIds,
+        } },
         { provide: AccountsState, useValue: { groupedAccounts } },
+        { provide: CategoriesState, useValue: { categories: signal([{ id: 2, fullName: '', children: [{ id: 7, fullName: 'Food' }] } as Category]) } },
       ],
     });
     fixture = TestBed.createComponent(FiltersBar);
@@ -72,7 +81,7 @@ describe('FiltersBar', () => {
 
   function chips(): HTMLElement[] {
     fixture.detectChanges();
-    return Array.from(fixture.nativeElement.querySelectorAll(':scope > [tuiChip]'));
+    return Array.from(fixture.nativeElement.querySelectorAll(':scope > [tuiChip]:not([data-kind="category"])'));
   }
 
   it('shows no account chips without an account filter', () => {
@@ -88,5 +97,21 @@ describe('FiltersBar', () => {
     selectedAccountIds.set([2, 3]);
     chips()[0].querySelector('button')!.click();
     expect(toggleAccounts).toHaveBeenCalledExactlyOnceWith([2, 3]);
+  });
+
+  function categoryChips(): HTMLElement[] {
+    fixture.detectChanges();
+    return Array.from(fixture.nativeElement.querySelectorAll('[data-kind="category"]'));
+  }
+
+  it('shows a chip per selected category, by its path', () => {
+    selectedCategoryIds.set([7, 8]);
+    expect(categoryChips().map(c => c.textContent!.replace('Remove', '').trim())).toEqual(['Food', '#8']);
+  });
+
+  it('removes a category from the filter with its X button', () => {
+    selectedCategoryIds.set([7]);
+    categoryChips()[0].querySelector('button')!.click();
+    expect(toggleCategory).toHaveBeenCalledExactlyOnceWith(7);
   });
 });

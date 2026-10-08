@@ -93,3 +93,47 @@ describe('TransactionsState.setDateRange', () => {
     expect(state.dateRange()).toBeNull();
   });
 });
+
+describe('TransactionsState category filter', () => {
+  let state: TransactionsState;
+  let getTransactions: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    getTransactions = vi.fn(() => of({ data: [], error: null }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+      ],
+    });
+    state = TestBed.inject(TransactionsState);
+  });
+
+  it('selects one category, replacing the previous ones and keeping the account filter', () => {
+    state.selectAccount(1);
+    state.toggleCategory(7);
+    state.selectCategory(9);
+    expect(state.selectedCategoryIds()).toEqual([9]);
+    expect(getTransactions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ account: [1], category: [9], offset: 0 }),
+    );
+  });
+
+  it('clears the filter when the sole selected category is selected again', () => {
+    state.selectCategory(9);
+    state.selectCategory(9);
+    expect(state.selectedCategoryIds()).toEqual([]);
+    expect(getTransactions.mock.lastCall![0].category).toBeUndefined();
+  });
+
+  it('toggles categories in and out of the filter', () => {
+    state.toggleCategory(7);
+    state.toggleCategory(9);
+    expect(state.selectedCategoryIds()).toEqual([7, 9]);
+    state.toggleCategory(7);
+    expect(state.selectedCategoryIds()).toEqual([9]);
+    state.toggleCategory(9);
+    expect(getTransactions.mock.lastCall![0].category).toBeUndefined();
+  });
+});
