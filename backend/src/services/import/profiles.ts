@@ -1,4 +1,4 @@
-export type ProfileId = 'lhv' | 'boc';
+export type ProfileId = 'lhv' | 'boc' | 'alfa';
 
 /**
  * One bank's layout, as data. Everything that differs between statements is
@@ -21,7 +21,7 @@ export interface Profile {
    * bank that exports the same layout in several languages.
    */
   headerAliases?: Record<string, string>;
-  dateFormat: 'iso' | 'dd/mm/yyyy';
+  dateFormat: 'iso' | 'dd/mm/yyyy' | 'dd.mm.yyyy';
   /** 'comma' implies '.' groups thousands, as in "39.384,54". */
   decimal: 'dot' | 'comma';
   amount:
@@ -29,11 +29,20 @@ export interface Profile {
     | { kind: 'split'; debitColumn: string; creditColumn: string };
   columns: { date: string; description: string; payee?: string };
   currency:
-    | { from: 'column'; column: string }
+    /** `aliases` maps the bank's codes to ours, e.g. the obsolete RUR to RUB. */
+    | { from: 'column'; column: string; aliases?: Record<string, string> }
     | { from: 'preamble'; line: number; after: string };
   identity:
     | { kind: 'reference'; columns: string[] }
     | { kind: 'content' };
+  /**
+   * For a statement covering several of the customer's accounts at one
+   * bank: rows that are two sides of a move between those accounts (same
+   * date, description and amount, opposite signs, different values in
+   * `accountColumn`) are dropped, since they net to zero on the one account
+   * the statement is imported into.
+   */
+  internalTransfers?: { accountColumn: string };
 }
 
 export const PROFILES: Record<ProfileId, Profile> = {
@@ -117,6 +126,29 @@ export const PROFILES: Record<ProfileId, Profile> = {
     columns: { date: 'Date', description: 'Description' },
     currency: { from: 'preamble', line: 4, after: 'Account currency:' },
     identity: { kind: 'reference', columns: ['Bank reference number'] },
+  },
+  alfa: {
+    id: 'alfa',
+    name: 'Alfa-Bank',
+    reader: 'csv',
+    encoding: 'utf8',
+    delimiter: ',',
+    skipLines: 0,
+    headerSignature: ['operationDate', 'accountNumber', 'merchant', 'amount', 'type'],
+    dateFormat: 'dd.mm.yyyy',
+    decimal: 'dot',
+    // Amounts are unsigned; "type" says which way the money went.
+    amount: { kind: 'signed', column: 'amount', directionColumn: 'type', debitFlag: 'Списание' },
+    // "category" is the bank's own spending category ("Коммунальные услуги");
+    // there is no payee column, and it is what the category suggestions key
+    // on. "merchant" holds the merchant or the payment's wording.
+    columns: { date: 'operationDate', description: 'merchant', payee: 'category' },
+    currency: { from: 'column', column: 'currency', aliases: { RUR: 'RUB' } },
+    // No per-row reference in the export.
+    identity: { kind: 'content' },
+    // One export spans every account the customer holds (current, savings,
+    // deposits, metal), which are imported into one account.
+    internalTransfers: { accountColumn: 'accountNumber' },
   },
 };
 

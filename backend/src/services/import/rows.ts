@@ -21,7 +21,9 @@ function parseDate(value: string, format: Profile['dateFormat']): string {
     }
     return v;
   }
-  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const m = v.match(
+    format === 'dd.mm.yyyy' ? /^(\d{2})\.(\d{2})\.(\d{4})$/ : /^(\d{2})\/(\d{2})\/(\d{4})$/
+  );
   if (!m) throw { statusCode: 400, message: `Unreadable date '${value}'` };
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
@@ -42,10 +44,44 @@ function parseAmount(value: string, decimal: Profile['decimal']): number {
 /** Rounds away float drift from the decimal parse, e.g. 0.1 + 0.2 cases. */
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+type Candidate = Omit<ParsedRow, 'index'> & { account: string };
+
+/**
+ * Drops pairs of rows that move money between two of the customer's own
+ * accounts: same date, description and amount, opposite signs, different
+ * accounts. Each row pairs at most once, so two genuine identical payments
+ * are not consumed by one transfer.
+ */
+function dropInternalTransfers(rows: Candidate[]): Candidate[] {
+  const dropped = new Set<Candidate>();
+  for (const out of rows) {
+    if (out.amount >= 0 || dropped.has(out)) continue;
+    const mirror = rows.find(r =>
+      !dropped.has(r)
+      && r.amount === -out.amount
+      && r.account !== out.account
+      && r.date === out.date
+      && r.description === out.description
+    );
+    if (mirror) {
+      dropped.add(out);
+      dropped.add(mirror);
+    }
+  }
+  return rows.filter(r => !dropped.has(r));
+}
+
+/**
+ * The statement's rows in `accountCurrency`. Rows in any other currency are
+ * skipped — a multi-currency statement is imported one currency at a time —
+ * but a statement with nothing in that currency is refused, since it is
+ * almost certainly the wrong file.
+ */
 export function readStatement(
   text: string,
-  profile: Profile
-): { rows: ParsedRow[]; currency: string } {
+  profile: Profile,
+  accountCurrency: string
+): { rows: ParsedRow[] } {
   const grid = parseCsv(text, profile.delimiter);
   const header = headerRow(grid, profile);
   if (!header) {
@@ -62,28 +98,30 @@ export function readStatement(
   const dateIdx = col(profile.columns.date);
   const descIdx = col(profile.columns.description);
   const payeeIdx = profile.columns.payee ? col(profile.columns.payee) : -1;
+  const accountIdx = profile.internalTransfers ? col(profile.internalTransfers.accountColumn) : -1;
 
-  let currency: string;
-  if (profile.currency.from === 'column') {
-    currency = '';
-  } else {
+  if (profile.currency.from === 'preamble') {
     const line = grid[profile.currency.line];
     const label = profile.currency.after;
     if (!line || line[0] !== label) {
       throw { statusCode: 400, message: `Statement preamble is missing '${label}'` };
     }
-    currency = (line[1] || '').trim();
+    const currency = (line[1] || '').trim();
+    if (!currency) {
+      throw { statusCode: 400, message: 'Could not determine the statement currency' };
+    }
+    if (currency !== accountCurrency) {
+      throw {
+        statusCode: 400,
+        message: `Statement is in ${currency} but the account is in ${accountCurrency}`,
+      };
+    }
   }
 
-  const rows: ParsedRow[] = [];
-  const dataRows = grid.slice(profile.skipLines + 1);
+  let candidates: Candidate[] = [];
+  const otherCurrencies = new Set<string>();
 
-  // index is assigned only to rows that survive the zero-amount filter
-  // below, so it stays contiguous and computeImportHashes (which relies on
-  // index for nothing, but does rely on occurrence order) sees the same set
-  // that is returned.
-  let index = 0;
-  dataRows.forEach(raw => {
+  grid.slice(profile.skipLines + 1).forEach(raw => {
     let amount: number;
     if (profile.amount.kind === 'signed') {
       amount = parseAmount(raw[col(profile.amount.column)] ?? '', profile.decimal);
@@ -99,22 +137,18 @@ export function readStatement(
     }
 
     if (profile.currency.from === 'column') {
-      const rowCurrency = (raw[col(profile.currency.column)] ?? '').trim();
-      if (!currency) currency = rowCurrency;
-      else if (rowCurrency && rowCurrency !== currency) {
-        throw {
-          statusCode: 400,
-          message: `Statement mixes currencies (${currency} and ${rowCurrency}); import one currency at a time`,
-        };
+      const code = (raw[col(profile.currency.column)] ?? '').trim();
+      const rowCurrency = profile.currency.aliases?.[code] ?? code;
+      if (rowCurrency && rowCurrency !== accountCurrency) {
+        otherCurrencies.add(rowCurrency);
+        return;
       }
     }
 
     const rounded = round2(amount);
     // A zero amount is nothing importable: an empty amount cell, or (Bank of
     // Cyprus) a row with both Debit and Credit blank — an informational /
-    // memo line real statements carry. Dropped here, before index is
-    // assigned, so index stays contiguous and computeImportHashes' occurrence
-    // counting sees exactly the rows that are returned.
+    // memo line real statements carry.
     if (rounded === 0) return;
 
     const reference =
@@ -122,18 +156,29 @@ export function readStatement(
         ? profile.identity.columns.map(c => (raw[col(c)] ?? '').trim()).join('|') || null
         : null;
 
-    rows.push({
-      index: index++,
+    candidates.push({
       date: parseDate(raw[dateIdx] ?? '', profile.dateFormat),
       amount: rounded,
       description: (raw[descIdx] ?? '').trim(),
       payee: payeeIdx === -1 ? null : (raw[payeeIdx] ?? '').trim() || null,
       reference,
+      account: accountIdx === -1 ? '' : (raw[accountIdx] ?? '').trim(),
     });
   });
 
-  if (!currency) {
-    throw { statusCode: 400, message: 'Could not determine the statement currency' };
+  if (candidates.length === 0 && otherCurrencies.size > 0) {
+    throw {
+      statusCode: 400,
+      message: `Statement is in ${[...otherCurrencies].join(', ')} but the account is in ${accountCurrency}`,
+    };
   }
-  return { rows, currency };
+
+  if (profile.internalTransfers) candidates = dropInternalTransfers(candidates);
+
+  // index is assigned only to rows that survive every filter above, so it
+  // stays contiguous and computeImportHashes' occurrence counting sees
+  // exactly the rows that are returned.
+  return {
+    rows: candidates.map(({ account: _account, ...row }, index) => ({ index, ...row })),
+  };
 }

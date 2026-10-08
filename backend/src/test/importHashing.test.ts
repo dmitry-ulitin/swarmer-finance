@@ -18,7 +18,7 @@ describe('computeImportHashes', () => {
     // including a 100,000 EUR deposit close, were silently dropped on import.
     // "Account servicer reference" is unique per row, which is why the
     // profile uses it.
-    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv);
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv, 'EUR');
     const hashes = computeImportHashes(rows, PROFILES.lhv);
 
     expect(new Set(hashes).size).toBe(rows.length);
@@ -32,20 +32,20 @@ describe('computeImportHashes', () => {
       ...PROFILES.lhv,
       identity: { kind: 'reference', columns: ['Transaction reference'] },
     };
-    const { rows } = readStatement(fixture('lhv', 'statement.csv'), batchRefProfile);
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), batchRefProfile, 'EUR');
     const hashes = computeImportHashes(rows, batchRefProfile);
 
     expect(new Set(hashes).size).toBeLessThan(rows.length);
   });
 
   it('is stable across runs over the same file', () => {
-    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv);
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv, 'EUR');
     expect(computeImportHashes(rows, PROFILES.lhv))
       .toEqual(computeImportHashes(rows, PROFILES.lhv));
   });
 
   it('gives every LHV row a distinct hash, via its bank reference', () => {
-    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv);
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), PROFILES.lhv, 'EUR');
     const hashes = computeImportHashes(rows, PROFILES.lhv);
     expect(new Set(hashes).size).toBe(143);
   });
@@ -54,14 +54,14 @@ describe('computeImportHashes', () => {
     // The fixture holds four rows booked 2026-07-29 at -10.00 that are
     // identical in every field the file exposes. A content hash must still
     // tell them apart, or a re-import would collapse four charges into one.
-    const { rows } = readStatement(fixture('lhv', 'statement.csv'), contentProfile);
+    const { rows } = readStatement(fixture('lhv', 'statement.csv'), contentProfile, 'EUR');
     const hashes = computeImportHashes(rows, contentProfile);
     expect(new Set(hashes).size).toBe(rows.length);
   });
 
   it('matches the same content row across two parses of the same file', () => {
-    const a = readStatement(fixture('lhv', 'statement.csv'), contentProfile);
-    const b = readStatement(fixture('lhv', 'statement.csv'), contentProfile);
+    const a = readStatement(fixture('lhv', 'statement.csv'), contentProfile, 'EUR');
+    const b = readStatement(fixture('lhv', 'statement.csv'), contentProfile, 'EUR');
     expect(computeImportHashes(a.rows, contentProfile))
       .toEqual(computeImportHashes(b.rows, contentProfile));
   });

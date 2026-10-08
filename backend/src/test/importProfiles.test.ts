@@ -17,6 +17,11 @@ describe('profiles', () => {
     expect(detectProfile(grid)?.id).toBe('boc');
   });
 
+  it('detects Alfa-Bank through its byte-order mark', () => {
+    const grid = parseCsv(fixture('alfabank', 'statement.csv'));
+    expect(detectProfile(grid)?.id).toBe('alfa');
+  });
+
   it('returns null for an unrecognised file', () => {
     expect(detectProfile([['foo', 'bar'], ['1', '2']])).toBeNull();
   });
@@ -31,6 +36,7 @@ describe('profiles', () => {
     const fixturePaths: Record<string, string[]> = {
       lhv: ['lhv', 'statement.csv'],
       boc: ['bank_of_cyprus', 'statement.csv'],
+      alfa: ['alfabank', 'statement.csv'],
     };
 
     for (const profile of Object.values(PROFILES)) {

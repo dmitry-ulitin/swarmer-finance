@@ -74,14 +74,7 @@ export const parseStatement = async (
   // today uses ',', so a plain read is enough to find the header.
   const profile = resolveProfile(parseCsv(text), format);
 
-  const { rows, currency } = readStatement(text, profile);
-
-  if (currency !== account.currency) {
-    throw {
-      statusCode: 400,
-      message: `Statement is in ${currency} but the account is in ${account.currency}`,
-    };
-  }
+  const { rows } = readStatement(text, profile, account.currency);
 
   const hashes = computeImportHashes(rows, profile);
 
