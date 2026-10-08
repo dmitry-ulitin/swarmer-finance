@@ -347,8 +347,7 @@ export interface CategorySummaryRow {
 
 /**
  * Income and expense sums per top-level category and account currency.
- * Transfers are left out. A row with no category counts as the system
- * Uncategorized (3 / 4) of its side. Top-level categories are grouped by
+ * Transfers are left out. Top-level categories are grouped by
  * root and name, as the category tree merges co-owners' rows at one path;
  * `category_id` is the lowest id behind that name.
  */
@@ -387,10 +386,7 @@ export const getCategorySummary = async (
               SUM(CASE WHEN t.debit_account_id IS NOT NULL THEN t.debit ELSE t.credit END) AS amount
        FROM transactions t
        JOIN accounts a ON a.id = COALESCE(t.debit_account_id, t.credit_account_id)
-       JOIN tops top ON top.id = COALESCE(
-         t.category_id,
-         CASE WHEN t.debit_account_id IS NOT NULL THEN 4 ELSE 3 END
-       )
+       JOIN tops top ON top.id = t.category_id
        JOIN categories tc ON tc.id = top.top_id
        WHERE ${conditions.join(' AND ')}
        GROUP BY 1, top.root_id, tc.name, a.currency, a.scale

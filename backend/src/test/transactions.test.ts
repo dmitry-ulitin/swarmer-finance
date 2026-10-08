@@ -665,4 +665,32 @@ describe('Transactions API', () => {
       expect(res.body.data.success).toBe(true);
     });
   });
+
+  describe('category constraint', () => {
+    const insert = (categoryId: number | null, debitId: number | null, creditId: number | null) =>
+      pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, $4, 100, 100, '2026-03-01')`,
+        [testUserId, categoryId, debitId, creditId]
+      );
+
+    afterEach(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+    });
+
+    it('rejects an expense or income without a category', async () => {
+      await expect(insert(null, testAccountId, null)).rejects.toThrow(/chk_transactions_category/);
+      await expect(insert(null, null, testAccountId)).rejects.toThrow(/chk_transactions_category/);
+    });
+
+    it('rejects a transfer with a category', async () => {
+      await expect(insert(expenseCategoryId, testAccountId, secondAccountId)).rejects.toThrow(/chk_transactions_category/);
+    });
+
+    it('accepts each type in its documented shape', async () => {
+      await insert(expenseCategoryId, testAccountId, null);
+      await insert(incomeCategoryId, null, testAccountId);
+      await insert(null, testAccountId, secondAccountId);
+    });
+  });
 });

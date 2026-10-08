@@ -65,7 +65,7 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→014)
+- Migrations in `backend/src/db/migrations/` — run in order (001→015)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -128,6 +128,10 @@ One `transactions` table covers expense, income, and transfer; the type is impli
 | Expense | filled | null | required |
 | Income | null | filled | required |
 | Transfer | filled | filled | null |
+
+The category column is enforced by `chk_transactions_category` (migration
+015): an expense/income without a category is stored as the system
+Uncategorized (ids 3 / 4), never NULL.
 
 No per-transaction `currency` field and no stored exchange rate. Expense/
 income are always denominated in the account's own currency (`debit` and `credit` are equal). Transfers

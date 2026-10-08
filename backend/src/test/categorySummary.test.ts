@@ -30,7 +30,7 @@ async function insertAccount(userId: number, name: string, currency: string): Pr
   return r.rows[0].id;
 }
 
-async function insertExpense(userId: number, categoryId: number | null, accountId: number, amount: number, date: string) {
+async function insertExpense(userId: number, categoryId: number, accountId: number, amount: number, date: string) {
   await pool.query(
     `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
      VALUES ($1, $2, $3, $4, $4, $5)`,
@@ -38,7 +38,7 @@ async function insertExpense(userId: number, categoryId: number | null, accountI
   );
 }
 
-async function insertIncome(userId: number, categoryId: number | null, accountId: number, amount: number, date: string) {
+async function insertIncome(userId: number, categoryId: number, accountId: number, amount: number, date: string) {
   await pool.query(
     `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
      VALUES ($1, $2, $3, $4, $4, $5)`,
@@ -114,14 +114,13 @@ describe('GET /api/transactions/summary', () => {
     ]);
   });
 
-  it('excludes transfers and folds rows without a category into Uncategorized', async () => {
+  it('excludes transfers', async () => {
     await pool.query(
       `INSERT INTO transactions (user_id, debit_account_id, credit_account_id, debit, credit, date)
        VALUES ($1, $2, $3, 500, 500, '2026-03-01')`,
       [userId, eurAccount, fxAccount]
     );
-    await insertExpense(userId, null, eurAccount, 700, '2026-03-01');
-    await insertExpense(userId, 4, eurAccount, 300, '2026-03-01');
+    await insertExpense(userId, 4, eurAccount, 1000, '2026-03-01');
 
     const res = await summary();
 
@@ -142,7 +141,7 @@ describe('GET /api/transactions/summary', () => {
   });
 
   it('ignores accounts the caller cannot reach', async () => {
-    await insertExpense(otherUserId, null, otherAccount, 1000, '2026-03-01');
+    await insertExpense(otherUserId, 4, otherAccount, 1000, '2026-03-01');
 
     const res = await summary(`?account=${otherAccount}`);
 

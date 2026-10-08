@@ -381,7 +381,10 @@ describe('syncAccount', () => {
     }) => pool.query(
       `INSERT INTO transactions (user_id, category_id, debit_account_id, credit_account_id, debit, credit, date, description, import_hash)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      [userId, f.category ?? null, f.debit ?? null, f.credit ?? null, f.amountDebit, f.amountCredit ?? f.amountDebit,
+      // An expense or income needs a category (chk_transactions_category):
+      // default to Uncategorized, as the service does; a transfer has none.
+      [userId, f.category !== undefined ? f.category : f.debit && f.credit ? null : f.debit ? 4 : 3,
+       f.debit ?? null, f.credit ?? null, f.amountDebit, f.amountCredit ?? f.amountDebit,
        f.date ?? '2026-05-29', f.description ?? '', f.importHash ?? null]
     );
     const seen = async (id: number) =>
