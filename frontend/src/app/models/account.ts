@@ -1,5 +1,8 @@
 export type AccountType = 'cash' | 'bank' | 'crypto';
 
+/** 1 read, 2 transactions, 3 admin, 4 owner. */
+export type AccessLevel = 1 | 2 | 3 | 4;
+
 export interface AccountSettings {
   cash: Record<string, never>;
   bank: { accountNumber?: string };
@@ -22,7 +25,7 @@ interface AccountBase {
    * 1 read, 2 transactions, 3 admin, 4 owner. Optional so existing
    * fixtures and forms need not supply it.
    */
-  access_level?: 1 | 2 | 3 | 4;
+  access_level?: AccessLevel;
   /** Display name of the account's owner. */
   owner_name?: string;
   /** Transactions come from the blockchain; computed by the backend. */

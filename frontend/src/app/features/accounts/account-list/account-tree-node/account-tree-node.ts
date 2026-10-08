@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { MoneyPipe } from '../../../../core/money.pipe';
-import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectUserBalance } from '../../../../core/accounts.state';
+import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectUserBalance } from '../../../../core/account-tree';
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';

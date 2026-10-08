@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, selectedAccountChips, AccountGroupItem } from './accounts.state';
+import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, selectedAccountChips, AccountGroupItem } from './account-tree';
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
