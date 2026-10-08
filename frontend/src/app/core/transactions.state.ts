@@ -19,6 +19,40 @@ function sameAccountFilter(a: number[], b: number[]): boolean {
   return b.every(id => setA.has(id));
 }
 
+/**
+ * The side a transaction is shown on: a transfer shows its receiving
+ * side only when the account filter has that account but not the sender.
+ */
+function shownSide(t: Transaction, type: TransactionType, accountFilter: number[]): 'debit' | 'credit' {
+  if (type === TransactionType.Income) return 'credit';
+  if (type === TransactionType.Expense) return 'debit';
+  const filtered = (a: TransactionAccount | null) => a != null && accountFilter.includes(a.id);
+  return filtered(t.credit_account) && !filtered(t.debit_account) ? 'credit' : 'debit';
+}
+
+function accountName(t: Transaction, type: TransactionType): string {
+  if (type === TransactionType.Expense) return t.debit_account?.name ?? '';
+  if (type === TransactionType.Income) return t.credit_account?.name ?? '';
+  return `${t.debit_account?.name ?? '?'} → ${t.credit_account?.name ?? '?'}`;
+}
+
+function toView(t: Transaction, accountFilter: number[]): TransactionView {
+  const type = getTransactionType(t);
+  const side = shownSide(t, type, accountFilter);
+  const account = side === 'credit' ? t.credit_account : t.debit_account;
+  return {
+    ...t,
+    accountName: accountName(t, type),
+    amount: t[side],
+    amountCurrency: account?.currency ?? t.currency ?? '',
+    amountScale: account?.scale ?? t.scale ?? 2,
+    balance: account?.balance ?? null,
+    balanceCurrency: account?.currency ?? '',
+    balanceScale: account?.scale ?? 2,
+    type,
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransactionsState {
   private readonly api = inject(ApiService);
@@ -46,14 +80,8 @@ export class TransactionsState {
   /** Bumped on every reload, so views derived from the transactions refetch too. */
   readonly revision = this._revision.asReadonly();
   readonly viewTransactions = computed<TransactionView[]>(() => {
-    const accountFilter = this._filters().account;
-    return this._transactions().map(t => ({
-      ...t,
-      accountName: this.getAccountName(t),
-      ...this.getAmount(t, accountFilter),
-      ...this.getBalance(t, accountFilter),
-      type: getTransactionType(t),
-    }));
+    const accountFilter = this.selectedAccountIds();
+    return this._transactions().map(t => toView(t, accountFilter));
   });
 
   setFilters(filters: TransactionFilters): void {
@@ -63,21 +91,18 @@ export class TransactionsState {
 
   setDetails(details: string | undefined): void {
     if (this._filters().details === details) return;
-    this._filters.update(f => ({ ...f, details }));
-    this.reload();
+    this.patchFilters({ details });
   }
 
   setDateRange(range: DateRange | null): void {
     const current = this.dateRange();
     if (current?.from === range?.from && current?.to === range?.to) return;
-    this._filters.update(f => ({ ...f, from: range?.from, to: range?.to }));
-    this.reload();
+    this.patchFilters({ from: range?.from, to: range?.to });
   }
 
   selectAllAccounts(): void {
     if (!this._filters().account) return;
-    this._filters.update(f => ({ ...f, account: undefined }));
-    this.reload();
+    this.patchFilters({ account: undefined });
   }
 
   selectAccount(id: number): void {
@@ -94,8 +119,7 @@ export class TransactionsState {
     const current = this._filters().account ?? [];
     const next = this.accounts.accounts().every(a => ids.includes(a.id)) ? [] : ids;
     if (sameAccountFilter(current, next)) return;
-    this._filters.update(f => ({ ...f, account: next.length ? next : undefined }));
-    this.reload();
+    this.patchFilters({ account: next.length ? next : undefined });
   }
 
   toggleAccounts(ids: number[]): void {
@@ -119,7 +143,11 @@ export class TransactionsState {
   }
 
   private setCategories(ids: number[]): void {
-    this._filters.update(f => ({ ...f, category: ids.length ? ids : undefined }));
+    this.patchFilters({ category: ids.length ? ids : undefined });
+  }
+
+  private patchFilters(patch: Partial<TransactionFilters>): void {
+    this._filters.update(f => ({ ...f, ...patch }));
     this.reload();
   }
 
@@ -129,15 +157,15 @@ export class TransactionsState {
   }
 
   create(data: TransactionRequest) {
-    return this.api.createTransaction(data).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
+    return this.api.createTransaction(data).pipe(tap(() => this.reloadWithAccounts()));
   }
 
   update(id: number, data: Partial<TransactionRequest>) {
-    return this.api.updateTransaction(id, data).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
+    return this.api.updateTransaction(id, data).pipe(tap(() => this.reloadWithAccounts()));
   }
 
   delete(id: number) {
-    return this.api.deleteTransaction(id).pipe(tap(() => { this.reload(); this.accounts.reload(); }));
+    return this.api.deleteTransaction(id).pipe(tap(() => this.reloadWithAccounts()));
   }
 
   selectTransaction(transaction: Transaction | null): void {
@@ -154,70 +182,10 @@ export class TransactionsState {
     this.fetch(0);
   }
 
-  private getAccountName(t: Transaction): string {
-    const type = getTransactionType(t);
-    if (type === TransactionType.Expense) return t.debit_account?.name ?? '';
-    if (type === TransactionType.Income) return t.credit_account?.name ?? '';
-    return `${t.debit_account?.name ?? '?'} → ${t.credit_account?.name ?? '?'}`;
-  }
-
-  private getAmount(t: Transaction, accountFilter?: number[]): Pick<TransactionView, 'amount' | 'amountCurrency' | 'amountScale'> {
-    const type = getTransactionType(t);
-
-    if (type === TransactionType.Transfer) {
-      const filterIds = accountFilter ?? [];
-      const showCredit = filterIds.length > 0
-        && t.credit_account != null
-        && filterIds.includes(t.credit_account.id)
-        && !(t.debit_account != null && filterIds.includes(t.debit_account.id));
-      return {
-        amount: showCredit ? t.credit : t.debit,
-        amountCurrency: showCredit
-          ? (t.credit_account?.currency ?? t.currency ?? '')
-          : (t.debit_account?.currency ?? t.currency ?? ''),
-        amountScale: showCredit
-          ? (t.credit_account?.scale ?? t.scale ?? 2)
-          : (t.debit_account?.scale ?? t.scale ?? 2),
-      };
-    }
-
-    if (type === TransactionType.Income) {
-      return {
-        amount: t.credit,
-        amountCurrency: t.credit_account?.currency ?? t.currency ?? '',
-        amountScale: t.credit_account?.scale ?? t.scale ?? 2,
-      };
-    }
-
-    return {
-      amount: t.debit,
-      amountCurrency: t.debit_account?.currency ?? t.currency ?? '',
-      amountScale: t.debit_account?.scale ?? t.scale ?? 2,
-    };
-  }
-
-  private getBalance(t: Transaction, accountFilter?: number[]): Pick<TransactionView, 'balance' | 'balanceCurrency' | 'balanceScale'> {
-    const type = getTransactionType(t);
-    let account: TransactionAccount | null = null;
-
-    if (type === TransactionType.Transfer) {
-      const filterIds = accountFilter ?? [];
-      const showCredit = filterIds.length > 0
-        && t.credit_account != null
-        && filterIds.includes(t.credit_account.id)
-        && !(t.debit_account != null && filterIds.includes(t.debit_account.id));
-      account = showCredit ? t.credit_account : t.debit_account;
-    } else if (type === TransactionType.Income) {
-      account = t.credit_account;
-    } else {
-      account = t.debit_account;
-    }
-
-    return {
-      balance: account?.balance ?? null,
-      balanceCurrency: account?.currency ?? '',
-      balanceScale: account?.scale ?? 2,
-    };
+  /** After a write: transactions and account balances both change. */
+  private reloadWithAccounts(): void {
+    this.reload();
+    this.accounts.reload();
   }
 
   private async fetch(offset: number): Promise<void> {

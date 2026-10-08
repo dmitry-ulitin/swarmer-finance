@@ -137,3 +137,51 @@ describe('TransactionsState category filter', () => {
     expect(getTransactions.mock.lastCall![0].category).toBeUndefined();
   });
 });
+
+describe('TransactionsState.viewTransactions', () => {
+  const usd = { id: 1, name: 'Cash', currency: 'USD', scale: 2, balance: 500 };
+  const btc = { id: 2, name: 'Wallet', currency: 'BTC', scale: 8, balance: 7 };
+  const base = { id: 10, user_id: 1, category: null, currency: null, scale: null, date: '2026-09-01', description: '', payee: null, txid: null, created_at: '' };
+  const expense = { ...base, id: 11, debit_account: usd, credit_account: null, debit: 100, credit: 100 };
+  const income = { ...base, id: 12, debit_account: null, credit_account: btc, debit: 3, credit: 3 };
+  const transfer = { ...base, id: 13, debit_account: usd, credit_account: btc, debit: 200, credit: 4 };
+  let state: TransactionsState;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions: () => of({ data: [expense, income, transfer], error: null }) } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
+      ],
+    });
+    state = TestBed.inject(TransactionsState);
+  });
+
+  async function view() {
+    await Promise.resolve();
+    return state.viewTransactions().map(({ accountName, amount, amountCurrency, amountScale, balance, balanceCurrency, balanceScale }) =>
+      ({ accountName, amount, amountCurrency, amountScale, balance, balanceCurrency, balanceScale }));
+  }
+
+  it('shows expenses on the debit side, income and unfiltered transfers on their own side', async () => {
+    state.reload();
+    expect(await view()).toEqual([
+      { accountName: 'Cash', amount: 100, amountCurrency: 'USD', amountScale: 2, balance: 500, balanceCurrency: 'USD', balanceScale: 2 },
+      { accountName: 'Wallet', amount: 3, amountCurrency: 'BTC', amountScale: 8, balance: 7, balanceCurrency: 'BTC', balanceScale: 8 },
+      { accountName: 'Cash → Wallet', amount: 200, amountCurrency: 'USD', amountScale: 2, balance: 500, balanceCurrency: 'USD', balanceScale: 2 },
+    ]);
+  });
+
+  it('shows a transfer on the credit side when only the receiving account is filtered', async () => {
+    state.selectAccount(2);
+    expect((await view())[2]).toEqual(
+      { accountName: 'Cash → Wallet', amount: 4, amountCurrency: 'BTC', amountScale: 8, balance: 7, balanceCurrency: 'BTC', balanceScale: 8 },
+    );
+  });
+
+  it('keeps a transfer on the debit side when both its accounts are filtered', async () => {
+    state.selectAccounts([1, 2]);
+    expect((await view())[2].amount).toBe(200);
+  });
+});
