@@ -57,7 +57,7 @@ function toView(t: Transaction, accountFilter: number[]): TransactionView {
 export class TransactionsState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
-  protected readonly accounts = inject(AccountsState);
+  private readonly accounts = inject(AccountsState);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _offset = signal(0);
