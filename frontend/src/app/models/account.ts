@@ -38,6 +38,9 @@ export type Account = {
   [T in AccountType]: AccountBase & { type: T; settings: AccountSettings[T] };
 }[AccountType];
 
+/** A missing level means the user's own account. */
+export const accessLevelOf = (account: Account): AccessLevel => account.access_level ?? 4;
+
 // What the account form submits. `type` and `settings` always travel
 // together, and the backend requires `type` on PUT as well as POST.
 export type AccountPayload = {

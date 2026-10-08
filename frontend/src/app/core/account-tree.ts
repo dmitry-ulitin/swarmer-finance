@@ -1,4 +1,4 @@
-import { AccessLevel, Account } from '../models/account';
+import { AccessLevel, Account, accessLevelOf } from '../models/account';
 
 export interface AccountLeafItem {
   kind: 'account';
@@ -30,7 +30,7 @@ export interface AccountSection {
 
 // An account the backend did not label is one the user owns outright.
 const levelOf = (item: AccountTreeItem): AccessLevel =>
-  item.kind === 'account' ? item.account.access_level ?? 4 : item.access_level;
+  item.kind === 'account' ? accessLevelOf(item.account) : item.access_level;
 
 function itemName(item: AccountTreeItem): string {
   return item.kind === 'account' ? item.account.displayName : item.displayName;
@@ -156,7 +156,7 @@ export function buildAccountTree(accounts: Account[]): AccountTreeItem[] {
     if (groupSegments.length === 0) {
       roots.push(leaf);
     } else {
-      getOrCreateGroup(groupSegments, account.access_level ?? 4, account.owner_name ?? '').children.push(leaf);
+      getOrCreateGroup(groupSegments, accessLevelOf(account), account.owner_name ?? '').children.push(leaf);
     }
   }
 

@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MoneyPipe } from '../../core/money.pipe';
 import { AccountsState } from '../../core/accounts.state';
-import { Account } from '../../models/account';
-import { AuthService } from '../../core/auth.service';
+import { AccessLevel, Account, accessLevelOf } from '../../models/account';
 import { TuiButton, TuiDataList, TuiDropdown, TuiLoader } from '@taiga-ui/core';
 import { TuiChevron } from '@taiga-ui/kit';
 import { AccountDialogService } from './account-dialog.service';
@@ -16,7 +15,6 @@ import { AccountDialogService } from './account-dialog.service';
 })
 export class Accounts {
   readonly accountsState = inject(AccountsState);
-  protected readonly auth = inject(AuthService);
   private readonly accountDialogs = inject(AccountDialogService);
 
   /**
@@ -24,17 +22,17 @@ export class Accounts {
    * side list; below admin an account is someone else's and says whose.
    */
   readonly sections = computed(() => {
-    const level = (a: Account) => a.access_level ?? 4;
     const sorted = [...this.accountsState.visibleAccounts()].sort((a, b) =>
-      level(b) - level(a) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    const sections: { access_level: number; accounts: (Account & { displayName: string })[] }[] = [];
+      accessLevelOf(b) - accessLevelOf(a) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sections: { access_level: AccessLevel; accounts: (Account & { displayName: string })[] }[] = [];
     for (const account of sorted) {
-      const displayName = level(account) < 3 && account.owner_name
+      const level = accessLevelOf(account);
+      const displayName = level < 3 && account.owner_name
         ? `${account.name} (${account.owner_name})`
         : account.name;
       const last = sections[sections.length - 1];
-      if (last?.access_level === level(account)) last.accounts.push({ ...account, displayName });
-      else sections.push({ access_level: level(account), accounts: [{ ...account, displayName }] });
+      if (last?.access_level === level) last.accounts.push({ ...account, displayName });
+      else sections.push({ access_level: level, accounts: [{ ...account, displayName }] });
     }
     return sections;
   });
@@ -45,10 +43,10 @@ export class Accounts {
     if (id === null) return null;
     return this.accountsState.visibleAccounts().find(a => a.id === id) ?? null;
   });
-  /** Owner or admin; a missing level means the user's own account. */
+  /** Owner or admin. */
   readonly canPurge = computed(() => {
     const account = this.selectedAccount();
-    return !!account && (account.access_level ?? 4) >= 3;
+    return !!account && accessLevelOf(account) >= 3;
   });
 
   setAsSelected(account: Account) {
@@ -88,10 +86,5 @@ export class Accounts {
     if (await this.accountDialogs.openDeleteWithTransactions(account)) {
       this.selectedId.set(null);
     }
-  }
-
-  showUserBalance(account: Account): boolean {
-    const user = this.auth.user();
-    return account.user_balance !== null && !!user && user.currency !== account.currency;
   }
 }
