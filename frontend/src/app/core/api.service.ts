@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Category } from '../models/category';
+import { Category, CategoryCreatePayload, CategoryUpdatePayload } from '../models/category';
 import { Account, AccountPayload, AccountPurgeResult, AccountSyncResult } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
@@ -33,11 +33,11 @@ export class ApiService {
     return this.http.get<ApiResponse<Category[]>>('/api/categories');
   }
 
-  createCategory(data: { name: string; parentId: number; color?: string; icon?: string }): Observable<ApiResponse<Category>> {
+  createCategory(data: CategoryCreatePayload): Observable<ApiResponse<Category>> {
     return this.http.post<ApiResponse<Category>>('/api/categories', data);
   }
 
-  updateCategory(id: number, data: { name?: string; color?: string; icon?: string }): Observable<ApiResponse<Category>> {
+  updateCategory(id: number, data: CategoryUpdatePayload): Observable<ApiResponse<Category>> {
     return this.http.put<ApiResponse<Category>>(`/api/categories/${id}`, data);
   }
 

@@ -10,7 +10,6 @@ import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { TransactionRequest } from '../../core/api.service';
-import { CategoriesState } from '../../core/categories.state';
 import { syncedLock } from './synced-lock';
 
 /**
@@ -50,7 +49,6 @@ export class TransactionDialogService {
   private readonly injector = inject(INJECTOR);
   private readonly transactionsState = inject(TransactionsState);
   private readonly accountState = inject(AccountsState);
-  private readonly categoriesState = inject(CategoriesState);
   private readonly notifications = inject(NotificationService);
 
   async openCreate(): Promise<Transaction | null> {

@@ -1,7 +1,7 @@
-import { Injectable, computed, effect, inject, resource, untracked } from '@angular/core';
+import { Injectable, computed, inject, resource } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { Category } from '../models/category';
+import { Category, CategoryCreatePayload, CategoryUpdatePayload } from '../models/category';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -25,15 +25,15 @@ export class CategoriesState {
     this.resource.reload();
   }
 
-  create(data: { name: string; parentId: number; color?: string; icon?: string }) {
-    return this.api.createCategory(data).pipe(tap(() => this.resource.reload()));
+  create(data: CategoryCreatePayload) {
+    return this.api.createCategory(data).pipe(tap(() => this.reload()));
   }
 
-  update(id: number, data: { name?: string; color?: string; icon?: string }) {
-    return this.api.updateCategory(id, data).pipe(tap(() => this.resource.reload()));
+  update(id: number, data: CategoryUpdatePayload) {
+    return this.api.updateCategory(id, data).pipe(tap(() => this.reload()));
   }
 
   delete(id: number) {
-    return this.api.deleteCategory(id).pipe(tap(() => this.resource.reload()));
+    return this.api.deleteCategory(id).pipe(tap(() => this.reload()));
   }
 }

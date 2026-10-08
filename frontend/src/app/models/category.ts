@@ -13,6 +13,15 @@ export interface Category {
   children?: Category[];
 }
 
+export interface CategoryCreatePayload {
+  name: string;
+  parentId: number;
+  color?: string;
+  icon?: string;
+}
+
+export type CategoryUpdatePayload = Partial<Omit<CategoryCreatePayload, 'parentId'>>;
+
 export const findCategoryById = (id: number | undefined, categories: Category[]): Category | null => {
   if (id === undefined) return null;
   for (const category of categories) {
