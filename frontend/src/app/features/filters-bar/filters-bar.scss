@@ -10,6 +10,10 @@
   max-width: 100%;
 }
 
+[data-kind='category'] {
+  border: 1px solid;
+}
+
 [tuiButtonX] {
   margin-inline-start: 0.25rem;
 }

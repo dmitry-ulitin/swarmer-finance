@@ -26,7 +26,10 @@ export class FiltersBar {
   );
   protected readonly categoryChips = computed(() => {
     const tree = this.categories.categories();
-    return this.transactions.selectedCategoryIds().map(id => ({ id, label: findCategoryById(id, tree)?.fullName ?? `#${id}` }));
+    return this.transactions.selectedCategoryIds().map(id => {
+      const category = findCategoryById(id, tree);
+      return { id, label: category?.fullName ?? `#${id}`, color: category?.color };
+    });
   });
   protected readonly details = new FormControl('', { nonNullable: true });
 

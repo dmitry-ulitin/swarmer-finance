@@ -11,7 +11,7 @@
   </span>
 }
 @for (chip of categoryChips(); track chip.id) {
-  <span tuiChip size="s" data-kind="category" [style.background-color]="chip.label | tuiAutoColor">
+  <span tuiChip size="s" data-kind="category" [style.border-color]="chip.color">
     {{ chip.label }}
     <button tuiButtonX appearance="icon" size="xs" [attr.aria-label]="'Remove ' + chip.label"
       (click)="transactions.toggleCategory(chip.id)">Remove</button>
