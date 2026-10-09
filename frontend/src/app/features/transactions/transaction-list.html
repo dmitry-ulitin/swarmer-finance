@@ -7,11 +7,11 @@
         (keydown.enter)="selectTransaction(t); $event.preventDefault()"
         (keydown.space)="selectTransaction(t); $event.preventDefault()"
     >
-        <span class="date">{{ t.date | date:'dd MMM' }}</span>
+        <span class="date">{{ t.date | date:'dd MMM yyyy' }}</span>
         <span class="info">
             <span class="meta">
                 {{ t.accountName }}
-                @if (t.category) { · {{ t.category.name }} }
+                @if (t.category) { · {{ t.category.fullName || t.category.name }} }
             </span>
             <span class="description">{{ t.description || t.payee || '—' }}</span>
         </span>
