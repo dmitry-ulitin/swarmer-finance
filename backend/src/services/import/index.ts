@@ -120,7 +120,8 @@ export const parseStatement = async (
     history.flatMap(h => {
       const categoryId = treeIds.get(h.categoryId);
       return categoryId === undefined ? [] : [{ ...h, categoryId }];
-    })
+    }),
+    profile.categoryKeys
   );
 
   const out: ImportRow[] = rows.map((row, i) => {

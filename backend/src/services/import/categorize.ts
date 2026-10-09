@@ -2,10 +2,11 @@
  * Category suggestions for imported rows, learned from the user's own
  * categorised history. Pure: the caller loads the history.
  *
- * A row is keyed by merchant and by MCC; each key votes with the categories
- * history filed it under. The merchant key is tried first because it is
- * specific; the MCC ("5812 = restaurants") only when the merchant is unknown
- * or ambiguous.
+ * A row is keyed by payee, by description (the merchant in it, when a known
+ * pattern finds one) and by MCC; each key votes, separately, with the
+ * categories history filed it under. The keys are tried in a per-bank order
+ * and the first one with a clear winner decides: usually the payee first,
+ * as the most specific, and the MCC ("5812 = restaurants") last.
  */
 
 /** A key's leading category must hold at least this share of its votes. */
@@ -27,7 +28,11 @@ export interface SuggestionInput {
   description: string;
 }
 
-export type SuggestionSource = 'payee' | 'mcc';
+export type KeyField = 'payee' | 'description' | 'mcc';
+
+export const DEFAULT_KEY_ORDER: KeyField[] = ['payee', 'description', 'mcc'];
+
+export type SuggestionSource = KeyField;
 
 export interface Suggestion {
   categoryId: number | null;
@@ -35,7 +40,7 @@ export interface Suggestion {
 }
 
 /**
- * Where a merchant hides in a description when there is no payee, first
+ * Where a merchant hides in a description, first
  * match wins. BoC card lines ("EE 5812 KADRIORU LOSSIKOHVIK PURCHASE Card…",
  * or without the country/MCC prefix), then LHV card lines as older history
  * stores them ("(..8306) 2023-03-03 19:08 KFC KRISTIINE \ENDLA 45…").
@@ -48,32 +53,38 @@ const MERCHANT_PATTERNS = [
 
 const MCC_PATTERN = /^[A-Z]{2} (\d{4}) /;
 
-/** Upper-cased letters and digits only, so "GOOGLE *YouTube" = "GOOGLE*YOUTUBE". */
+/** Fewer letters than this and the digits are the identity, e.g. a tax id. */
+const MIN_KEY_LETTERS = 3;
+
+/**
+ * Upper-cased letters only, so "GOOGLE *YouTube" = "GOOGLE*YOUTUBE" and
+ * "PYATEROCHKA 11" = "PYATEROCHKA 1234". Digits stay when too few letters
+ * would be left without them ("A93135218103").
+ */
 export function normalizeKey(text: string): string | null {
   const key = text.toUpperCase().replace(/[^\p{L}\p{N}]/gu, '');
-  return key || null;
+  const letters = key.replace(/\p{N}/gu, '');
+  return (letters.length >= MIN_KEY_LETTERS ? letters : key) || null;
 }
 
-export function categoryKeys(
-  payee: string | null,
-  description: string
-): { merchant: string | null; mcc: string | null } {
+export function categoryKeys(payee: string | null, description: string): Record<KeyField, string | null> {
   const desc = description.trim();
-  let merchant = payee?.trim() ?? '';
-  if (!merchant) {
-    for (const pattern of MERCHANT_PATTERNS) {
-      const m = desc.match(pattern);
-      if (m) {
-        merchant = m[1];
-        break;
-      }
+  let merchant = desc;
+  for (const pattern of MERCHANT_PATTERNS) {
+    const m = desc.match(pattern);
+    if (m) {
+      merchant = m[1];
+      break;
     }
   }
-  if (!merchant) merchant = desc;
-  return { merchant: normalizeKey(merchant), mcc: desc.match(MCC_PATTERN)?.[1] ?? null };
+  return {
+    payee: payee ? normalizeKey(payee) : null,
+    description: normalizeKey(merchant),
+    mcc: desc.match(MCC_PATTERN)?.[1] ?? null,
+  };
 }
 
-/** key → categoryId → number of history rows. */
+/** field|side|key → categoryId → number of history rows. */
 type Votes = Map<string, Map<number, number>>;
 
 function vote(votes: Votes, key: string, categoryId: number): void {
@@ -104,25 +115,26 @@ function winner(byCategory: Map<number, number> | undefined): number | null {
   return bestCount / total >= SUGGESTION_MIN_SHARE ? best : null;
 }
 
-export function suggestCategories(rows: SuggestionInput[], history: HistoryRow[]): Suggestion[] {
-  const byMerchant: Votes = new Map();
-  const byMcc: Votes = new Map();
+export function suggestCategories(
+  rows: SuggestionInput[],
+  history: HistoryRow[],
+  order: KeyField[] = DEFAULT_KEY_ORDER
+): Suggestion[] {
+  const votes: Votes = new Map();
   for (const h of history) {
     const keys = categoryKeys(h.payee, h.description);
-    if (keys.merchant) vote(byMerchant, `${h.side}|${keys.merchant}`, h.categoryId);
-    if (keys.mcc) vote(byMcc, `${h.side}|${keys.mcc}`, h.categoryId);
+    for (const field of order) {
+      if (keys[field]) vote(votes, `${field}|${h.side}|${keys[field]}`, h.categoryId);
+    }
   }
 
   return rows.map(row => {
     const side: Side = row.amount < 0 ? 'expense' : 'income';
     const keys = categoryKeys(row.payee, row.description);
-
-    const merchant = keys.merchant ? winner(byMerchant.get(`${side}|${keys.merchant}`)) : null;
-    if (merchant !== null) return { categoryId: merchant, source: 'payee' };
-
-    const mcc = keys.mcc ? winner(byMcc.get(`${side}|${keys.mcc}`)) : null;
-    if (mcc !== null) return { categoryId: mcc, source: 'mcc' };
-
+    for (const field of order) {
+      const categoryId = keys[field] ? winner(votes.get(`${field}|${side}|${keys[field]}`)) : null;
+      if (categoryId !== null) return { categoryId, source: field };
+    }
     return { categoryId: null, source: null };
   });
 }

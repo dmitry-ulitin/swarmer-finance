@@ -230,7 +230,7 @@ describe('ImportReview', () => {
   });
 
   describe('category suggestions', () => {
-    const suggested = (id: number | null, source: 'payee' | 'mcc' = 'payee'): ImportRow => ({
+    const suggested = (id: number | null, source: 'payee' | 'description' | 'mcc' = 'payee'): ImportRow => ({
       ...makeRow(0, 'new'),
       suggestedCategoryId: id,
       suggestionSource: id === null ? null : source,

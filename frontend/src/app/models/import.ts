@@ -19,7 +19,7 @@ export interface ImportRow {
   /** Pre-filled category, learned from history; null when nothing is confident. */
   suggestedCategoryId: number | null;
   /** 'payee' = matched by merchant, 'mcc' = matched by merchant type. */
-  suggestionSource: 'payee' | 'mcc' | null;
+  suggestionSource: 'payee' | 'description' | 'mcc' | null;
 }
 
 export interface ImportParseResult {

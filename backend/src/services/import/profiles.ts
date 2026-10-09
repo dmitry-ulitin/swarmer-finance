@@ -1,3 +1,5 @@
+import { KeyField } from './categorize';
+
 export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa';
 
 /**
@@ -29,6 +31,11 @@ export interface Profile {
     | { kind: 'signed'; column: string; directionColumn?: string; debitFlag?: string }
     | { kind: 'split'; debitColumn: string; creditColumn: string };
   columns: { date: string; description: string; payee?: string };
+  /**
+   * Order in which category suggestions try a row's keys, most specific
+   * first; defaults to payee, description, MCC.
+   */
+  categoryKeys?: KeyField[];
   /**
    * A preamble currency follows `after` in the line's first cell, or sits
    * in the next cell when `after` fills the first. `aliases` maps the
@@ -145,9 +152,12 @@ export const PROFILES: Record<ProfileId, Profile> = {
     // Amounts are unsigned; "type" says which way the money went.
     amount: { kind: 'signed', column: 'amount', directionColumn: 'type', debitFlag: 'Списание' },
     // "category" is the bank's own spending category ("Коммунальные услуги");
-    // there is no payee column, and it is what the category suggestions key
-    // on. "merchant" holds the merchant or the payment's wording.
+    // there is no payee column. "merchant" holds the merchant or the
+    // payment's wording.
     columns: { date: 'operationDate', description: 'merchant', payee: 'category' },
+    // The bank's category is broad ("Переводы" covers every person paid),
+    // so it is only the fallback to the merchant.
+    categoryKeys: ['description', 'payee'],
     currency: { from: 'column', column: 'currency', aliases: { RUR: 'RUB' } },
     // No per-row reference in the export.
     identity: { kind: 'content' },
