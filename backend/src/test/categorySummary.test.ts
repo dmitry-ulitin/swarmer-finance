@@ -164,6 +164,42 @@ describe('GET /api/transactions/summary', () => {
     ]));
   });
 
+  describe('with a co-owner', () => {
+    let sharedAccount: number;
+
+    beforeAll(async () => {
+      sharedAccount = await insertAccount(otherUserId, 'Shared', 'EUR');
+      await pool.query(
+        `INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, 1)`,
+        [sharedAccount, userId]
+      );
+    });
+
+    it('reports the category the tree shows: the own row over an older foreign one', async () => {
+      const theirs = await insertCategory(otherUserId, 'SumShared', 2);
+      const mine = await insertCategory(userId, 'SumShared', 2);
+      await insertExpense(otherUserId, theirs, sharedAccount, 1000, '2026-03-01');
+      await insertExpense(userId, mine, eurAccount, 500, '2026-03-01');
+
+      const res = await summary();
+
+      expect(res.body.data.expense).toEqual([
+        expect.objectContaining({ category_id: mine, name: 'SumShared', total: 15 }),
+      ]);
+    });
+
+    it('reports the foreign row when the user has none at that path', async () => {
+      const theirs = await insertCategory(otherUserId, 'SumTheirs', 2);
+      await insertExpense(otherUserId, theirs, sharedAccount, 1000, '2026-03-01');
+
+      const res = await summary();
+
+      expect(res.body.data.expense).toEqual([
+        expect.objectContaining({ category_id: theirs, name: 'SumTheirs', total: 10 }),
+      ]);
+    });
+  });
+
   it('returns a null total when a rate is unavailable', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
     const noRate = await insertAccount(userId, 'NoRate', 'ZZQ');

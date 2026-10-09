@@ -1,6 +1,6 @@
 import * as transactionQueries from '../db/queries/transactions';
 import * as accountQueries from '../db/queries/accounts';
-import { resolveCategoryForOwner } from './categories';
+import { getTreeCategories, resolveCategoryForOwner } from './categories';
 import { expandCategoryFilter } from '../db/queries/categories';
 import { getRelatedUserIds } from '../db/queries/accountShares';
 import * as userQueries from '../db/queries/users';
@@ -399,16 +399,17 @@ export const getCategorySummary = async (
   const rows = await transactionQueries.getCategorySummary({ ...filters, accounts: accountIds });
   const rates = await getRatesTo(user.currency, rows.map(r => r.currency));
 
-  // One item per type + name; the query splits each by currency.
+  // One item per type + the category the user's tree shows for that name
+  // (their own row over a co-owner's); the query splits each by currency.
+  const tree = await getTreeCategories(userId);
   const items = new Map<string, CategorySummaryItem & { type: 'income' | 'expense'; cents: number | null }>();
   for (const row of rows) {
-    const key = `${row.type}:${row.name}`;
+    const category = tree.get(row.category_id) ?? { ...row, id: row.category_id };
+    const key = `${row.type}:${category.id}`;
     let item = items.get(key);
     if (!item) {
-      item = { type: row.type, category_id: row.category_id, name: row.name, color: row.color, icon: row.icon, total: null, cents: 0, amounts: [] };
+      item = { type: row.type, category_id: category.id, name: category.name, color: category.color, icon: category.icon, total: null, cents: 0, amounts: [] };
       items.set(key, item);
-    } else if (row.category_id < item.category_id) {
-      Object.assign(item, { category_id: row.category_id, color: row.color, icon: row.icon });
     }
     const converted = convertAmount(row.amount, row.scale, rates.get(row.currency) ?? null, user.currency_scale);
     item.cents = item.cents === null || converted === null ? null : item.cents + converted;

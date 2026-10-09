@@ -64,20 +64,26 @@ const pathWinners = (categories: Category[], userId: number): Map<string, Catego
 };
 
 /**
- * Every category id `userId` can meet in a transaction, mapped to the id
+ * Every category id `userId` can meet in a transaction, mapped to the row
  * their tree shows for the same path. A co-owner's row at a path the user
  * also owns maps to the user's own row; ids outside the user's reach are
  * absent.
  */
-export const getTreeCategoryIds = async (userId: number): Promise<Map<number, number>> => {
+export const getTreeCategories = async (userId: number): Promise<Map<number, Category>> => {
   const categories = await categoryQueries.getCategoriesByUserIds(await getRelatedUserIds(userId));
   const winners = pathWinners(categories, userId);
   return new Map(
     categories.map(c => [
       c.id,
-      c.parent_id === null ? c.id : winners.get(pathKey(c.root_id, c.fullName))!.id,
+      c.parent_id === null ? c : winners.get(pathKey(c.root_id, c.fullName))!,
     ])
   );
+};
+
+/** `getTreeCategories`, reduced to the ids. */
+export const getTreeCategoryIds = async (userId: number): Promise<Map<number, number>> => {
+  const tree = await getTreeCategories(userId);
+  return new Map([...tree].map(([id, c]) => [id, c.id]));
 };
 
 /**
