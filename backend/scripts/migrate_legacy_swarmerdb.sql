@@ -22,6 +22,7 @@
 --   uncategorised expense/income  -> system Uncategorized (4 / 3)
 --   transfers         keep NULL category
 --   passwords         legacy '{bcrypt}' prefix stripped
+--   category look     color/icon from cat_look by path, else the parent's
 
 -- Parameters (only set when not already supplied on the command line).
 \if :{?legacy_password} \else
@@ -70,11 +71,12 @@ FROM ins JOIN legacy.users lu ON lu.email = ins.email;
 -- New system roots: 1 = Income, 2 = Expenses.
 CREATE TEMP TABLE c_src AS
 WITH RECURSIVE tree AS (
-  SELECT c.id, c.owner_id, c.parent_id, c.name, c.parent_id AS root, 1 AS depth
+  SELECT c.id, c.owner_id, c.parent_id, c.name, c.parent_id AS root, 1 AS depth,
+         CASE c.parent_id WHEN 1 THEN 'Expense/' WHEN 2 THEN 'Income/' END || c.name AS path
   FROM legacy.categories c
   WHERE c.parent_id IN (1, 2, 3) AND c.owner_id IN (:legacy_users)
   UNION ALL
-  SELECT c.id, c.owner_id, c.parent_id, c.name, t.root, t.depth + 1
+  SELECT c.id, c.owner_id, c.parent_id, c.name, t.root, t.depth + 1, t.path || '/' || c.name
   FROM legacy.categories c
   JOIN tree t ON c.parent_id = t.id
   WHERE c.owner_id IN (:legacy_users)
@@ -94,28 +96,78 @@ SELECT s.id AS old_id, (s.id + 1000)::int AS new_id
 FROM c_src s
 JOIN c_canon k ON k.old_id = s.id AND k.canon_id = s.id;
 
+-- Legacy categories have no color/icon. Give known paths a look of their own;
+-- anything else takes its parent's (a top-level miss gets its system root's).
+CREATE TEMP TABLE cat_look (path text PRIMARY KEY, color text NOT NULL, icon text NOT NULL);
+INSERT INTO cat_look VALUES
+  ('Expense/Bills',                 '#5c6bc0', 'receipt'),
+  ('Expense/Bills/Internet',        '#5c6bc0', 'wifi'),
+  ('Expense/Bills/Mobile',          '#5c6bc0', 'smartphone'),
+  ('Expense/Bills/Spain',           '#5c6bc0', 'flag'),
+  ('Expense/Bills/Subscriptions',   '#5c6bc0', 'repeat'),
+  ('Expense/Bills/Taxes',           '#5c6bc0', 'landmark'),
+  ('Expense/Bills/Utility bills',   '#5c6bc0', 'zap'),
+  ('Expense/Car',                   '#455a64', 'car'),
+  ('Expense/Car/Fuel',              '#455a64', 'fuel'),
+  ('Expense/Car/Repair',            '#455a64', 'wrench'),
+  ('Expense/Celebration',           '#ec407a', 'party-popper'),
+  ('Expense/Clothes',               '#ab47bc', 'shirt'),
+  ('Expense/Education',             '#3949ab', 'graduation-cap'),
+  ('Expense/Electronics',           '#546e7a', 'laptop'),
+  ('Expense/Entertainment',         '#ff7043', 'gamepad-2'),
+  ('Expense/Food',                  '#ef6c00', 'utensils'),
+  ('Expense/Food/Food supplies',    '#ef6c00', 'shopping-basket'),
+  ('Expense/Food/Restorants',       '#ef6c00', 'coffee'),
+  ('Expense/Gifts',                 '#d81b60', 'gift'),
+  ('Expense/Healthcare',            '#e53935', 'heart-pulse'),
+  ('Expense/Healthcare/Doctors',    '#e53935', 'stethoscope'),
+  ('Expense/Healthcare/Medicine',   '#e53935', 'pill'),
+  ('Expense/Help to child',         '#8e24aa', 'baby'),
+  ('Expense/Help to parents',       '#8e24aa', 'hand-heart'),
+  ('Expense/Household',             '#8d6e63', 'home'),
+  ('Expense/Interests and hobbies', '#00897b', 'music'),
+  ('Expense/Investments',           '#2e7d32', 'trending-up'),
+  ('Expense/Pocket expenses',       '#fbc02d', 'wallet'),
+  ('Expense/Service',               '#6d4c41', 'sparkles'),
+  ('Expense/Transport',             '#1e88e5', 'bus'),
+  ('Expense/Traveling',             '#00acc1', 'plane'),
+  ('Income/Bonuses',                '#43a047', 'star'),
+  ('Income/Cashback',               '#43a047', 'percent'),
+  ('Income/Gift',                   '#43a047', 'gift'),
+  ('Income/Interest',               '#43a047', 'piggy-bank'),
+  ('Income/Refund',                 '#43a047', 'undo-2'),
+  ('Income/Rent',                   '#43a047', 'key-round'),
+  ('Income/Salary',                 '#43a047', 'briefcase');
+
 -- Insert level by level so parents always exist before their children.
 DO $$
 DECLARE
   lvl int;
 BEGIN
   FOR lvl IN SELECT DISTINCT depth FROM c_src ORDER BY depth LOOP
-    INSERT INTO categories (id, user_id, name, parent_id)
-    SELECT cm.new_id,
-           m.new_id,
-           s.name,
-           CASE
-             -- top level: attach to the new system root
-             WHEN s.parent_id IN (1, 2)
-               THEN CASE s.root WHEN 1 THEN 2 ELSE 1 END
-             ELSE (SELECT cm2.new_id FROM c_map cm2
-                   JOIN c_canon kk ON kk.old_id = s.parent_id
-                   WHERE cm2.old_id = kk.canon_id)
-           END
-    FROM c_src s
-    JOIN c_map cm ON cm.old_id = s.id          -- canonical rows only
-    JOIN u_map m ON m.old_id = s.owner_id
-    WHERE s.depth = lvl;
+    INSERT INTO categories (id, user_id, name, parent_id, color, icon)
+    SELECT x.id, x.user_id, x.name, x.parent_id,
+           coalesce(l.color, p.color), coalesce(l.icon, p.icon)
+    FROM (
+      SELECT cm.new_id AS id,
+             m.new_id AS user_id,
+             s.name,
+             s.path,
+             CASE
+               -- top level: attach to the new system root
+               WHEN s.parent_id IN (1, 2)
+                 THEN CASE s.root WHEN 1 THEN 2 ELSE 1 END
+               ELSE (SELECT cm2.new_id FROM c_map cm2
+                     JOIN c_canon kk ON kk.old_id = s.parent_id
+                     WHERE cm2.old_id = kk.canon_id)
+             END AS parent_id
+      FROM c_src s
+      JOIN c_map cm ON cm.old_id = s.id          -- canonical rows only
+      JOIN u_map m ON m.old_id = s.owner_id
+      WHERE s.depth = lvl
+    ) x
+    JOIN categories p ON p.id = x.parent_id
+    LEFT JOIN cat_look l ON lower(l.path) = lower(x.path);
   END LOOP;
 END $$;
 

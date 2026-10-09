@@ -86,6 +86,10 @@ stays the single source of ownership.
 `Income` under `Income` (1). Same-name siblings — which the legacy schema allowed
 and the current unique index does not — collapse onto the lowest legacy id.
 
+Legacy categories have no color or icon. Known paths get theirs from the
+`cat_look` table in the script (same look for both users); any other category
+takes its parent's, and a top-level one its system root's.
+
 The `Correction` root has no counterpart here. Its tree is dropped and its
 transactions go to the system `Uncategorized` (3 for income, 4 for expense) with
 `Correction. ` prefixed to the description, so they stay findable.
