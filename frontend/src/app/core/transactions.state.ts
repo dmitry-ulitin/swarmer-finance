@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Transaction, TransactionAccount, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
@@ -83,6 +83,20 @@ export class TransactionsState {
     const accountFilter = this.selectedAccountIds();
     return this._transactions().map(t => toView(t, accountFilter));
   });
+
+  constructor() {
+    // A root singleton outlives the session: the next user must not inherit filters.
+    effect(() => {
+      if (this.auth.isAuthenticated()) return;
+      untracked(() => {
+        this._filters.set({});
+        this._selectedTransaction.set(null);
+        this._transactions.set([]);
+        this._hasMore.set(true);
+        this._offset.set(0);
+      });
+    });
+  }
 
   setFilters(filters: TransactionFilters): void {
     this._filters.set(filters);

@@ -185,3 +185,35 @@ describe('TransactionsState.viewTransactions', () => {
     expect((await view())[2].amount).toBe(200);
   });
 });
+
+describe('TransactionsState on logout', () => {
+  it('drops the filters and loaded transactions', () => {
+    const isAuthenticated = signal(true);
+    const getTransactions = vi.fn((_: object) => of({ data: [{ id: 7 }], error: null }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+      ],
+    });
+    const state = TestBed.inject(TransactionsState);
+    state.selectAccount(1);
+    state.selectCategory(5);
+    state.setDateRange({ from: '2026-01-01', to: '2026-01-31' });
+    state.setDetails('coffee');
+    TestBed.tick();
+
+    isAuthenticated.set(false);
+    TestBed.tick();
+
+    expect(state.selectedAccountIds()).toEqual([]);
+    expect(state.selectedCategoryIds()).toEqual([]);
+    expect(state.dateRange()).toBeNull();
+    expect(state.transactions()).toEqual([]);
+
+    isAuthenticated.set(true);
+    state.reload();
+    expect(getTransactions.mock.lastCall![0]).toEqual({ offset: 0, limit: 20 });
+  });
+});
