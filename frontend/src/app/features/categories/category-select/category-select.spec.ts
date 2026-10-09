@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
-import { TuiTextfieldComponent } from '@taiga-ui/core';
+import { provideTaiga, TuiRoot, TuiTextfieldComponent } from '@taiga-ui/core';
 import { CategorySelect } from './category-select';
 import { CategoriesState } from '../../../core/categories.state';
 import { AuthService } from '../../../core/auth.service';
+import { CategoryDialogService } from '../category-dialog.service';
 import type { Category } from '../../../models/category';
 
 const ME = 1;
@@ -45,18 +46,34 @@ const tree: Category[] = [
   }),
 ];
 
-function create(rootId: number) {
+function setup(
+  rootId: number,
+  openCreate: (parent: Category | null, rootId?: number) => Promise<Category | null> = async () => null,
+) {
   TestBed.configureTestingModule({
     providers: [
       { provide: CategoriesState, useValue: { categories: signal(tree) } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+      { provide: CategoryDialogService, useValue: { openCreate } },
     ],
   });
   const fixture = TestBed.createComponent(CategorySelect);
   fixture.componentRef.setInput('rootId', rootId);
   fixture.detectChanges();
-  return fixture.componentInstance;
+  return fixture;
 }
+
+function create(rootId: number) {
+  return setup(rootId).componentInstance;
+}
+
+// The dropdown is a portal, which needs tui-root to render into.
+@Component({
+  imports: [TuiRoot, CategorySelect],
+  template: `<tui-root><app-category-select [rootId]="2" /></tui-root>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class RootHost {}
 
 describe('CategorySelect', () => {
   beforeEach(() => TestBed.resetTestingModule());
@@ -105,6 +122,54 @@ describe('CategorySelect', () => {
     it('does not match the same path under different roots', () => {
       const sameNameIncome = makeCategory({ id: 40, name: 'Groceries', root_id: 1 });
       expect(create(2).categoryMatcher(myExpense, sameNameIncome)).toBe(false);
+    });
+  });
+
+  describe('addCategory', () => {
+    it.each([2, 1])("creates it in root %i's branch and selects it", async rootId => {
+      const created = makeCategory({ id: 50, name: 'New', root_id: rootId });
+      const openCreate = vi.fn(async () => created);
+      const select = setup(rootId, openCreate).componentInstance;
+      const onChange = vi.fn();
+      select.registerOnChange(onChange);
+
+      await select.addCategory();
+
+      expect(openCreate).toHaveBeenCalledWith(null, rootId);
+      expect(onChange).toHaveBeenCalledWith(created);
+    });
+
+    it('keeps the category when the dialog is cancelled', async () => {
+      const select = create(2);
+      select.writeValue(myExpense);
+      const onChange = vi.fn();
+      select.registerOnChange(onChange);
+
+      await select.addCategory();
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('offers it below the tree in the open dropdown', async () => {
+      // jsdom has no matchMedia, which tui-root reads.
+      vi.stubGlobal('matchMedia', () => ({
+        matches: false, addEventListener() {}, removeEventListener() {},
+      }));
+      onTestFinished(() => { vi.unstubAllGlobals(); });
+      TestBed.configureTestingModule({
+        providers: [
+          provideTaiga(),
+          { provide: CategoriesState, useValue: { categories: signal(tree) } },
+          { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+        ],
+      });
+      const fixture = TestBed.createComponent(RootHost);
+      await fixture.whenStable();
+      (fixture.nativeElement as HTMLElement).querySelector('input')!.click();
+      await fixture.whenStable();
+      const options = [...document.querySelectorAll('tui-data-list button')];
+      expect(options).toHaveLength(3);
+      expect(options.at(-1)!.textContent?.trim()).toBe('Add category…');
     });
   });
 

@@ -5,6 +5,7 @@ import { TuiChevron, TuiSelect, TuiTree } from '@taiga-ui/kit';
 import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { CategoriesState } from '../../../core/categories.state';
 import { AuthService } from '../../../core/auth.service';
+import { CategoryDialogService } from '../category-dialog.service';
 import type { Category } from '../../../models/category';
 import { TransactionType } from '../../../models/transaction';
 
@@ -38,11 +39,13 @@ export class CategorySelect implements ControlValueAccessor {
 
   private readonly categoriesState = inject(CategoriesState);
   private readonly auth = inject(AuthService);
+  private readonly categoryDialogs = inject(CategoryDialogService);
 
   // Signals, so a value written by the form (e.g. a programmatic setValue)
   // re-renders this OnPush view without waiting for an event inside it.
   protected readonly value = signal<Category | null>(null);
   protected readonly disabled = signal(false);
+  protected readonly open = signal(false);
   private onChange: (value: Category | null) => void = () => {};
   protected onTouched: () => void = () => {};
 
@@ -84,6 +87,15 @@ export class CategorySelect implements ControlValueAccessor {
 
   setDisabledState(disabled: boolean): void {
     this.disabled.set(disabled);
+  }
+
+  /** Creates a category in this select's branch and selects it. */
+  async addCategory(): Promise<void> {
+    this.open.set(false);
+    const category = await this.categoryDialogs.openCreate(null, this.rootId());
+    if (category) {
+      this.onValueChange(category);
+    }
   }
 
   protected onValueChange(value: Category | null): void {

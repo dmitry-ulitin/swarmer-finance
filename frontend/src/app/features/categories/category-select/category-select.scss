@@ -23,6 +23,12 @@
     width: 100%;
 }
 
+.add-option {
+    gap: 0.5rem;
+    border-top: 1px solid var(--tui-border-normal);
+    color: var(--tui-text-secondary);
+}
+
 .owner-badge {
     margin-left: auto;
     padding-left: 0.5rem;

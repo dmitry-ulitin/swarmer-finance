@@ -1,5 +1,6 @@
 <tui-textfield tuiChevron [tuiTextfieldCleaner]="cleaner()" [stringify]="stringify"
-    [identityMatcher]="categoryMatcher" [tuiTextfieldSize]="size()" [content]="value() && selectedContent">
+    [identityMatcher]="categoryMatcher" [tuiTextfieldSize]="size()" [content]="value() && selectedContent"
+    [(open)]="open">
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
@@ -10,6 +11,10 @@
             <tui-tree [childrenHandler]="treeHandler" [content]="treeNodeContent" [map]="treeMap"
                 [tuiTreeController]="false" [value]="item" />
         }
+        <button tuiOption type="button" class="add-option" (click)="addCategory()">
+            <tui-icon icon="@tui.plus" />
+            Add category…
+        </button>
     </tui-data-list>
 </tui-textfield>
 <ng-template #selectedContent let-item>
