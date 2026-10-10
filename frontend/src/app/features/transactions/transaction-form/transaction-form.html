@@ -27,12 +27,7 @@
 
     <!-- From / To accounts -->
     @if (isExpense() || isTransfer()) {
-        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
-            [identityMatcher]="accountMatcher">
-            <label tuiLabel>{{ isTransfer() ? 'From Account' : 'Account' }}</label>
-            <input tuiSelect formControlName="fromAccount" placeholder="Select account" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountOptions()" [itemContent]="accountTemplate" />
-        </tui-textfield>
+        <app-account-select formControlName="fromAccount" [label]="isTransfer() ? 'From Account' : 'Account'" />
         <div class="row">
             <tui-textfield>
                 <input tuiAutoFocus tuiInputNumber formControlName="debitAmount" [min]="0" [quantum]="debitQuantum()"
@@ -43,12 +38,7 @@
         </div>
     }
     @if (isIncome() || isTransfer()) {
-        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringifyAccount"
-            [identityMatcher]="accountMatcher">
-            <label tuiLabel>{{ isTransfer() ? 'To Account' : 'Account' }}</label>
-            <input tuiSelect formControlName="toAccount" placeholder="Select account" />
-            <tui-data-list-wrapper *tuiDropdown [items]="accountOptions()" [itemContent]="accountTemplate" />
-        </tui-textfield>
+        <app-account-select formControlName="toAccount" [label]="isTransfer() ? 'To Account' : 'Account'" />
         @if (isIncome() || !isSameCurrency()) {
             <div class="row">
                 <tui-textfield>
@@ -106,7 +96,3 @@
         <button tuiButton size="s" type="submit">Save</button>
     </div>
 </form>
-
-<ng-template #accountTemplate let-item>
-    {{ item.name }}
-</ng-template>

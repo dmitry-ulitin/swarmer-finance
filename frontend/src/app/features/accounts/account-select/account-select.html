@@ -1,9 +1,9 @@
 <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringify"
-    [identityMatcher]="accountMatcher" [tuiTextfieldSize]="size()" [content]="value() && accountContent">
+    [identityMatcher]="accountMatcher" [tuiTextfieldSize]="size()" [content]="displayed() && accountContent">
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
-    <input tuiSelect placeholder="Select account" [ngModel]="value()" [ngModelOptions]="{ standalone: true }"
+    <input tuiSelect placeholder="Select account" [ngModel]="displayed()" [ngModelOptions]="{ standalone: true }"
         [disabled]="disabled()" (ngModelChange)="onValueChange($event)" (blur)="onTouched()" />
     <tui-data-list *tuiDropdown>
         @for (item of options(); track item.id) {

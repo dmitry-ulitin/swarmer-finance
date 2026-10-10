@@ -1,21 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiDataList, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
-import { TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputDate, TuiInputNumber, TuiSelect, TuiSegmented, TuiTextarea } from '@taiga-ui/kit';
+import { TuiComboBox, TuiInputDate, TuiInputNumber, TuiSegmented, TuiTextarea } from '@taiga-ui/kit';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
-import { TuiAutoFocus, type TuiStringHandler } from '@taiga-ui/cdk';
+import { TuiAutoFocus } from '@taiga-ui/cdk';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TransactionsState } from '../../../core/transactions.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
 import { TransactionType, type Transaction, type TransactionAccount } from '../../../models/transaction';
-import { ADDRESS_EXPLORERS, TX_EXPLORERS, type Account } from '../../../models/account';
+import { ADDRESS_EXPLORERS, TX_EXPLORERS } from '../../../models/account';
 import type { Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { CategorySelect } from '../../categories/category-select/category-select';
+import { AccountSelect } from '../../accounts/account-select/account-select';
 import { syncedLock } from '../synced-lock';
 
 /** The type selector's segments, in order: Expense, Income, Transfer. */
@@ -37,15 +38,13 @@ function shorten(s: string): string {
     TuiTextarea,
     TuiInputDate,
     TuiInputNumber,
-    TuiSelect,
     TuiComboBox,
-    TuiDataListWrapper,
     TuiDataList,
-    TuiChevron,
     TuiButton,
     TuiAutoFocus,
     TuiNumberFormat,
-    CategorySelect
+    CategorySelect,
+    AccountSelect,
   ],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
@@ -60,8 +59,6 @@ export class TransactionForm {
 
   private readonly data = this.context.data;
 
-  readonly stringifyAccount: TuiStringHandler<Account | null> = a => a?.name ?? '';
-  readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
   readonly lock = syncedLock(this.data, this.accountsState.trackedIds());
   /** Network fees are written by sync only: neither category nor type can change. */
   readonly isNetworkFee = this.data.category?.id === TransactionType.NetworkFees;
@@ -104,12 +101,6 @@ export class TransactionForm {
 
   readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: this.form.controls.fromAccount.value });
   readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: this.form.controls.toAccount.value });
-
-  /** Synced accounts are never picked by hand: sync alone writes to them. */
-  readonly accountOptions = computed(() => {
-    const tracked = this.accountsState.trackedIds();
-    return this.accountsState.accounts().filter(a => !tracked.has(a.id));
-  });
 
   readonly isSameCurrency = computed(() => {
     const d = this.fromAccountValue()?.currency;
@@ -168,6 +159,8 @@ export class TransactionForm {
     if (this.isNetworkFee) {
       c.category.disable();
     }
+    this.swapOnClash(c.fromAccount, c.toAccount);
+    this.swapOnClash(c.toAccount, c.fromAccount);
 
     effect(() => {
       const type = this.type();
@@ -285,7 +278,21 @@ export class TransactionForm {
     const tracked = this.accountsState.trackedIds();
     const recent = this.transactionsState.transactions()
       .find(t => t[own]?.id === account.id && !!t[other] && !tracked.has(t[other].id))?.[other];
-    const others = this.accountOptions().filter(a => a.id !== account.id);
+    const others = this.accountsState.transferTargets().filter(a => a.id !== account.id);
     return recent ?? others.find(a => a.currency === account.currency) ?? others[0] ?? null;
+  }
+
+  /** Picking the account the other side holds swaps the two sides instead. */
+  private swapOnClash(
+    own: FormControl<TransactionAccount | null>,
+    other: FormControl<TransactionAccount | null>
+  ): void {
+    let previous = own.value;
+    own.valueChanges.pipe(takeUntilDestroyed()).subscribe(next => {
+      if (next && other.value?.id === next.id) {
+        other.setValue(previous);
+      }
+      previous = next;
+    });
   }
 }

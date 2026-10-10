@@ -22,7 +22,13 @@ const me = { provide: AuthService, useValue: { user: signal({ id: 1 }) } };
 
 function setup(excludeId: number | null = null) {
   TestBed.configureTestingModule({
-    providers: [me, { provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd]) } }],
+    providers: [
+      me,
+      {
+        provide: AccountsState,
+        useValue: { accounts: signal([lhv, cash, usd, shared]), transferTargets: signal([lhv, cash, usd]) },
+      },
+    ],
   });
   const fixture = TestBed.createComponent(AccountSelect);
   fixture.componentRef.setInput('excludeId', excludeId);
@@ -61,6 +67,19 @@ describe('AccountSelect', () => {
     expect(select.accountMatcher(cash, lhv)).toBe(false);
   });
 
+  it('shows a bare transaction account as the full account it refers to', () => {
+    const select = setup();
+    select.writeValue({ id: 4, name: 'Joint', currency: 'EUR', scale: 2 });
+    expect(select.displayed()).toBe(shared);
+  });
+
+  it('shows a value it cannot resolve as given', () => {
+    const select = setup();
+    const unknown = { id: 99, name: 'Gone', currency: 'EUR', scale: 2 };
+    select.writeValue(unknown);
+    expect(select.displayed()).toBe(unknown);
+  });
+
   it('reports a picked account to the form', () => {
     const select = setup();
     const onChange = vi.fn();
@@ -81,7 +100,10 @@ describe('AccountSelect', () => {
       providers: [
         provideTaiga(),
         me,
-        { provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd, shared]) } },
+        {
+          provide: AccountsState,
+          useValue: { accounts: signal([lhv, cash, usd, shared]), transferTargets: signal([lhv, cash, usd, shared]) },
+        },
       ],
     });
     const fixture = TestBed.createComponent(RootHost);

@@ -62,7 +62,14 @@ function configure(
       TransactionForm,
       { provide: POLYMORPHEUS_CONTEXT, useValue: { data, completeWith: () => {} } },
       { provide: CategoriesState, useValue: { categories: signal(tree) } },
-      { provide: AccountsState, useValue: { accounts: signal(accounts), trackedIds: signal(new Set(trackedIds)) } },
+      {
+        provide: AccountsState,
+        useValue: {
+          accounts: signal(accounts),
+          trackedIds: signal(new Set(trackedIds)),
+          transferTargets: signal(accounts.filter(a => !trackedIds.includes(a.id!) && !a.deleted)),
+        },
+      },
       { provide: TransactionsState, useValue: { transactions: signal([]) } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
       { provide: NotificationService, useValue: { showError: () => {} } },
@@ -172,9 +179,11 @@ describe('TransactionForm on a synced account', () => {
     expect([form.typeAllowed(0), form.typeAllowed(1), form.typeAllowed(2)]).toEqual([true, false, false]);
   });
 
-  it('offers only ordinary accounts to pick', () => {
-    const form = configure({ debit_account: exchange }, [wallet, exchange], [1]);
-    expect(form.accountOptions().map(a => a.id)).toEqual([3]);
+  it('never pre-picks a synced account as the other side of a transfer', () => {
+    const form = configure({ credit_account: exchange }, [wallet, exchange], [1]);
+    form.activeTypeIndex.set(2);
+    TestBed.tick();
+    expect(form.form.controls.fromAccount.value).toBeNull();
   });
 
   it('allows no type change on a transfer between synced wallets', () => {
@@ -287,5 +296,32 @@ describe('TransactionForm amount precision', () => {
     const form = configure({ debit_account: btc, credit_account: eur, debit: 0.00146435, credit: 90 }, [btc, eur]);
     expect(form.debitPrecision()).toBe(8);
     expect(form.creditPrecision()).toBe(2);
+  });
+});
+
+describe('TransactionForm transfer accounts', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const a = { id: 11, name: 'A', currency: 'EUR', scale: 2 };
+  const b = { id: 12, name: 'B', currency: 'EUR', scale: 2 };
+  const c = { id: 13, name: 'C', currency: 'EUR', scale: 2 };
+  const transfer = () => configure({ debit_account: a, credit_account: b }, [a, b, c]);
+
+  it('swaps the sides when From is set to the To account', () => {
+    const form = transfer();
+    form.form.controls.fromAccount.setValue(b);
+    expect(form.form.controls.toAccount.value).toEqual(a);
+  });
+
+  it('swaps the sides when To is set to the From account', () => {
+    const form = transfer();
+    form.form.controls.toAccount.setValue(a);
+    expect(form.form.controls.fromAccount.value).toEqual(b);
+  });
+
+  it('leaves the other side alone for a different account', () => {
+    const form = transfer();
+    form.form.controls.fromAccount.setValue(c);
+    expect(form.form.controls.toAccount.value).toEqual(b);
   });
 });

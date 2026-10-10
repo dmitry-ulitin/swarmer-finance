@@ -7,6 +7,7 @@ import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { AccountsState } from '../../../core/accounts.state';
 import { AuthService } from '../../../core/auth.service';
 import type { Account } from '../../../models/account';
+import type { TransactionAccount } from '../../../models/transaction';
 
 /**
  * Picks the other account of a transfer, the way CategorySelect picks a
@@ -35,23 +36,33 @@ export class AccountSelect implements ControlValueAccessor {
   private readonly accountsState = inject(AccountsState);
   private readonly auth = inject(AuthService);
 
-  protected readonly value = signal<Account | null>(null);
+  // A transaction carries only a summary of its accounts, so the value may be
+  // a bare TransactionAccount; picks from the list are always full accounts.
+  protected readonly value = signal<TransactionAccount | null>(null);
   protected readonly disabled = signal(false);
   private onChange: (value: Account | null) => void = () => {};
   protected onTouched: () => void = () => {};
+
+  /** The value as the full account, for its owner; as given when it is not loaded. */
+  readonly displayed = computed(() => {
+    const value = this.value();
+    return this.accountsState.accounts().find(a => a.id === value?.id) ?? value;
+  });
 
   readonly options = computed(() =>
     this.accountsState.transferTargets().filter(a => a.id !== this.excludeId())
   );
 
-  readonly stringify: TuiStringHandler<Account | null> = a => a?.name ?? '';
+  readonly stringify: TuiStringHandler<TransactionAccount | null> = a => a?.name ?? '';
 
   /** Someone else's account, shared with the user; its owner is shown beside the name. */
-  readonly isForeign = (a: Account): boolean => a.user_id !== this.auth.user()?.id;
+  readonly isForeign = (a: TransactionAccount | Account): boolean =>
+    'user_id' in a && a.user_id !== this.auth.user()?.id;
 
-  readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
+  readonly accountMatcher = (a: TransactionAccount | null, b: TransactionAccount | null): boolean =>
+    a?.id === b?.id;
 
-  writeValue(value: Account | null): void {
+  writeValue(value: TransactionAccount | null): void {
     this.value.set(value);
   }
 
