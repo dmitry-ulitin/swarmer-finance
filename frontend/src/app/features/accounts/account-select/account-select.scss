@@ -1,3 +1,28 @@
 :host {
     display: block;
 }
+
+.account {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    inline-size: 100%;
+    min-inline-size: 0;
+    white-space: nowrap;
+}
+
+.name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.owner,
+.currency {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--tui-text-secondary);
+}
+
+.currency {
+    margin-inline-start: auto;
+}

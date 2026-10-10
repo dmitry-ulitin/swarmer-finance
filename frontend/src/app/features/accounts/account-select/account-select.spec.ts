@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideTaiga, TuiRoot } from '@taiga-ui/core';
 import { AccountSelect } from './account-select';
 import { AccountsState } from '../../../core/accounts.state';
+import { AuthService } from '../../../core/auth.service';
 import type { Account } from '../../../models/account';
 
 function makeAccount(id: number, name: string, currency = 'EUR'): Account {
@@ -16,10 +17,12 @@ function makeAccount(id: number, name: string, currency = 'EUR'): Account {
 const lhv = makeAccount(1, 'LHV');
 const cash = makeAccount(2, 'Cash');
 const usd = makeAccount(3, 'Wise USD', 'USD');
+const shared: Account = { ...makeAccount(4, 'Joint', 'EUR'), user_id: 2, owner_name: 'Kate' };
+const me = { provide: AuthService, useValue: { user: signal({ id: 1 }) } };
 
 function setup(excludeId: number | null = null) {
   TestBed.configureTestingModule({
-    providers: [{ provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd]) } }],
+    providers: [me, { provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd]) } }],
   });
   const fixture = TestBed.createComponent(AccountSelect);
   fixture.componentRef.setInput('excludeId', excludeId);
@@ -46,8 +49,10 @@ describe('AccountSelect', () => {
     expect(setup(1).options().map(a => a.name)).toEqual(['Cash', 'Wise USD']);
   });
 
-  it('shows the name with the currency', () => {
-    expect(setup().stringify(usd)).toBe('Wise USD (USD)');
+  it('marks only accounts owned by someone else as foreign', () => {
+    const select = setup();
+    expect(select.isForeign(cash)).toBe(false);
+    expect(select.isForeign(shared)).toBe(true);
   });
 
   it('matches accounts by id', () => {
@@ -66,7 +71,7 @@ describe('AccountSelect', () => {
     expect(onChange).toHaveBeenCalledWith(cash);
   });
 
-  it('lists the accounts by name and currency in the open dropdown', async () => {
+  it('lists name, owner of a shared account, and currency in the open dropdown', async () => {
     // jsdom has no matchMedia, which tui-root reads.
     vi.stubGlobal('matchMedia', () => ({
       matches: false, addEventListener() {}, removeEventListener() {},
@@ -75,7 +80,8 @@ describe('AccountSelect', () => {
     TestBed.configureTestingModule({
       providers: [
         provideTaiga(),
-        { provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd]) } },
+        me,
+        { provide: AccountsState, useValue: { transferTargets: signal([lhv, cash, usd, shared]) } },
       ],
     });
     const fixture = TestBed.createComponent(RootHost);
@@ -83,6 +89,9 @@ describe('AccountSelect', () => {
     (fixture.nativeElement as HTMLElement).querySelector('input')!.click();
     await fixture.whenStable();
     const options = [...document.querySelectorAll('tui-data-list button')];
-    expect(options.map(o => o.textContent?.trim())).toEqual(['Cash (EUR)', 'Wise USD (USD)']);
+    const parts = options.map(o =>
+      [...o.querySelectorAll('.name, .owner, .currency')].map(e => e.textContent?.trim())
+    );
+    expect(parts).toEqual([['Cash', 'EUR'], ['Wise USD', 'USD'], ['Joint', 'Kate', 'EUR']]);
   });
 });

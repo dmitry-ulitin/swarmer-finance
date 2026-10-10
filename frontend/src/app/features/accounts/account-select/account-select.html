@@ -1,9 +1,24 @@
 <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringify"
-    [identityMatcher]="accountMatcher" [tuiTextfieldSize]="size()">
+    [identityMatcher]="accountMatcher" [tuiTextfieldSize]="size()" [content]="value() && accountContent">
     @if (label()) {
         <label tuiLabel>{{ label() }}</label>
     }
     <input tuiSelect placeholder="Select account" [ngModel]="value()" [ngModelOptions]="{ standalone: true }"
         [disabled]="disabled()" (ngModelChange)="onValueChange($event)" (blur)="onTouched()" />
-    <tui-data-list-wrapper *tuiDropdown [items]="options()" />
+    <tui-data-list *tuiDropdown>
+        @for (item of options(); track item.id) {
+            <button tuiOption new type="button" [value]="item">
+                <ng-container *ngTemplateOutlet="accountContent; context: { $implicit: item }" />
+            </button>
+        }
+    </tui-data-list>
 </tui-textfield>
+<ng-template #accountContent let-item>
+    <span class="account">
+        <span class="name">{{ item.name }}</span>
+        @if (isForeign(item)) {
+            <span class="owner">{{ item.owner_name }}</span>
+        }
+        <span class="currency">{{ item.currency }}</span>
+    </span>
+</ng-template>

@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, forwardRef, inject, input, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { TuiTextfield } from '@taiga-ui/core';
-import { TuiChevron, TuiDataListWrapper, TuiSelect } from '@taiga-ui/kit';
+import { TuiDataList, TuiTextfield } from '@taiga-ui/core';
+import { TuiChevron, TuiSelect } from '@taiga-ui/kit';
 import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { AccountsState } from '../../../core/accounts.state';
+import { AuthService } from '../../../core/auth.service';
 import type { Account } from '../../../models/account';
 
 /**
@@ -12,7 +14,7 @@ import type { Account } from '../../../models/account';
  */
 @Component({
   selector: 'app-account-select',
-  imports: [FormsModule, TuiTextfield, TuiSelect, TuiDataListWrapper, TuiChevron],
+  imports: [FormsModule, NgTemplateOutlet, TuiTextfield, TuiSelect, TuiDataList, TuiChevron],
   templateUrl: './account-select.html',
   styleUrl: './account-select.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +33,7 @@ export class AccountSelect implements ControlValueAccessor {
   readonly excludeId = input<number | null>(null);
 
   private readonly accountsState = inject(AccountsState);
+  private readonly auth = inject(AuthService);
 
   protected readonly value = signal<Account | null>(null);
   protected readonly disabled = signal(false);
@@ -41,8 +44,10 @@ export class AccountSelect implements ControlValueAccessor {
     this.accountsState.transferTargets().filter(a => a.id !== this.excludeId())
   );
 
-  readonly stringify: TuiStringHandler<Account | null> = a =>
-    a ? `${a.name} (${a.currency})` : '';
+  readonly stringify: TuiStringHandler<Account | null> = a => a?.name ?? '';
+
+  /** Someone else's account, shared with the user; its owner is shown beside the name. */
+  readonly isForeign = (a: Account): boolean => a.user_id !== this.auth.user()?.id;
 
   readonly accountMatcher = (a: Account | null, b: Account | null): boolean => a?.id === b?.id;
 
