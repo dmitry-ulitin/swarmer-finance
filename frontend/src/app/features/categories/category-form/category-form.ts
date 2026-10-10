@@ -23,10 +23,11 @@ export interface CategoryFormData {
 }
 
 const PREDEFINED_ICONS = [
-  'home', 'car', 'fuel', 'wrench', 'shopping-cart', 'shirt', 'shopping-basket', 'percent', 'briefcase',
+  'home', 'key-round', 'car', 'fuel', 'wrench', 'shopping-cart', 'shirt', 'shopping-basket', 'broom', 'receipt', 'percent', 'briefcase',
   'graduation-cap', 'bus','plane', 'ship', 'tree-palm', 'gift', 'music', 'gamepad-2',
-  'zap', 'droplets', 'heart-pulse', 'pill', 'briefcase-medical',
-  'dumbbell', 'cat', 'wallet', 'hand-coins', 'utensils', 'coffee', 'soup', 'bottle-wine', 'baby', 'fish',
+  'zap', 'droplets', 'wifi', 'smartphone', 'laptop', 'heart-pulse', 'stethoscope', 'pill', 'briefcase-medical',
+  'dumbbell', 'cat', 'wallet', 'piggy-bank', 'landmark', 'trending-up', 'hand-coins', 'hand-heart', 'repeat', 'undo-2',
+  'utensils', 'coffee', 'soup', 'bottle-wine', 'baby', 'fish', 'tent-tree', 'sparkles', 'flag',
   'star', 'playing-cards-fan', 'party-popper', 'cake', 'badge-dollar-sign', 'badge-euro', 'badge-russian-ruble'
 ];
 
