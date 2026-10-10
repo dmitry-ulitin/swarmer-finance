@@ -81,6 +81,28 @@ describe('Import API', () => {
     expect(res.body.data.created).toBe(143);
   });
 
+  it('passes transferAccountId through to reconcile', async () => {
+    const peer = await pool.query(
+      `INSERT INTO accounts (user_id, name, currency, start_balance)
+       VALUES ($1, 'Peer', 'EUR', 0) RETURNING id`,
+      [userId]
+    );
+    const peerId = peer.rows[0].id;
+    const res = await request(app)
+      .post('/api/import/reconcile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        accountId,
+        rows: [{ date: '2026-07-02', amount: -5, hash: 'api-tr', transferAccountId: peerId }],
+      });
+    expect(res.status).toBe(200);
+    const t = await pool.query(
+      'SELECT credit_account_id FROM transactions WHERE user_id = $1',
+      [userId]
+    );
+    expect(t.rows[0].credit_account_id).toBe(peerId);
+  });
+
   it('surfaces a currency mismatch as 400', async () => {
     const usd = await pool.query(
       `INSERT INTO accounts (user_id, name, currency, start_balance)

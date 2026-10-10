@@ -13,6 +13,11 @@ describe('reconcile', () => {
   let accountId: number;
   let ownerCategoryId: number;
   let unrelatedCategoryId: number;
+  let eurPeerId: number;
+  let usdPeerId: number;
+  let xtsPeerId: number;
+  let unrelatedPeerId: number;
+  let trackedPeerId: number;
 
   beforeAll(async () => {
     const mk = async (email: string) => {
@@ -48,6 +53,24 @@ describe('reconcile', () => {
       [thirdUserId]
     );
     unrelatedCategoryId = unrelatedCat.rows[0].id;
+
+    const mkAccount = async (ownerId: number, currency: string, type = 'bank', settings = {}) => {
+      const r = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, type, settings)
+         VALUES ($1, 'Peer', $2, 0, $3, $4) RETURNING id`,
+        [ownerId, currency, type, settings]
+      );
+      return r.rows[0].id as number;
+    };
+    eurPeerId = await mkAccount(userId, 'EUR');
+    usdPeerId = await mkAccount(userId, 'USD');
+    // ISO 4217's code reserved for testing: no provider quotes it.
+    xtsPeerId = await mkAccount(userId, 'XTS');
+    unrelatedPeerId = await mkAccount(thirdUserId, 'EUR');
+    trackedPeerId = await mkAccount(userId, 'BTC', 'crypto', {
+      blockchain: 'bitcoin',
+      address: 'bc1qtrackedpeer',
+    });
   });
 
   afterAll(async () => {
@@ -205,5 +228,121 @@ describe('reconcile', () => {
       'SELECT COUNT(*) FROM transactions WHERE user_id = $1', [userId]
     );
     expect(Number(count.rows[0].count)).toBe(0);
+  });
+
+  describe('transfers', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const originalFetch = global.fetch;
+
+    beforeAll(async () => {
+      await pool.query(
+        `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)
+         VALUES ('EUR', 'USD', 1.1, $1)
+         ON CONFLICT (from_currency, to_currency, as_of) DO UPDATE SET rate = EXCLUDED.rate`,
+        [today]
+      );
+    });
+
+    afterAll(async () => {
+      await pool.query(
+        `DELETE FROM exchange_rates WHERE from_currency = 'EUR' AND to_currency = 'USD' AND as_of = $1`,
+        [today]
+      );
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    const countRows = async () =>
+      Number((await pool.query('SELECT COUNT(*) FROM transactions WHERE user_id = $1', [userId])).rows[0].count);
+
+    it('stores an outgoing row as a transfer to the peer, without a category', async () => {
+      await reconcile(userId, accountId, [
+        { date: '2026-07-02', amount: -25.5, hash: 'tr-out', transferAccountId: eurPeerId },
+      ]);
+      const t = await pool.query(
+        `SELECT debit_account_id, credit_account_id, debit, credit, category_id, import_hash
+         FROM transactions WHERE user_id = $1`,
+        [userId]
+      );
+      expect(t.rows[0]).toMatchObject({
+        debit_account_id: accountId,
+        credit_account_id: eurPeerId,
+        category_id: null,
+        import_hash: 'tr-out',
+      });
+      expect(Number(t.rows[0].debit)).toBe(2550);
+      expect(Number(t.rows[0].credit)).toBe(2550);
+    });
+
+    it('stores an incoming row as a transfer from the peer', async () => {
+      await reconcile(userId, accountId, [
+        { date: '2026-07-02', amount: 10, hash: 'tr-in', transferAccountId: eurPeerId },
+      ]);
+      const t = await pool.query(
+        'SELECT debit_account_id, credit_account_id FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+      expect(t.rows[0]).toMatchObject({ debit_account_id: eurPeerId, credit_account_id: accountId });
+    });
+
+    it('ignores a category sent alongside a transfer', async () => {
+      await reconcile(userId, accountId, [
+        {
+          date: '2026-07-02', amount: -1, hash: 'tr-cat',
+          transferAccountId: eurPeerId, categoryId: ownerCategoryId,
+        },
+      ]);
+      const t = await pool.query('SELECT category_id FROM transactions WHERE user_id = $1', [userId]);
+      expect(t.rows[0].category_id).toBeNull();
+    });
+
+    it('converts the peer side at the current rate when currencies differ', async () => {
+      await reconcile(userId, accountId, [
+        { date: '2026-07-02', amount: -100, hash: 'tr-fx', transferAccountId: usdPeerId },
+      ]);
+      const t = await pool.query('SELECT debit, credit FROM transactions WHERE user_id = $1', [userId]);
+      expect(Number(t.rows[0].debit)).toBe(10000);
+      expect(Number(t.rows[0].credit)).toBe(11000);
+    });
+
+    it('rejects a transfer with no available rate with 400, and creates nothing', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('offline')) as unknown as typeof fetch;
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      await expect(
+        reconcile(userId, accountId, [
+          { date: '2026-07-02', amount: -1, hash: 'ok', categoryId: null },
+          { date: '2026-07-02', amount: -1, hash: 'tr-xts', transferAccountId: xtsPeerId },
+        ])
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(await countRows()).toBe(0);
+      jest.restoreAllMocks();
+    });
+
+    it('rejects a peer the user cannot write to with 403, and creates nothing', async () => {
+      await expect(
+        reconcile(userId, accountId, [
+          { date: '2026-07-02', amount: -1, hash: 'tr-x', transferAccountId: unrelatedPeerId },
+        ])
+      ).rejects.toMatchObject({ statusCode: 403 });
+      expect(await countRows()).toBe(0);
+    });
+
+    it('rejects a blockchain-tracked peer with 403', async () => {
+      await expect(
+        reconcile(userId, accountId, [
+          { date: '2026-07-02', amount: -1, hash: 'tr-t', transferAccountId: trackedPeerId },
+        ])
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('rejects a transfer to the imported account itself with 400', async () => {
+      await expect(
+        reconcile(userId, accountId, [
+          { date: '2026-07-02', amount: -1, hash: 'tr-self', transferAccountId: accountId },
+        ])
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
   });
 });

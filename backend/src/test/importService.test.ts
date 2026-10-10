@@ -188,6 +188,32 @@ describe('parseStatement', () => {
     expect(result.rows[0].status).toBe('new');
   });
 
+  it('flags a transfer already imported from the peer account as possible_duplicate', async () => {
+    // LHV row 0 is +1305.28 on 2026-07-01: here, money arriving from the USD
+    // account, already imported from that account's own statement.
+    await pool.query(
+      `INSERT INTO transactions
+         (user_id, debit_account_id, credit_account_id, debit, credit, date, description, import_hash)
+       VALUES ($1, $2, $3, 140000, 130528, '2026-07-01', 'from the peer', 'peer-hash')`,
+      [userId, usdAccountId, eurAccountId]
+    );
+    const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+    expect(result.rows[0].status).toBe('possible_duplicate');
+  });
+
+  it('keys a transfer by this account\'s own side, not the peer\'s', async () => {
+    // Money LEAVING the EUR account must not match the incoming row 0, even
+    // though the peer's side carries the same number.
+    await pool.query(
+      `INSERT INTO transactions
+         (user_id, debit_account_id, credit_account_id, debit, credit, date, description)
+       VALUES ($1, $2, $3, 130528, 130528, '2026-07-01', 'outgoing')`,
+      [userId, eurAccountId, usdAccountId]
+    );
+    const result = await parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'));
+    expect(result.rows[0].status).toBe('new');
+  });
+
   describe('category suggestions', () => {
     const seedIncome = (ownerId: number, accountId: number, categoryId: number, description: string | null = 'seed') =>
       pool.query(

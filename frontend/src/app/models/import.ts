@@ -37,6 +37,8 @@ export interface ImportReconcileRow {
   payee?: string | null;
   hash: string;
   categoryId?: number | null;
+  /** Makes the row a transfer with this account. */
+  transferAccountId?: number | null;
 }
 
 export interface ImportReconcileResult {

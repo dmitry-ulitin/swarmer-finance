@@ -7,9 +7,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ImportReview } from './import-review';
 import { ApiService } from '../../../core/api.service';
 import { CategoriesState } from '../../../core/categories.state';
+import { AccountsState } from '../../../core/accounts.state';
 import { AuthService } from '../../../core/auth.service';
 import { NotificationService } from '../../../core/notification.service';
 import type { Category } from '../../../models/category';
+import type { Account } from '../../../models/account';
 import type { ImportParseResult, ImportRow, ImportRowStatus } from '../../../models/import';
 
 const ME = 1;
@@ -26,6 +28,18 @@ const tree: Category[] = [
   makeCategory({ id: 1, name: 'Income', user_id: null, parent_id: null, root_id: 1, children: [] }),
   makeCategory({ id: 2, name: 'Expenses', user_id: null, parent_id: null, children: [groceries] }),
 ];
+
+function makeAccount(id: number, name: string, currency = 'EUR'): Account {
+  return {
+    id, user_id: ME, name, currency, scale: 2, start_balance: 0, balance: 0,
+    user_balance: 0, deleted: false, created_at: '', type: 'bank', settings: {},
+  };
+}
+
+// Account 7 is the one being imported into (see makeResult).
+const imported = makeAccount(7, 'LHV');
+const wiseUsd = makeAccount(8, 'Wise USD', 'USD');
+const cash = makeAccount(9, 'Cash');
 
 function makeRow(i: number, status: ImportRowStatus, amount = -10): ImportRow {
   return {
@@ -59,7 +73,8 @@ function makeResult(rows: ImportRow[]): ImportParseResult {
 function configure(
   result: ImportParseResult,
   api: Partial<ApiService> = {},
-  categories: WritableSignal<Category[]> = signal(tree)
+  categories: WritableSignal<Category[]> = signal(tree),
+  transferTargets: WritableSignal<Account[]> = signal([imported, wiseUsd, cash])
 ) {
   const completeWith = vi.fn();
   const showError = vi.fn();
@@ -69,6 +84,7 @@ function configure(
       { provide: POLYMORPHEUS_CONTEXT, useValue: { data: result, completeWith } },
       { provide: ApiService, useValue: api },
       { provide: CategoriesState, useValue: { categories } },
+      { provide: AccountsState, useValue: { transferTargets } },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
       { provide: NotificationService, useValue: { showError, showSuccess: vi.fn() } },
     ],
@@ -184,7 +200,7 @@ describe('ImportReview', () => {
       await component.submit();
 
       expect(Object.keys(reconcileImport.mock.calls[0][1][0]).sort()).toEqual([
-        'amount', 'categoryId', 'date', 'description', 'hash', 'payee',
+        'amount', 'categoryId', 'date', 'description', 'hash', 'payee', 'transferAccountId',
       ]);
     });
 
@@ -285,12 +301,89 @@ describe('ImportReview', () => {
 
       expect(reconcileImport.mock.calls[0][1][0].categoryId).toBe(10);
     });
+  });
 
-    it('names where the suggestion came from', () => {
-      const { component } = configure(makeResult([suggested(10, 'payee'), { ...suggested(10, 'mcc'), index: 1 }]));
-      const [fromHistory, fromMcc] = component.rows();
-      expect(component.suggestionHint(fromHistory)).toBe('Suggested from history');
-      expect(component.suggestionHint(fromMcc)).toBe('Suggested by merchant type');
+  describe('transfers', () => {
+    const ok = () => vi.fn().mockReturnValue(of({ data: { created: 1, skipped: 0 }, error: null }));
+
+    it('starts every row as income or expense', () => {
+      const { component } = configure(makeResult([makeRow(0, 'new')]));
+      expect(component.rows()[0].transfer).toBe(false);
+    });
+
+    it('defaults to another account in the same currency', () => {
+      const { component } = configure(makeResult([makeRow(0, 'new')]));
+      component.setTransfer(0, true);
+      const row = component.rows()[0];
+      expect(row.transfer).toBe(true);
+      expect(row.transferAccount).toBe(cash);
+    });
+
+    it('falls back to an account in another currency', () => {
+      const { component } = configure(
+        makeResult([makeRow(0, 'new')]), {}, signal(tree), signal([imported, wiseUsd])
+      );
+      component.setTransfer(0, true);
+      expect(component.rows()[0].transferAccount).toBe(wiseUsd);
+    });
+
+    it('keeps the category for when the row is switched back', () => {
+      const { component } = configure(makeResult([makeRow(0, 'new')]));
+      component.setCategory(0, groceries);
+      component.setTransfer(0, true);
+      component.setTransfer(0, false);
+      expect(component.categoryOf(component.rows()[0])).toBe(groceries);
+    });
+
+    it('flags a peer in another currency as converted', () => {
+      const { component } = configure(makeResult([makeRow(0, 'new')]));
+      component.setTransfer(0, true);
+      expect(component.isConverted(component.rows()[0])).toBe(false);
+      component.setTransferAccount(0, wiseUsd);
+      expect(component.isConverted(component.rows()[0])).toBe(true);
+    });
+
+    it('sends the peer and no category for a transfer', async () => {
+      const reconcileImport = ok();
+      const { component } = configure(makeResult([makeRow(0, 'new')]), { reconcileImport } as never);
+      component.setCategory(0, groceries);
+      component.setTransfer(0, true);
+
+      await component.submit();
+
+      const sent = reconcileImport.mock.calls[0][1][0];
+      expect(sent.transferAccountId).toBe(9);
+      expect(sent.categoryId).toBeNull();
+    });
+
+    it('sends no peer for an income or expense row', async () => {
+      const reconcileImport = ok();
+      const { component } = configure(makeResult([makeRow(0, 'new')]), { reconcileImport } as never);
+
+      await component.submit();
+
+      expect(reconcileImport.mock.calls[0][1][0].transferAccountId).toBeNull();
+    });
+
+    it('blocks import while a selected transfer has no account', async () => {
+      const reconcileImport = ok();
+      const { component } = configure(
+        makeResult([makeRow(0, 'new')]), { reconcileImport } as never, signal(tree), signal([imported])
+      );
+      component.setTransfer(0, true);
+
+      expect(component.canSubmit()).toBe(false);
+      await component.submit();
+      expect(reconcileImport).not.toHaveBeenCalled();
+    });
+
+    it('ignores an incomplete transfer on an unselected row', () => {
+      const { component } = configure(
+        makeResult([makeRow(0, 'new'), makeRow(1, 'new')]), {}, signal(tree), signal([imported])
+      );
+      component.setTransfer(1, true);
+      component.toggle(1, false);
+      expect(component.canSubmit()).toBe(true);
     });
   });
 });

@@ -1,7 +1,7 @@
 import * as accountQueries from '../../db/queries/accounts';
 import * as transactionQueries from '../../db/queries/transactions';
 import { LEVEL, getAccessibleAccountIds, requireLevel } from '../access';
-import { toCents } from '../currency';
+import { convertAmount, getOrRefreshRate, toCents } from '../currency';
 import { detectProfile, getProfile, Profile } from './profiles';
 import { readStatement } from './rows';
 import { computeImportHashes } from './hash';
@@ -95,13 +95,12 @@ export const parseStatement = async (
     // Only the side that actually belongs to THIS account is keyed — using
     // both sides unconditionally made an expense also register an
     // income-shaped key (and vice versa), matching an imported row of the
-    // opposite sign. Transfers are skipped entirely: an imported row can
-    // never be one, and for cross-currency transfers `credit`/`debit` are in
-    // different accounts' currencies/scales, so keying either side by this
-    // account's cents would be meaningless.
-    if (t.debit_account_id === accountId && t.credit_account_id === null) {
+    // opposite sign. Transfers count too — one imported from the peer
+    // account's statement shows up here again — and each side's amount is in
+    // its own account's currency, so this account's side is comparable.
+    if (t.debit_account_id === accountId) {
       byKey.set(`${d}|-${t.debit}`, t.id);
-    } else if (t.credit_account_id === accountId && t.debit_account_id === null) {
+    } else if (t.credit_account_id === accountId) {
       byKey.set(`${d}|${t.credit}`, t.id);
     }
   }
@@ -182,6 +181,8 @@ export interface ReconcileRow {
   payee?: string | null;
   hash: string;
   categoryId?: number | null;
+  /** Makes the row a transfer with this account; its category is then ignored. */
+  transferAccountId?: number | null;
 }
 
 /**
@@ -241,9 +242,46 @@ export const reconcile = async (
     resolvedCategoryIds.set(id, await resolveCategoryForOwner(id, account.user_id));
   }
 
+  // Transfer peers get the same checks as the imported account, and the
+  // rate to each peer's currency is fetched once, up front: the statement
+  // carries one amount, so the peer's side is converted at today's rate,
+  // for the user to correct by hand if it matters.
+  const peers = new Map<number, { scale: number; rate: number }>();
+  for (const peerId of new Set(
+    toInsert.map(r => r.transferAccountId).filter((id): id is number => id != null)
+  )) {
+    if (peerId === accountId) {
+      throw { statusCode: 400, message: 'A transfer needs two different accounts' };
+    }
+    const peer = await loadWritableAccount(peerId, userId);
+    const rate = await getOrRefreshRate(account.currency, peer.currency);
+    if (rate === null) {
+      throw {
+        statusCode: 400,
+        message: `No exchange rate for ${account.currency} to ${peer.currency}`,
+      };
+    }
+    peers.set(peerId, { scale: peer.scale, rate });
+  }
+
   const payload = toInsert.map(row => {
     const cents = toCents(Math.abs(row.amount), account.scale);
     const isExpense = row.amount < 0;
+    const peer = row.transferAccountId != null ? peers.get(row.transferAccountId) : undefined;
+    if (peer) {
+      const peerCents = convertAmount(cents, account.scale, peer.rate, peer.scale)!;
+      return {
+        categoryId: undefined,
+        debitAccountId: isExpense ? accountId : row.transferAccountId!,
+        creditAccountId: isExpense ? row.transferAccountId! : accountId,
+        debit: isExpense ? cents : peerCents,
+        credit: isExpense ? peerCents : cents,
+        date: row.date,
+        description: row.description ?? '',
+        payee: row.payee ?? null,
+        importHash: row.hash,
+      };
+    }
     return {
       categoryId:
         (row.categoryId != null ? resolvedCategoryIds.get(row.categoryId) : undefined) ??

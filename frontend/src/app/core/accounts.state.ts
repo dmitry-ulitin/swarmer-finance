@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, resource } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { Account, AccountPayload } from '../models/account';
+import { Account, AccountPayload, accessLevelOf } from '../models/account';
 import { AccountSection, AccountTreeItem, buildAccountTree, groupIntoSections } from './account-tree';
 import { ApiService } from './api.service';
 
@@ -34,6 +34,10 @@ export class AccountsState {
   /** Accounts whose transactions come from the blockchain. */
   readonly trackedIds = computed<ReadonlySet<number>>(
     () => new Set(this.accounts().filter(a => a.tracked).map(a => a.id))
+  );
+  /** Accounts a transfer can be entered against by hand: live, untracked, writable. */
+  readonly transferTargets = computed(() =>
+    this.visibleAccounts().filter(a => !a.tracked && accessLevelOf(a) >= 2)
   );
   readonly groupedAccounts = computed<AccountTreeItem[]>(() => buildAccountTree(this.visibleAccounts()));
   readonly accountSections = computed<AccountSection[]>(() => groupIntoSections(this.groupedAccounts()));

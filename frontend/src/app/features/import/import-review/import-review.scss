@@ -95,8 +95,8 @@
 // min-inline-size keeps the select from being squeezed by .col-desc, which
 // claims all spare width.
 .col-category {
-    inline-size: 14rem;
-    min-inline-size: 14rem;
+    inline-size: 20rem;
+    min-inline-size: 20rem;
 }
 
 .category-cell {
@@ -104,14 +104,14 @@
     align-items: center;
     gap: 0.25rem;
 
-    app-category-select {
+    app-category-select,
+    app-account-select {
         flex: 1;
         min-inline-size: 0;
     }
 }
 
-// The empty placeholder keeps every select the same width, icon or not.
-.suggested {
+.converted {
     flex-shrink: 0;
     inline-size: 1rem;
     font-size: 1rem;
@@ -178,4 +178,8 @@
     margin-inline-end: auto;
     color: var(--tui-text-secondary);
     font-size: 0.875rem;
+}
+
+.transfer-toggle {
+    flex-shrink: 0;
 }

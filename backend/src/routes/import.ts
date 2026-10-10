@@ -25,6 +25,7 @@ const reconcileSchema = z.object({
       payee: z.string().nullish(),
       hash: z.string().min(1),
       categoryId: z.number().int().positive().nullish(),
+      transferAccountId: z.number().int().positive().nullish(),
     })
   ).min(1),
 });
