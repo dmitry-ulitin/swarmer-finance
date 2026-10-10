@@ -5,7 +5,7 @@
         class="type-selector">
         <button type="button" [disabled]="!typeAllowed(0)">Expense</button>
         <button type="button" [disabled]="!typeAllowed(1)">Income</button>
-        <button type="button" [disabled]="accountsState.accounts().length < 2 || !typeAllowed(2)">Transfer</button>
+        <button type="button" [disabled]="!canTransfer() || !typeAllowed(2)">Transfer</button>
     </tui-segmented>
 
     <!-- Date -->

@@ -102,6 +102,17 @@ export class TransactionForm {
   readonly fromAccountValue = toSignal(this.form.controls.fromAccount.valueChanges, { initialValue: this.form.controls.fromAccount.value });
   readonly toAccountValue = toSignal(this.form.controls.toAccount.valueChanges, { initialValue: this.form.controls.toAccount.value });
 
+  /**
+   * A transfer needs two accounts: ones that can be picked, plus a synced
+   * side this transaction already holds, which is not pickable but stays.
+   */
+  readonly canTransfer = computed(() => {
+    const ids = new Set(this.accountsState.transferTargets().map(a => a.id));
+    if (this.lock.debitLocked && this.data.debit_account) ids.add(this.data.debit_account.id);
+    if (this.lock.creditLocked && this.data.credit_account) ids.add(this.data.credit_account.id);
+    return ids.size >= 2;
+  });
+
   readonly isSameCurrency = computed(() => {
     const d = this.fromAccountValue()?.currency;
     const c = this.toAccountValue()?.currency;

@@ -186,6 +186,11 @@ describe('TransactionForm on a synced account', () => {
     expect(form.form.controls.fromAccount.value).toBeNull();
   });
 
+  it('counts the synced side towards the two accounts a transfer needs', () => {
+    const form = configure({ id: 5, debit_account: wallet, debit: 0.001, credit: 0.001 }, [wallet, exchange], [1]);
+    expect(form.canTransfer()).toBe(true);
+  });
+
   it('allows no type change on a transfer between synced wallets', () => {
     const other = { id: 2, name: 'Hot', currency: 'BTC', scale: 8 };
     const form = configure({ id: 6, debit_account: wallet, credit_account: other }, [wallet, other], [1, 2]);
@@ -317,6 +322,13 @@ describe('TransactionForm transfer accounts', () => {
     const form = transfer();
     form.form.controls.toAccount.setValue(a);
     expect(form.form.controls.fromAccount.value).toEqual(b);
+  });
+
+  it('allows a transfer only with two accounts to pick from', () => {
+    const gone = { ...c, deleted: true };
+    expect(configure({ debit_account: a }, [a, gone]).canTransfer()).toBe(false);
+    TestBed.resetTestingModule();
+    expect(configure({ debit_account: a }, [a, c]).canTransfer()).toBe(true);
   });
 
   it('leaves the other side alone for a different account', () => {
