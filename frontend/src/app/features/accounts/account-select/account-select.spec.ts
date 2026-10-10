@@ -17,7 +17,7 @@ function makeAccount(id: number, name: string, currency = 'EUR'): Account {
 const lhv = makeAccount(1, 'LHV');
 const cash = makeAccount(2, 'Cash');
 const usd = makeAccount(3, 'Wise USD', 'USD');
-const shared: Account = { ...makeAccount(4, 'Joint', 'EUR'), user_id: 2, owner_name: 'Kate' };
+const shared: Account = { ...makeAccount(4, 'Joint', 'EUR'), user_id: 2, owner_name: 'Kate', access_level: 3 };
 const me = { provide: AuthService, useValue: { user: signal({ id: 1 }) } };
 
 function setup(excludeId: number | null = null) {
@@ -48,7 +48,25 @@ describe('AccountSelect', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
   it('offers every transfer target', () => {
-    expect(setup().options().map(a => a.name)).toEqual(['LHV', 'Cash', 'Wise USD']);
+    expect(setup().options().map(a => a.name)).toEqual(['Cash', 'LHV', 'Wise USD']);
+  });
+
+  it('orders by access level, own accounts first, then by name ignoring case', () => {
+    const readOnlyA: Account = { ...makeAccount(5, 'Alpha'), access_level: 2 };
+    const admin: Account = { ...makeAccount(6, 'beta'), access_level: 3 };
+    const ownLower = makeAccount(7, 'alpha');
+    TestBed.configureTestingModule({
+      providers: [
+        me,
+        {
+          provide: AccountsState,
+          useValue: { accounts: signal([]), transferTargets: signal([readOnlyA, usd, admin, ownLower, cash]) },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AccountSelect);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.options().map(a => a.id)).toEqual([7, 2, 3, 6, 5]);
   });
 
   it('leaves out the excluded account', () => {

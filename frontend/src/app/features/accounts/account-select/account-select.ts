@@ -6,7 +6,7 @@ import { TuiChevron, TuiSelect } from '@taiga-ui/kit';
 import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { AccountsState } from '../../../core/accounts.state';
 import { AuthService } from '../../../core/auth.service';
-import type { Account } from '../../../models/account';
+import { accessLevelOf, type Account } from '../../../models/account';
 import type { TransactionAccount } from '../../../models/transaction';
 
 /**
@@ -49,8 +49,16 @@ export class AccountSelect implements ControlValueAccessor {
     return this.accountsState.accounts().find(a => a.id === value?.id) ?? value;
   });
 
+  /** Ordered like the Accounts page: own accounts first, then by name. */
   readonly options = computed(() =>
-    this.accountsState.transferTargets().filter(a => a.id !== this.excludeId())
+    this.accountsState
+      .transferTargets()
+      .filter(a => a.id !== this.excludeId())
+      .sort(
+        (a, b) =>
+          accessLevelOf(b) - accessLevelOf(a) ||
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      )
   );
 
   readonly stringify: TuiStringHandler<TransactionAccount | null> = a => a?.name ?? '';
