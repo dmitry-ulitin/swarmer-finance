@@ -4,6 +4,7 @@ import { TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { ApiService } from '../../core/api.service';
 import { TransactionsState } from '../../core/transactions.state';
 import { MoneyPipe } from '../../core/money.pipe';
+import { amountsHint } from '../../core/money-hint';
 import { CategorySummaryItem } from '../../models/transaction';
 
 interface SummaryRow extends CategorySummaryItem {
@@ -71,13 +72,8 @@ export class CategorySummaryPanel {
     const rows = items.map(i => ({
       ...i,
       share: total && i.total !== null ? Math.round((i.total / total) * 100) : 0,
-      hint: this.hint(i, currency),
+      hint: amountsHint(this.money, i.amounts, currency),
     }));
     return { type, title, total, rows };
-  }
-
-  private hint(item: CategorySummaryItem, currency: string): string | null {
-    if (item.amounts.length === 1 && item.amounts[0].currency === currency) return null;
-    return item.amounts.map(a => this.money.transform(a.amount, a.currency, a.scale)).join(' + ');
   }
 }
