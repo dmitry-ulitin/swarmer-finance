@@ -1,4 +1,5 @@
 import { AccessLevel, Account, accessLevelOf } from '../models/account';
+import { MoneyAmount } from './money-hint';
 
 export interface AccountLeafItem {
   kind: 'account';
@@ -191,6 +192,26 @@ export function collectAccountIds(group: AccountGroupItem): number[] {
     else ids.push(...collectAccountIds(item));
   }
   return ids;
+}
+
+export function collectAccounts(group: AccountGroupItem): Account[] {
+  const accounts: Account[] = [];
+  for (const item of group.children) {
+    if (item.kind === 'account') accounts.push(item.account);
+    else accounts.push(...collectAccounts(item));
+  }
+  return accounts;
+}
+
+/** Unconverted balances summed per account currency, in first-seen order. */
+export function sumByCurrency(accounts: Account[]): MoneyAmount[] {
+  const sums = new Map<string, MoneyAmount>();
+  for (const account of accounts) {
+    const sum = sums.get(account.currency);
+    if (sum) sum.amount += account.balance;
+    else sums.set(account.currency, { currency: account.currency, scale: account.scale, amount: account.balance });
+  }
+  return [...sums.values()];
 }
 
 /** One chip of the active account filter: a single account or a whole group. */

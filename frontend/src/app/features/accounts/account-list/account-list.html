@@ -23,9 +23,17 @@
     </div>
   }
 
-  @if (state.accountSections().length > 0 && state.summary() && !state.summary()?.incomplete) {
-    <div class="summary-row">
-      <span class="summary-balance">{{ state.summary()?.total  | money: state.summary()?.currency : state.summary()?.scale }}</span>
-    </div>
+  @if (state.accountSections().length > 0 && state.summary(); as summary) {
+    @if (totalHint(); as hint) {
+      <div class="summary-row">
+        <span class="summary-balance" [tuiHint]="hint">
+          {{ summary.incomplete ? '—' : (summary.total | money: summary.currency : summary.scale) }}
+        </span>
+      </div>
+    } @else if (!summary.incomplete) {
+      <div class="summary-row">
+        <span class="summary-balance">{{ summary.total | money: summary.currency : summary.scale }}</span>
+      </div>
+    }
   }
 </nav>

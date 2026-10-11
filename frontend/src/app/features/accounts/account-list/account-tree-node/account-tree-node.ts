@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { MoneyPipe } from '../../../../core/money.pipe';
-import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectUserBalance } from '../../../../core/account-tree';
+import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectAccounts, collectUserBalance, sumByCurrency } from '../../../../core/account-tree';
+import { amountsHint } from '../../../../core/money-hint';
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';
-import { TuiExpand, TuiButton } from '@taiga-ui/core';
+import { TuiExpand, TuiButton, TuiHint } from '@taiga-ui/core';
 import { TuiHovered } from '@taiga-ui/cdk';
 import { Account } from '../../../../models/account';
 import { ImportDialogService } from '../../../import/import-dialog.service';
@@ -12,7 +13,8 @@ import { AccountSyncService } from '../../account-sync.service';
 
 @Component({
   selector: 'app-account-tree-node',
-  imports: [AccountTreeNode, MoneyPipe, TuiExpand, TuiButton, TuiHovered],
+  imports: [AccountTreeNode, MoneyPipe, TuiExpand, TuiButton, TuiHint, TuiHovered],
+  providers: [MoneyPipe],
   templateUrl: './account-tree-node.html',
   styleUrl: './account-tree-node.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,6 +28,7 @@ export class AccountTreeNode {
   protected readonly auth = inject(AuthService);
   private readonly importDialog = inject(ImportDialogService);
   protected readonly sync = inject(AccountSyncService);
+  private readonly money = inject(MoneyPipe);
   protected hovered = false;
 
   protected readonly nodeAccountIds = computed(() => {
@@ -36,6 +39,24 @@ export class AccountTreeNode {
   protected readonly groupBalance = computed(() => {
     const item = this.item();
     return item.kind === 'group' ? collectUserBalance(item) : null;
+  });
+
+  /** An account's balance in the user's currency, when it is kept in another. */
+  protected readonly accountHint = computed(() => {
+    const item = this.item();
+    const user = this.auth.user();
+    if (item.kind !== 'account' || !user) return null;
+    const { currency, user_balance } = item.account;
+    if (currency === user.currency || user_balance === null) return null;
+    return this.money.transform(user_balance, user.currency, user.currency_scale);
+  });
+
+  /** The unconverted balances behind a group's total. */
+  protected readonly groupHint = computed(() => {
+    const item = this.item();
+    const user = this.auth.user();
+    if (item.kind !== 'group' || !user) return null;
+    return amountsHint(this.money, sumByCurrency(collectAccounts(item)), user.currency);
   });
 
   protected asGroup(item: AccountTreeItem): AccountGroupItem {

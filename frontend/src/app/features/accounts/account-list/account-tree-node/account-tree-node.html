@@ -36,7 +36,11 @@
       </button>
       }
       @if (account.balance !== null) {
-        <span class="row-balance">{{ account.balance | money: account.currency : account.scale }}</span>
+        @if (accountHint(); as hint) {
+          <span class="row-balance" [tuiHint]="hint">{{ account.balance | money: account.currency : account.scale }}</span>
+        } @else {
+          <span class="row-balance">{{ account.balance | money: account.currency : account.scale }}</span>
+        }
       }
     </div>
   } @else {
@@ -55,8 +59,14 @@
         [attr.aria-label]="'Toggle ' + group.displayName"
         (click)="store.toggleExpanded(group.key)"
       >›</button>
-      @if (groupBalance() !== null && auth.user(); as user) {
-        <span class="row-balance">{{ groupBalance() | money: user.currency : user.currency_scale }}</span>
+      @if (auth.user(); as user) {
+        @if (groupHint(); as hint) {
+          <span class="row-balance" [tuiHint]="hint">
+            {{ groupBalance() === null ? '—' : (groupBalance() | money: user.currency : user.currency_scale) }}
+          </span>
+        } @else if (groupBalance() !== null) {
+          <span class="row-balance">{{ groupBalance() | money: user.currency : user.currency_scale }}</span>
+        }
       }
     </div>
     <tui-expand [expanded]="store.isExpanded(group.key)">

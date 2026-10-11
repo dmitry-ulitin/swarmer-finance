@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccountTree, collectAccountIds, collectUserBalance, groupIntoSections, selectedAccountChips, AccountGroupItem } from './account-tree';
+import { buildAccountTree, collectAccountIds, collectAccounts, collectUserBalance, groupIntoSections, selectedAccountChips, sumByCurrency, AccountGroupItem } from './account-tree';
 import { Account } from '../models/account';
 
 function makeAccount(id: number, name: string): Account {
@@ -377,6 +377,26 @@ describe('collectUserBalance', () => {
   it('returns null if any account in the subtree has no user_balance', () => {
     const group: AccountGroupItem = { kind: 'group', displayName: 'G', fullPath: 'G', key: 'G', access_level: 4, children: [accountItem(1, 100), accountItem(2, null)] };
     expect(collectUserBalance(group)).toBeNull();
+  });
+});
+
+describe('collectAccounts', () => {
+  it('collects accounts across nested groups', () => {
+    const [group] = buildAccountTree([makeAccount(1, 'Bank/A'), makeAccount(2, 'Bank/Sav/X'), makeAccount(3, 'Bank/Sav/Y')]);
+    expect(collectAccounts(group as AccountGroupItem).map(a => a.id).sort()).toEqual([1, 2, 3]);
+  });
+});
+
+describe('sumByCurrency', () => {
+  it('sums balances per currency in first-seen order', () => {
+    expect(sumByCurrency([
+      { ...makeAccount(1, 'A'), balance: 100 },
+      { ...makeCryptoAccount(2, 'B'), balance: 0.5 },
+      { ...makeAccount(3, 'C'), balance: 50 },
+    ])).toEqual([
+      { currency: 'USD', scale: 2, amount: 150 },
+      { currency: 'BTC', scale: 8, amount: 0.5 },
+    ]);
   });
 });
 
