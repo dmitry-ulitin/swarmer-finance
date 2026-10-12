@@ -222,7 +222,7 @@ export class TransactionForm {
     }
 
     if (this.isSameCurrency()) {
-      debitAmount = creditAmount = creditAmount ?? debitAmount;
+      debitAmount = creditAmount = this.isIncome() ? (creditAmount ?? debitAmount) : (debitAmount ?? creditAmount);
     }
     if (debitAmount == null || debitAmount <= 0 || creditAmount == null || creditAmount <= 0) {
       this.notifications.showError('Debit and credit amounts are required');
