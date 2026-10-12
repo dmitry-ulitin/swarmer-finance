@@ -15,6 +15,22 @@
   margin-bottom: 0.25rem;
   border-bottom: 1px solid var(--tui-border-normal);
   font-weight: 500;
+  width: 100%;
+  padding-top: 0;
+  padding-inline: 0;
+  border-top: none;
+  border-inline: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &.selected {
+    border-bottom-color: var(--tui-text-primary);
+  }
 }
 
 .row {

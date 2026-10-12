@@ -22,6 +22,8 @@ describe('FiltersBar', () => {
   let toggleCategory: ReturnType<typeof vi.fn>;
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectedAccountIds: ReturnType<typeof signal<number[]>>;
+  let selectedType: ReturnType<typeof signal<'income' | 'expense' | undefined>>;
+  let clearType: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<FiltersBar>;
   let input: HTMLInputElement;
 
@@ -32,13 +34,15 @@ describe('FiltersBar', () => {
     toggleCategory = vi.fn();
     selectedCategoryIds = signal<number[]>([]);
     selectedAccountIds = signal<number[]>([]);
+    selectedType = signal<'income' | 'expense' | undefined>(undefined);
+    clearType = vi.fn();
     const groupedAccounts = signal(buildAccountTree([
       makeAccount(1, 'Cash'), makeAccount(2, 'Bank/A'), makeAccount(3, 'Bank/B'),
     ]));
     TestBed.configureTestingModule({
       providers: [
         { provide: TransactionsState, useValue: {
-          setDetails, toggleAccounts, selectedAccountIds, dateRange: signal(null), toggleCategory, selectedCategoryIds,
+          setDetails, toggleAccounts, selectedAccountIds, dateRange: signal(null), toggleCategory, selectedCategoryIds, selectedType, clearType,
         } },
         { provide: AccountsState, useValue: { groupedAccounts } },
         { provide: CategoriesState, useValue: { categories: signal([{ id: 2, fullName: '', children: [{ id: 7, fullName: 'Food' }] } as Category]) } },
@@ -82,7 +86,7 @@ describe('FiltersBar', () => {
 
   function chips(): HTMLElement[] {
     fixture.detectChanges();
-    return Array.from(fixture.nativeElement.querySelectorAll(':scope > [tuiChip]:not([data-kind="category"])'));
+    return Array.from(fixture.nativeElement.querySelectorAll(':scope > [tuiChip]:not([data-kind])'));
   }
 
   it('shows no account chips without an account filter', () => {
@@ -114,5 +118,24 @@ describe('FiltersBar', () => {
     selectedCategoryIds.set([7]);
     categoryChips()[0].querySelector('button')!.click();
     expect(toggleCategory).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  function typeChip(): HTMLElement | null {
+    fixture.detectChanges();
+    return fixture.nativeElement.querySelector('[data-kind="type"]');
+  }
+
+  it('shows a chip for the selected type', () => {
+    expect(typeChip()).toBeNull();
+    selectedType.set('expense');
+    expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Expenses');
+    selectedType.set('income');
+    expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Income');
+  });
+
+  it('clears the type with its X button', () => {
+    selectedType.set('income');
+    typeChip()!.querySelector('button')!.click();
+    expect(clearType).toHaveBeenCalledOnce();
   });
 });

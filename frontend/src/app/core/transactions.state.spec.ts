@@ -136,6 +136,37 @@ describe('TransactionsState category filter', () => {
     state.toggleCategory(9);
     expect(getTransactions.mock.lastCall![0].categories).toBeUndefined();
   });
+
+  it('selects a type in place of the categories, clearing it when selected again', () => {
+    state.selectAccount(1);
+    state.toggleCategory(7);
+    state.selectType('expense');
+    expect(state.selectedType()).toBe('expense');
+    expect(state.selectedCategoryIds()).toEqual([]);
+    expect(getTransactions.mock.lastCall![0]).toMatchObject({ accounts: [1], type: 'expense', categories: undefined });
+    state.selectType('income');
+    expect(state.selectedType()).toBe('income');
+    state.selectType('income');
+    expect(state.selectedType()).toBeUndefined();
+    expect(getTransactions.mock.lastCall![0].type).toBeUndefined();
+  });
+
+  it('clears the type when a category is selected or toggled', () => {
+    state.selectType('expense');
+    state.selectCategory(9);
+    expect(state.selectedType()).toBeUndefined();
+    state.selectType('expense');
+    state.toggleCategory(7);
+    expect(state.selectedType()).toBeUndefined();
+    expect(getTransactions.mock.lastCall![0]).toMatchObject({ categories: [7], type: undefined });
+  });
+
+  it('clears the type', () => {
+    state.selectType('income');
+    state.clearType();
+    expect(state.selectedType()).toBeUndefined();
+    expect(getTransactions.mock.lastCall![0].type).toBeUndefined();
+  });
 });
 
 describe('TransactionsState.viewTransactions', () => {

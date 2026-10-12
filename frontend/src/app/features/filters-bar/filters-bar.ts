@@ -32,6 +32,10 @@ export class FiltersBar {
       return { id, label: category?.fullName ?? `#${id}`, color: category?.color };
     });
   });
+  protected readonly typeChip = computed(() => {
+    const type = this.transactions.selectedType();
+    return type === 'income' ? 'Income' : type === 'expense' ? 'Expenses' : null;
+  });
   protected readonly details = new FormControl('', { nonNullable: true });
 
   constructor() {

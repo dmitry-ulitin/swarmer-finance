@@ -1,11 +1,17 @@
 @for (block of blocks(); track block.type) {
   <section class="block" [attr.data-type]="block.type" [attr.aria-label]="block.title">
-    <header class="block-header">
+    <button
+      type="button"
+      class="block-header"
+      [class.selected]="transactions.selectedType() === block.type"
+      [attr.aria-pressed]="transactions.selectedType() === block.type"
+      (click)="transactions.selectType(block.type)"
+    >
       <span class="block-title">{{ block.title }}</span>
       @if (block.total !== null) {
         <span class="block-total">{{ block.total | money: currency() : scale() }}</span>
       }
-    </header>
+    </button>
     @for (row of block.rows; track row.category_id) {
       <button
         type="button"

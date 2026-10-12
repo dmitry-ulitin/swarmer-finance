@@ -19,6 +19,8 @@ describe('CategorySummaryPanel', () => {
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectCategory: ReturnType<typeof vi.fn>;
   let toggleCategory: ReturnType<typeof vi.fn>;
+  let selectedType: ReturnType<typeof signal<'income' | 'expense' | undefined>>;
+  let selectType: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<CategorySummaryPanel>;
 
   function respond(summary: Partial<CategorySummary>): void {
@@ -43,10 +45,12 @@ describe('CategorySummaryPanel', () => {
     selectedCategoryIds = signal<number[]>([]);
     selectCategory = vi.fn();
     toggleCategory = vi.fn();
+    selectedType = signal<'income' | 'expense' | undefined>(undefined);
+    selectType = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: ApiService, useValue: { getCategorySummary } },
-        { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision, selectedCategoryIds, selectCategory, toggleCategory } },
+        { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision, selectedCategoryIds, selectCategory, toggleCategory, selectedType, selectType } },
       ],
     });
     fixture = TestBed.createComponent(CategorySummaryPanel);
@@ -119,5 +123,27 @@ describe('CategorySummaryPanel', () => {
     expect(rows[1].classList).toContain('selected');
     expect(rows[1].getAttribute('aria-pressed')).toBe('true');
     expect(rows[0].getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('filters by income or expense on a block header click', async () => {
+    respond({ income: [item('Salary', 100)], expense: [item('Food', 75)] });
+    const el = await render();
+    const headers = el.querySelectorAll<HTMLButtonElement>('.block-header');
+
+    headers[0].click();
+    headers[1].click();
+
+    expect(selectType.mock.calls).toEqual([['income'], ['expense']]);
+  });
+
+  it('marks the selected type', async () => {
+    respond({ income: [item('Salary', 100)], expense: [item('Food', 75)] });
+    selectedType.set('expense');
+    const el = await render();
+    const headers = el.querySelectorAll('.block-header');
+
+    expect(headers[1].classList).toContain('selected');
+    expect(headers[1].getAttribute('aria-pressed')).toBe('true');
+    expect(headers[0].getAttribute('aria-pressed')).toBe('false');
   });
 });

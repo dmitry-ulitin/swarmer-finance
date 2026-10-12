@@ -10,6 +10,13 @@
       (click)="transactions.toggleAccounts(chip.ids)">Remove</button>
   </span>
 }
+@if (typeChip(); as label) {
+  <span tuiChip size="s" data-kind="type">
+    {{ label }}
+    <button tuiButtonX appearance="icon" size="xs" [attr.aria-label]="'Remove ' + label"
+      (click)="transactions.clearType()">Remove</button>
+  </span>
+}
 @for (chip of categoryChips(); track chip.id) {
   <span tuiChip size="s" data-kind="category" [style.border-color]="chip.color">
     {{ chip.label }}

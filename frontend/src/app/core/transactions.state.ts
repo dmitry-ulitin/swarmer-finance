@@ -72,6 +72,7 @@ export class TransactionsState {
   readonly hasMore = this._hasMore.asReadonly();
   readonly selectedAccountIds = computed(() => this._filters().accounts ?? []);
   readonly selectedCategoryIds = computed(() => this._filters().categories ?? []);
+  readonly selectedType = computed(() => this._filters().type);
   readonly dateRange = computed<DateRange | null>(() => {
     const { from, to } = this._filters();
     return from && to ? { from, to } : null;
@@ -156,8 +157,18 @@ export class TransactionsState {
     this.setCategories(current.includes(id) ? current.filter(c => c !== id) : [...current, id]);
   }
 
+  /** A category implies its type, so the two filters replace each other. */
   private setCategories(ids: number[]): void {
-    this.patchFilters({ categories: ids.length ? ids : undefined });
+    this.patchFilters({ categories: ids.length ? ids : undefined, type: undefined });
+  }
+
+  /** Filters by income or expense alone; selecting the selected type clears the filter. */
+  selectType(type: 'income' | 'expense'): void {
+    this.patchFilters({ type: this.selectedType() === type ? undefined : type, categories: undefined });
+  }
+
+  clearType(): void {
+    this.patchFilters({ type: undefined });
   }
 
   private patchFilters(patch: Partial<TransactionFilters>): void {
