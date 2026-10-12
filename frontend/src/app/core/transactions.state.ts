@@ -162,8 +162,8 @@ export class TransactionsState {
     this.patchFilters({ categories: ids.length ? ids : undefined, type: undefined });
   }
 
-  /** Filters by income or expense alone; selecting the selected type clears the filter. */
-  selectType(type: 'income' | 'expense'): void {
+  /** Filters by one transaction type alone; selecting the selected type clears the filter. */
+  selectType(type: NonNullable<TransactionFilters['type']>): void {
     this.patchFilters({ type: this.selectedType() === type ? undefined : type, categories: undefined });
   }
 

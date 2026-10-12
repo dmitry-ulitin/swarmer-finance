@@ -22,7 +22,7 @@ describe('FiltersBar', () => {
   let toggleCategory: ReturnType<typeof vi.fn>;
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectedAccountIds: ReturnType<typeof signal<number[]>>;
-  let selectedType: ReturnType<typeof signal<'income' | 'expense' | undefined>>;
+  let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
   let clearType: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<FiltersBar>;
   let input: HTMLInputElement;
@@ -34,7 +34,7 @@ describe('FiltersBar', () => {
     toggleCategory = vi.fn();
     selectedCategoryIds = signal<number[]>([]);
     selectedAccountIds = signal<number[]>([]);
-    selectedType = signal<'income' | 'expense' | undefined>(undefined);
+    selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
     clearType = vi.fn();
     const groupedAccounts = signal(buildAccountTree([
       makeAccount(1, 'Cash'), makeAccount(2, 'Bank/A'), makeAccount(3, 'Bank/B'),
@@ -131,6 +131,8 @@ describe('FiltersBar', () => {
     expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Expenses');
     selectedType.set('income');
     expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Income');
+    selectedType.set('transfer');
+    expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Transfers');
   });
 
   it('clears the type with its X button', () => {

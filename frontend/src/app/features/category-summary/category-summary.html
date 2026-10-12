@@ -43,3 +43,13 @@
 } @else if (blocks().length === 0) {
   <p class="empty">No income or expenses.</p>
 }
+
+<button
+  type="button"
+  class="block-header transfers"
+  [class.selected]="transactions.selectedType() === 'transfer'"
+  [attr.aria-pressed]="transactions.selectedType() === 'transfer'"
+  (click)="transactions.selectType('transfer')"
+>
+  Transfers
+</button>

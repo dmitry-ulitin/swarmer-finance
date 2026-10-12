@@ -161,6 +161,14 @@ describe('TransactionsState category filter', () => {
     expect(getTransactions.mock.lastCall![0]).toMatchObject({ categories: [7], type: undefined });
   });
 
+  it('selects transfers as a type', () => {
+    state.selectType('transfer');
+    expect(state.selectedType()).toBe('transfer');
+    expect(getTransactions.mock.lastCall![0].type).toBe('transfer');
+    state.selectType('transfer');
+    expect(state.selectedType()).toBeUndefined();
+  });
+
   it('clears the type', () => {
     state.selectType('income');
     state.clearType();

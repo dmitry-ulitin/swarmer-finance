@@ -11,6 +11,8 @@ import { CategoriesState } from '../../core/categories.state';
 import { findCategoryById } from '../../models/category';
 import { DateRangeFilter } from './date-range-filter/date-range-filter';
 
+const TYPE_LABELS = { income: 'Income', expense: 'Expenses', transfer: 'Transfers' } as const;
+
 @Component({
   selector: 'app-filters-bar',
   imports: [DateRangeFilter, ReactiveFormsModule, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
@@ -34,7 +36,7 @@ export class FiltersBar {
   });
   protected readonly typeChip = computed(() => {
     const type = this.transactions.selectedType();
-    return type === 'income' ? 'Income' : type === 'expense' ? 'Expenses' : null;
+    return type ? TYPE_LABELS[type] : null;
   });
   protected readonly details = new FormControl('', { nonNullable: true });
 

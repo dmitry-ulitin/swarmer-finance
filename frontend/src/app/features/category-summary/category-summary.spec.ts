@@ -19,7 +19,7 @@ describe('CategorySummaryPanel', () => {
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectCategory: ReturnType<typeof vi.fn>;
   let toggleCategory: ReturnType<typeof vi.fn>;
-  let selectedType: ReturnType<typeof signal<'income' | 'expense' | undefined>>;
+  let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
   let selectType: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<CategorySummaryPanel>;
 
@@ -45,7 +45,7 @@ describe('CategorySummaryPanel', () => {
     selectedCategoryIds = signal<number[]>([]);
     selectCategory = vi.fn();
     toggleCategory = vi.fn();
-    selectedType = signal<'income' | 'expense' | undefined>(undefined);
+    selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
     selectType = vi.fn();
     TestBed.configureTestingModule({
       providers: [
@@ -145,5 +145,23 @@ describe('CategorySummaryPanel', () => {
     expect(headers[1].classList).toContain('selected');
     expect(headers[1].getAttribute('aria-pressed')).toBe('true');
     expect(headers[0].getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('filters by transfers, even with no income or expenses', async () => {
+    const el = await render();
+    const transfers = el.querySelector<HTMLButtonElement>('.transfers')!;
+
+    transfers.click();
+
+    expect(selectType).toHaveBeenCalledExactlyOnceWith('transfer');
+  });
+
+  it('marks transfers when selected', async () => {
+    selectedType.set('transfer');
+    const el = await render();
+    const transfers = el.querySelector('.transfers')!;
+
+    expect(transfers.classList).toContain('selected');
+    expect(transfers.getAttribute('aria-pressed')).toBe('true');
   });
 });
