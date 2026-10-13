@@ -43,12 +43,15 @@ export interface Suggestion {
  * Where a merchant hides in a description, first
  * match wins. BoC card lines ("EE 5812 KADRIORU LOSSIKOHVIK PURCHASE Card…",
  * or without the country/MCC prefix), then LHV card lines as older history
- * stores them ("(..8306) 2023-03-03 19:08 KFC KRISTIINE \ENDLA 45…").
+ * stores them ("(..8306) 2023-03-03 19:08 KFC KRISTIINE \ENDLA 45…"), then
+ * UniCredit card lines ("… Card 5418-95XX-XXXX-6234 2026.10.11 Temu.com POS
+ * purchase…", or "Goods return/deposit" for a refund).
  */
 const MERCHANT_PATTERNS = [
   /^[A-Z]{2} \d{4} (.+?) PURCHASE\b/,
   /^(.+?) PURCHASE\b/,
   /^\(\.\.\d{4}\) \d{4}-\d{2}-\d{2} \d{2}:\d{2} ([^\\]+)/,
+  /\bCard:? ?[\dX-]+ \d{4}\.\d{2}\.\d{2} (.+?) (?:POS purchase|Goods return)\b/,
 ];
 
 const MCC_PATTERN = /^[A-Z]{2} (\d{4}) /;

@@ -42,6 +42,7 @@ function parseAmount(value: string, decimal: Profile['decimal']): number {
   if (v === '') return 0;
   // 'comma' means "39.384,54": dots group thousands, the comma is the point.
   if (decimal === 'comma') v = v.replace(/\./g, '').replace(',', '.');
+  else v = v.replace(/,/g, '');
   v = v.replace(/\s/g, '');
   const n = Number(v);
   if (!Number.isFinite(n)) {
@@ -141,6 +142,8 @@ export function readStatement(
   const otherCurrencies = new Set<string>();
 
   grid.slice(profile.skipLines + 1).forEach(raw => {
+    if (profile.booked && (raw[col(profile.booked.column)] ?? '').trim() !== profile.booked.value) return;
+
     let amount: number;
     if (profile.amount.kind === 'signed') {
       amount = parseAmount(raw[col(profile.amount.column)] ?? '', profile.decimal);

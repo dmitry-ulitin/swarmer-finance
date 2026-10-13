@@ -11,6 +11,12 @@ const BOC_CARD_NO_MCC =
   'SECOND CUP PURCHASE CY Card 4***2037 2026-07-08 11.55 EUR Auth 362898 Trace 838125';
 const LHV_CARD =
   '(..8306) 2023-03-03 19:08 KFC KRISTIINE \\ENDLA 45 \\TALLINN \\10615 ESTEST';
+const UNICREDIT_CARD =
+  '+CMS CLT-3565201092 Card 5418-95XX-XXXX-6234 2026.10.11 Temu.com POS purchase Auth code 675386 12,48 EUR';
+const UNICREDIT_RETURN =
+  '+CMS CLT-3562876520 Card 5418-95XX-XXXX-6234 2026.10.07 Temu.com Goods return/deposit Auth code 884687 12,96 EUR';
+const UNICREDIT_CARD_FX =
+  'Card:5545-93XX-XXXX-0033 2026.06.24 TURKUAZ BUTIK POS purchase Auth code 585566 7.800,00 TRY 149,88 EUR @5,3530 EUR-RON';
 
 const expense = (categoryId: number, payee: string | null, description = ''): HistoryRow =>
   ({ categoryId, side: 'expense', payee, description });
@@ -56,6 +62,12 @@ describe('categoryKeys', () => {
 
   it('extracts the merchant from an LHV card line', () => {
     expect(categoryKeys('', LHV_CARD)).toEqual({ payee: null, description: 'KFCKRISTIINE', mcc: null });
+  });
+
+  it('extracts the merchant from UniCredit card lines', () => {
+    expect(categoryKeys(null, UNICREDIT_CARD).description).toBe('TEMUCOM');
+    expect(categoryKeys(null, UNICREDIT_RETURN).description).toBe('TEMUCOM');
+    expect(categoryKeys(null, UNICREDIT_CARD_FX).description).toBe('TURKUAZBUTIK');
   });
 
   it('falls back to the whole description', () => {

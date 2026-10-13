@@ -53,6 +53,7 @@ export const IMPORT_FORMATS = [
   { id: 'boc', name: 'Bank of Cyprus' },
   { id: 'alfa', name: 'Alfa-Bank' },
   { id: 'caixa', name: 'CaixaBank' },
+  { id: 'unicredit', name: 'UniCredit' },
 ] as const;
 
 export type ImportFormat = (typeof IMPORT_FORMATS)[number];

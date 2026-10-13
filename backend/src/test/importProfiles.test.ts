@@ -30,6 +30,11 @@ describe('profiles', () => {
     expect(detectProfile(grid)?.id).toBe('caixa');
   });
 
+  it('detects UniCredit in an .xlsx workbook past its preamble', () => {
+    const grid = parseWorkbook(fixtureBytes('unicredit', 'statement.xlsx'));
+    expect(detectProfile(grid)?.id).toBe('unicredit');
+  });
+
   it('returns null for an unrecognised file', () => {
     expect(detectProfile([['foo', 'bar'], ['1', '2']])).toBeNull();
   });
@@ -46,6 +51,7 @@ describe('profiles', () => {
       boc: ['bank_of_cyprus', 'statement.csv'],
       alfa: ['alfabank', 'statement.csv'],
       caixa: ['caixabank', 'statement.xls'],
+      unicredit: ['unicredit', 'statement.xlsx'],
     };
 
     for (const profile of Object.values(PROFILES)) {

@@ -1,6 +1,6 @@
 import { KeyField } from './categorize';
 
-export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa';
+export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa' | 'unicredit';
 
 /**
  * One bank's layout, as data. Everything that differs between statements is
@@ -25,7 +25,10 @@ export interface Profile {
   headerAliases?: Record<string, string>;
   /** 'excel' is a workbook date cell's serial day number. */
   dateFormat: 'iso' | 'dd/mm/yyyy' | 'dd.mm.yyyy' | 'excel';
-  /** 'comma' implies '.' groups thousands, as in "39.384,54". */
+  /**
+   * 'comma' implies '.' groups thousands, as in "39.384,54"; 'dot' implies
+   * ',' does, as in "200,000.00".
+   */
   decimal: 'dot' | 'comma';
   amount:
     | { kind: 'signed'; column: string; directionColumn?: string; debitFlag?: string }
@@ -55,6 +58,12 @@ export interface Profile {
    * the statement is imported into.
    */
   internalTransfers?: { accountColumn: string };
+  /**
+   * Only rows whose `column` reads `value` are imported. The rest are card
+   * holds the bank books later as rows of their own, so importing them would
+   * double-count.
+   */
+  booked?: { column: string; value: string };
 }
 
 export const PROFILES: Record<ProfileId, Profile> = {
@@ -182,6 +191,32 @@ export const PROFILES: Record<ProfileId, Profile> = {
     currency: { from: 'preamble', line: 1, after: 'Amounts expressed in', aliases: { euros: 'EUR' } },
     // No per-row reference in the export.
     identity: { kind: 'content' },
+  },
+  unicredit: {
+    id: 'unicredit',
+    name: 'UniCredit',
+    reader: 'xls',
+    encoding: 'utf8',
+    delimiter: ',',
+    skipLines: 3,
+    headerSignature: ['Cont / Account', 'Suma / Amount', 'Status', 'Detaliile tranzacției / Transaction Details'],
+    dateFormat: 'dd.mm.yyyy',
+    decimal: 'dot',
+    amount: { kind: 'signed', column: 'Suma / Amount' },
+    // The value date, not the booking date: a matured term deposit is
+    // "booked" on the day it was opened, months before the money returns.
+    // "Name" is filled for transfers only; card lines carry the merchant in
+    // the details.
+    columns: {
+      date: 'Data valutei / Value date',
+      description: 'Detaliile tranzacției / Transaction Details',
+      payee: 'Nume / Name',
+    },
+    currency: { from: 'column', column: 'Valuta / Currency' },
+    // "Order No" is blank on every row.
+    identity: { kind: 'content' },
+    // RESERVED rows are card holds, booked later with different details.
+    booked: { column: 'Status', value: 'BOOKED' },
   },
 };
 

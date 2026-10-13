@@ -225,3 +225,29 @@ describe('readStatement — CaixaBank (Excel)', () => {
     );
   });
 });
+
+describe('readStatement — UniCredit (Excel)', () => {
+  const bytes = () => fs.readFileSync(path.join(__dirname, 'fixtures', 'banks', 'unicredit', 'statement.xlsx'));
+  const result = () => readStatement(bytes(), PROFILES.unicredit, 'EUR');
+
+  it('reads booked rows only, with comma-grouped amounts', () => {
+    expect(result().rows.map(r => r.amount)).toEqual([-12.48, 12.96, 200000, -92, 1500]);
+  });
+
+  it('dates rows by the value date, not the booking date', () => {
+    expect(result().rows.map(r => r.date)).toEqual([
+      '2026-10-12', '2026-10-07', '2026-09-18', '2026-09-18', '2026-07-17',
+    ]);
+  });
+
+  it('reads "Name" as payee and "Transaction Details" as description', () => {
+    expect(result().rows[4]).toMatchObject({ payee: 'COMPANY 001 SRL', description: 'retur imprumut' });
+    expect(result().rows[0].payee).toBeNull();
+  });
+
+  it('refuses a statement in another currency', () => {
+    expect(() => readStatement(bytes(), PROFILES.unicredit, 'RON')).toThrow(
+      expect.objectContaining({ statusCode: 400, message: 'Statement is in EUR but the account is in RON' })
+    );
+  });
+});

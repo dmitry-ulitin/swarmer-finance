@@ -95,6 +95,14 @@ describe('parseStatement', () => {
     expect(result.rows).toHaveLength(5);
   });
 
+  it('auto-detects a UniCredit .xlsx statement', async () => {
+    const result = await parseStatement(
+      userId, eurAccountId, fixtureB64('unicredit', 'statement.xlsx')
+    );
+    expect(result.format).toBe('unicredit');
+    expect(result.rows).toHaveLength(5);
+  });
+
   it('rejects a CSV file given as CaixaBank with 400', async () => {
     await expect(
       parseStatement(userId, eurAccountId, fixtureB64('lhv', 'statement.csv'), 'caixa')
