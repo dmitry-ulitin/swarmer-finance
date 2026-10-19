@@ -29,6 +29,12 @@ export class Header {
     const t = this.selectedTransaction();
     return !!t && !syncedLock(t, this.accountState.trackedIds()).synced;
   });
+  /** The account the filters narrow to, when exactly one is selected. */
+  readonly filteredAccount = computed(() => {
+    const ids = this.transactionsState.selectedAccountIds();
+    if (ids.length !== 1) return null;
+    return this.accountState.visibleAccounts().find(a => a.id === ids[0]) ?? null;
+  });
 
   categories(): void {
     this.categoryDialogs.openManager();
@@ -41,6 +47,11 @@ export class Header {
 
   accounts(): void {
     this.accountDialogs.openManager();
+  }
+
+  editFilteredAccount(): void {
+    const account = this.filteredAccount();
+    if (account) void this.accountDialogs.openEdit(account);
   }
 
   addTransaction(): void {

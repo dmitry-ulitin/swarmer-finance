@@ -14,6 +14,10 @@
 <button #settingsButton tuiButton tuiChevron type="button" appearance="flat-grayscale" size="xs" class="light" [tuiDropdown]="settingsDropdown" tuiDropdownAuto><tui-icon icon="@tui.settings"></tui-icon></button>
 <ng-template #settingsDropdown>
   <tui-data-list [size]="'s'">
+    @if (filteredAccount(); as account) {
+    <button tuiOption (click)="editFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.pencil'">{{ account.name }}</button>
+    <hr />
+    }
     <button tuiOption (click)="accounts();settingsButton.click()" [iconEnd]="'@tui.wallet'">Accounts</button>
     <button tuiOption (click)="categories();settingsButton.click()" [iconEnd]="'@tui.folder'">Categories</button>
   </tui-data-list>
