@@ -16,6 +16,12 @@
   <tui-data-list [size]="'s'">
     @if (filteredAccount(); as account) {
     <button tuiOption (click)="editFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.pencil'">{{ account.name }}</button>
+    @if (account.type === 'bank') {
+    <button tuiOption (click)="importFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.download'">Import</button>
+    }
+    @if (account.tracked) {
+    <button tuiOption (click)="syncFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.refresh-cw'" [disabled]="sync.syncing().has(account.id)">Sync</button>
+    }
     <hr />
     }
     <button tuiOption (click)="accounts();settingsButton.click()" [iconEnd]="'@tui.wallet'">Accounts</button>

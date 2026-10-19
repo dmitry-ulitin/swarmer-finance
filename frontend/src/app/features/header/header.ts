@@ -8,6 +8,8 @@ import { TransactionDialogService } from '../transactions/transaction-dialog.ser
 import { AccountsState } from '../../core/accounts.state';
 import { TuiChevron } from '@taiga-ui/kit/directives/chevron';
 import { syncedLock } from '../transactions/synced-lock';
+import { ImportDialogService } from '../import/import-dialog.service';
+import { AccountSyncService } from '../accounts/account-sync.service';
 
 @Component({
   selector: 'app-header',
@@ -23,6 +25,8 @@ export class Header {
   private readonly categoryDialogs = inject(CategoryDialogService);
   private readonly accountDialogs = inject(AccountDialogService);
   private readonly transactionDialogs = inject(TransactionDialogService);
+  private readonly importDialog = inject(ImportDialogService);
+  readonly sync = inject(AccountSyncService);
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
   readonly canDelete = computed(() => {
@@ -52,6 +56,16 @@ export class Header {
   editFilteredAccount(): void {
     const account = this.filteredAccount();
     if (account) void this.accountDialogs.openEdit(account);
+  }
+
+  importFilteredAccount(): void {
+    const account = this.filteredAccount();
+    if (account) void this.importDialog.open(account);
+  }
+
+  syncFilteredAccount(): void {
+    const account = this.filteredAccount();
+    if (account) void this.sync.sync(account);
   }
 
   addTransaction(): void {
