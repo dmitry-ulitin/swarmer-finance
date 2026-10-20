@@ -1,25 +1,31 @@
 <div class="sharing" tuiTextfieldSize="s">
-    <ul class="members">
-        @for (member of members(); track member) {
-            <li class="member">
-                <div class="who">
-                    <span class="name">{{ member.name }}@if (isMe(member)) { (you)}</span>
-                    <span class="email">{{ member.email }}</span>
-                </div>
-                @if (canManage() && member.level !== 4) {
-                    <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
-                        <input tuiSelect [ngModel]="member.level" [ngModelOptions]="{ standalone: true }" [disabled]="busy()"
-                            (ngModelChange)="changeLevel(member, $event)" />
-                        <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
-                    </tui-textfield>
-                    <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Remove" data-test="remove"
-                        [disabled]="busy()" (click)="remove(member)"></button>
-                } @else {
-                    <span class="level-label">{{ levelLabel(member.level) }}</span>
-                }
-            </li>
+    <tui-loader [loading]="loading()">
+        @if (!loading() && members().length === 0) {
+            <!-- A loaded list always holds the creator, so empty means the load failed. -->
+            <p class="empty">Could not load who has access.</p>
         }
-    </ul>
+        <ul class="members">
+            @for (member of members(); track member) {
+                <li class="member">
+                    <div class="who">
+                        <span class="name">{{ member.name }}@if (isMe(member)) { (you)}</span>
+                        <span class="email">{{ member.email }}</span>
+                    </div>
+                    @if (canManage() && member.level !== 4) {
+                        <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
+                            <input tuiSelect [ngModel]="member.level" [ngModelOptions]="{ standalone: true }" [disabled]="busy()"
+                                (ngModelChange)="changeLevel(member, $event)" />
+                            <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
+                        </tui-textfield>
+                        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Remove" data-test="remove"
+                            [disabled]="busy()" (click)="remove(member)"></button>
+                    } @else {
+                        <span class="level-label">{{ levelLabel(member.level) }}</span>
+                    }
+                </li>
+            }
+        </ul>
+    </tui-loader>
 
     @if (canManage()) {
         <form [formGroup]="form" (ngSubmit)="add()" class="add">

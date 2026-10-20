@@ -11,13 +11,15 @@ import { AuthService } from '../../../core/auth.service';
 import { AccountsState } from '../../../core/accounts.state';
 import { CategoriesState } from '../../../core/categories.state';
 import { TransactionsState } from '../../../core/transactions.state';
+import { NotificationService } from '../../../core/notification.service';
 import type { AccountMember } from '../../../models/account';
 
 const OWNER: AccountMember = { user_id: 1, name: 'Alice', email: 'alice@x', level: 4, is_creator: true };
 const READER: AccountMember = { user_id: 2, name: 'Bob', email: 'bob@x', level: 1, is_creator: false };
 const WRITER: AccountMember = { user_id: 2, name: 'Bob', email: 'bob@x', level: 2, is_creator: false };
 
-function setup(myId: number, members: AccountMember[]) {
+/** `members: null` fails the initial load. */
+function setup(myId: number, members: AccountMember[] | null) {
   const dialogOpen = vi.fn(() => of(true));
   const completeWith = vi.fn();
   const accounts = { reload: vi.fn() };
@@ -34,11 +36,15 @@ function setup(myId: number, members: AccountMember[]) {
       { provide: AccountsState, useValue: accounts },
       { provide: CategoriesState, useValue: categories },
       { provide: TransactionsState, useValue: transactions },
+      { provide: NotificationService, useValue: { showError: vi.fn() } },
     ],
   });
   const fixture = TestBed.createComponent(AccountSharing);
   const http = TestBed.inject(HttpTestingController);
-  http.expectOne('/api/accounts/7/shares').flush({ data: members, error: null });
+  const load = http.expectOne('/api/accounts/7/shares');
+  expect(fixture.componentInstance.loading()).toBe(true);
+  if (members) load.flush({ data: members, error: null });
+  else load.flush({ data: null, error: 'boom' }, { status: 500, statusText: 'Server Error' });
   fixture.detectChanges();
   return { fixture, component: fixture.componentInstance, http, dialogOpen, completeWith, accounts, categories, transactions };
 }
@@ -55,6 +61,12 @@ describe('AccountSharing', () => {
     expect(text).toContain('Owner');
     expect(text).toContain('Read');
     expect(text).toContain('(you)');
+  });
+
+  it('shows a message when the members cannot be loaded', () => {
+    const { fixture, component } = setup(1, null);
+    expect(component.loading()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Could not load who has access.');
   });
 
   it('hides management controls below co-owner', () => {

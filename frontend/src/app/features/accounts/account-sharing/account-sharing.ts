@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, FormsModule, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
-import { TuiButton, TuiDialogService, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiDialogService, TuiInput, TuiLoader } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiDataListWrapper, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
@@ -23,7 +23,7 @@ function trimmedEmail(control: AbstractControl<string>): ValidationErrors | null
 
 @Component({
   selector: 'app-account-sharing',
-  imports: [ReactiveFormsModule, FormsModule, TuiInput, TuiButton, TuiChevron, TuiSelect, TuiDataListWrapper, TuiStringifyContentPipe],
+  imports: [ReactiveFormsModule, FormsModule, TuiInput, TuiButton, TuiLoader, TuiChevron, TuiSelect, TuiDataListWrapper, TuiStringifyContentPipe],
   templateUrl: './account-sharing.html',
   styleUrl: './account-sharing.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,6 +43,7 @@ export class AccountSharing {
   readonly levels = SHARE_LEVELS;
   readonly levelLabel = (level: number): string => LEVEL_LABELS[level as ShareLevel];
   readonly busy = signal(false);
+  readonly loading = signal(true);
   readonly members = signal<AccountMember[]>([]);
   readonly me = computed(() => this.members().find(m => m.user_id === this.auth.user()?.id) ?? null);
   readonly canManage = computed(() => (this.me()?.level ?? 0) >= 3);
@@ -56,8 +57,14 @@ export class AccountSharing {
 
   constructor() {
     this.api.getAccountShares(this.account.id).subscribe({
-      next: r => this.members.set(r.data ?? []),
-      error: e => this.notifications.showError(e, 'Failed to load sharing'),
+      next: r => {
+        this.members.set(r.data ?? []);
+        this.loading.set(false);
+      },
+      error: e => {
+        this.loading.set(false);
+        this.notifications.showError(e, 'Failed to load sharing');
+      },
     });
   }
 
