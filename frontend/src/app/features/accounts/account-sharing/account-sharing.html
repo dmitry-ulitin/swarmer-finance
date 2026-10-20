@@ -6,7 +6,7 @@
         }
         <ul class="members">
             @for (member of members(); track member) {
-                <li class="member">
+                <li class="member" [class.admin]="member.level >= 3">
                     <div class="who">
                         <span class="name">{{ member.name }}@if (isMe(member)) { (you)}</span>
                         <span class="email">{{ member.email }}</span>

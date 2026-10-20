@@ -34,6 +34,12 @@
     min-width: 0;
 }
 
+// Admins and the owner are set off from the other members.
+.sharing:not(.readonly) .admin .who,
+.admin .level-label {
+    padding-left: 10px;
+}
+
 .email {
     color: var(--tui-text-secondary);
     font-size: 0.8125rem;
