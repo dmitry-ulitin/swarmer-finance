@@ -148,6 +148,38 @@ describe('AccountSharing', () => {
     expect(component.members()).not.toBe(before);
   });
 
+  it('confirms before a co-owner lowers their own level', async () => {
+    const { component, http, dialogOpen } = setup(2, [CO_CREATOR, CO_OWNER]);
+    const done = component.changeLevel(CO_OWNER, 2);
+    await flushAsync();
+    expect((dialogOpen.mock.calls[0] as unknown[])[1]).toMatchObject({
+      data: { content: 'Lower your own level on "Wallet" to Transactions? You will no longer be able to manage access.' },
+    });
+    http.expectOne('/api/accounts/7/shares/2').flush({ data: [CO_CREATOR, { ...CO_OWNER, level: 2 }], error: null });
+    await done;
+  });
+
+  it('warns the creator that lowering their own level gives up ownership', async () => {
+    const { component, http, dialogOpen } = setup(1, [CO_CREATOR, CO_OWNER]);
+    const done = component.changeLevel(CO_CREATOR, 1);
+    await flushAsync();
+    expect((dialogOpen.mock.calls[0] as unknown[])[1]).toMatchObject({
+      data: {
+        content: 'Lower your own level on "Wallet" to Read? Ownership passes to another co-owner, and you will no longer be able to manage access.',
+      },
+    });
+    http.expectOne('/api/accounts/7/shares/1').flush({ data: [{ ...CO_OWNER, level: 4, is_creator: true }, READER], error: null });
+    await done;
+  });
+
+  it('keeps your own level when lowering it is cancelled', async () => {
+    const { component, http, dialogOpen } = setup(2, [CO_CREATOR, CO_OWNER]);
+    dialogOpen.mockReturnValue(of(false));
+    await component.changeLevel(CO_OWNER, 1);
+    http.expectNone('/api/accounts/7/shares/2');
+    expect(component.members()).toEqual([CO_CREATOR, CO_OWNER]);
+  });
+
   it('leaving closes the dialog', async () => {
     const { component, http, completeWith } = setup(2, [OWNER, READER]);
     const done = component.leave();

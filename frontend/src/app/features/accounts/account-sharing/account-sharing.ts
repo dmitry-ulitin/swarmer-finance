@@ -69,12 +69,7 @@ export class AccountSharing {
 
   async changeLevel(member: AccountMember, level: ShareLevel): Promise<void> {
     if (level === member.level) return;
-    const who = member.name || member.email;
-    // Moving another creator below co-owner hands ownership to the caller.
-    const confirmed = member.is_creator && level < 3 && !this.isMe(member)
-      ? await this.confirm('Change level', `${who} created "${this.account.name}". Changing their level makes you the owner.`, 'Change level')
-      : level !== 3 || await this.confirmCoOwner(who);
-    if (!confirmed) {
+    if (!await this.confirmLevelChange(member, level)) {
       this.refreshRows();
       return;
     }
@@ -92,6 +87,27 @@ export class AccountSharing {
     const me = this.me();
     if (!me || !await this.confirm('Leave account', `Leave "${this.account.name}"? You will lose access to it.`, 'Leave')) return;
     if (await this.mutate(this.api.removeAccountShare(this.account.id, me.user_id))) this.context.completeWith();
+  }
+
+  /** Asks first when a level change gives up ownership or the right to manage access. */
+  private confirmLevelChange(member: AccountMember, level: ShareLevel): Promise<boolean> {
+    if (level === 3) return this.confirmCoOwner(member.name || member.email);
+    if (member.level < 3) return Promise.resolve(true);
+    if (this.isMe(member)) {
+      const ownership = member.is_creator ? ' Ownership passes to another co-owner, and you' : ' You';
+      return this.confirm(
+        'Lower your level',
+        `Lower your own level on "${this.account.name}" to ${LEVEL_LABELS[level]}?${ownership} will no longer be able to manage access.`,
+        'Lower level',
+      );
+    }
+    // Moving another creator below co-owner hands ownership to the caller.
+    if (!member.is_creator) return Promise.resolve(true);
+    return this.confirm(
+      'Change level',
+      `${member.name || member.email} created "${this.account.name}". Changing their level makes you the owner.`,
+      'Change level',
+    );
   }
 
   /** Granting co-owner on a personal account gives up sole ownership. */
