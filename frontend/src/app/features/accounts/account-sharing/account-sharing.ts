@@ -48,7 +48,10 @@ export class AccountSharing {
   readonly me = computed(() => this.members().find(m => m.user_id === this.auth.user()?.id) ?? null);
   readonly canManage = computed(() => (this.me()?.level ?? 0) >= 3);
   /** The Owner of a personal account cannot leave it, only delete it. */
-  readonly canLeave = computed(() => !!this.me() && this.me()!.level !== 4);
+  readonly canLeave = computed(() => {
+    const me = this.me();
+    return !!me && me.level !== 4;
+  });
 
   readonly form = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true, validators: [trimmedEmail] }),
