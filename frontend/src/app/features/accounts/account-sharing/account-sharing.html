@@ -30,11 +30,9 @@
     @if (canManage()) {
         <form [formGroup]="form" (ngSubmit)="add()" class="add">
             <tui-textfield>
-                <label tuiLabel>Email</label>
                 <input tuiInput type="email" formControlName="email" placeholder="user@example.com" />
             </tui-textfield>
             <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
-                <label tuiLabel>Access</label>
                 <input tuiSelect formControlName="level" />
                 <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
             </tui-textfield>
