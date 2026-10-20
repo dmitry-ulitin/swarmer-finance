@@ -10,6 +10,7 @@ import { TuiChevron } from '@taiga-ui/kit/directives/chevron';
 import { syncedLock } from '../transactions/synced-lock';
 import { ImportDialogService } from '../import/import-dialog.service';
 import { AccountSyncService } from '../accounts/account-sync.service';
+import { accessLevelOf } from '../../models/account';
 
 @Component({
   selector: 'app-header',
@@ -39,6 +40,11 @@ export class Header {
     if (ids.length !== 1) return null;
     return this.accountState.visibleAccounts().find(a => a.id === ids[0]) ?? null;
   });
+  /** Editing an account takes co-owner or owner, as the backend requires. */
+  readonly canEditFiltered = computed(() => {
+    const account = this.filteredAccount();
+    return !!account && accessLevelOf(account) >= 3;
+  });
 
   categories(): void {
     this.categoryDialogs.openManager();
@@ -55,7 +61,7 @@ export class Header {
 
   editFilteredAccount(): void {
     const account = this.filteredAccount();
-    if (account) void this.accountDialogs.openEdit(account);
+    if (account && this.canEditFiltered()) void this.accountDialogs.openEdit(account);
   }
 
   shareFilteredAccount(): void {

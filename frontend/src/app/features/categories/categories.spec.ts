@@ -5,7 +5,7 @@ import { Categories } from './categories';
 import { CategoriesState } from '../../core/categories.state';
 import { CategoryDialogService } from './category-dialog.service';
 import { AuthService } from '../../core/auth.service';
-import type { Category } from '../../models/category';
+import { flattenCategories, type Category } from '../../models/category';
 
 const ME = 1;
 const OTHER = 2;
@@ -43,12 +43,12 @@ const tree: Category[] = [
   }),
 ];
 
-function configure() {
+function configure(categories = signal(tree), dialogs: Partial<CategoryDialogService> = {}) {
   TestBed.configureTestingModule({
     providers: [
       Categories,
-      { provide: CategoriesState, useValue: { categories: signal(tree), loading: signal(false) } },
-      { provide: CategoryDialogService, useValue: {} },
+      { provide: CategoriesState, useValue: { categories, loading: signal(false) } },
+      { provide: CategoryDialogService, useValue: dialogs },
       { provide: AuthService, useValue: { user: signal({ id: ME }) } },
     ],
   });
@@ -95,5 +95,61 @@ describe('Categories management screen', () => {
 
     expect(screen.isEditable()).toBe(false);
     expect(screen.isDeletable()).toBe(false);
+  });
+});
+
+describe('Categories tree expansion', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const expanded = (screen: Categories, id: number): boolean | undefined => {
+    const node = flattenCategories(screen.categories()).find(c => c.id === id)!;
+    return screen['map']().get(node);
+  };
+
+  it('keeps a node expanded across a reload of the tree', () => {
+    const categories = signal(tree);
+    const screen = configure(categories);
+    screen.onToggled(screen.categories()[0]);
+    expect(expanded(screen, 2)).toBe(true);
+
+    categories.set(structuredClone(tree));
+
+    expect(expanded(screen, 2)).toBe(true);
+  });
+
+  it('collapses an expanded node on the next toggle', () => {
+    const screen = configure();
+    screen.onToggled(screen.categories()[0]);
+    screen.onToggled(screen.categories()[0]);
+    expect(expanded(screen, 2)).toBeFalsy();
+  });
+
+  it('expands the ancestors of a selected category', () => {
+    const screen = configure();
+    screen.setAsSelected(withChild.children![0]);
+    expect(expanded(screen, 2)).toBe(true);
+    expect(expanded(screen, 30)).toBe(true);
+  });
+
+  it('expands the branch of a created category once the reloaded tree has it', async () => {
+    const created = makeCategory({ id: 32, name: 'HasChild / New', parent_id: 30 });
+    const categories = signal(tree);
+    const screen = configure(categories, { openCreate: async () => created });
+
+    await screen.openCreateDialog();
+    const reloaded = structuredClone(tree);
+    reloaded[0].children![2].children!.push(created);
+    categories.set(reloaded);
+
+    expect(expanded(screen, 2)).toBe(true);
+    expect(expanded(screen, 30)).toBe(true);
+  });
+
+  it('drops the selection when its branch is collapsed', () => {
+    const screen = configure();
+    screen.setAsSelected(withChild.children![0]);
+    screen.onToggled(flattenCategories(screen.categories()).find(c => c.id === 30)!);
+    expect(screen.selectedId()).toBeNull();
+    expect(expanded(screen, 30)).toBeFalsy();
   });
 });

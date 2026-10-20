@@ -1,7 +1,7 @@
 @if (item(); as it) {
   @if (it.kind === 'account') {
     @let account = asAccount(it).account;
-    <div class="row-header" [style.padding-left]="indent" (tuiHoveredChange)="onHovered($event)">
+    <div class="row-header" [style.padding-left]="indent()" (tuiHoveredChange)="hovered.set($event)">
       <button
         class="row-name"
         type="button"
@@ -12,7 +12,7 @@
       <button
         appearance="gray"
         class="small"
-        [class.hidden]="!hovered"
+        [class.hidden]="!hovered()"
         iconStart="@tui.download"
         size="xs"
         tuiIconButton
@@ -25,7 +25,7 @@
       <button
         appearance="gray"
         class="small"
-        [class.hidden]="!hovered && !sync.syncing().has(account.id)"
+        [class.hidden]="!hovered() && !sync.syncing().has(account.id)"
         [disabled]="sync.syncing().has(account.id)"
         iconStart="@tui.refresh-cw"
         size="xs"
@@ -45,7 +45,7 @@
     </div>
   } @else {
     @let group = asGroup(it);
-    <div class="row-header" [style.padding-left]="indent">
+    <div class="row-header" [style.padding-left]="indent()">
       <button
         class="row-name"
         type="button"

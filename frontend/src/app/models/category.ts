@@ -13,6 +13,15 @@ export interface Category {
   children?: Category[];
 }
 
+/** Ids of the system categories the backend seeds (migrations 002 and 012). */
+export const SystemCategory = {
+  Income: 1,
+  Expenses: 2,
+  UncategorizedIncome: 3,
+  UncategorizedExpense: 4,
+  NetworkFees: 5,
+} as const;
+
 export interface CategoryCreatePayload {
   name: string;
   parentId: number;

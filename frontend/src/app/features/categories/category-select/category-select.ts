@@ -6,8 +6,7 @@ import { type TuiStringHandler } from '@taiga-ui/cdk';
 import { CategoriesState } from '../../../core/categories.state';
 import { AuthService } from '../../../core/auth.service';
 import { CategoryDialogService } from '../category-dialog.service';
-import type { Category } from '../../../models/category';
-import { TransactionType } from '../../../models/transaction';
+import { SystemCategory, type Category } from '../../../models/category';
 
 /**
  * Picks a category from the tree under one root (1 = Income, 2 = Expenses).
@@ -50,7 +49,7 @@ export class CategorySelect implements ControlValueAccessor {
   protected onTouched: () => void = () => {};
 
   readonly visibleCategories = computed(
-    () => this.categoriesState.categories().find(c => c.id === this.rootId())?.children?.filter(c => c.id !== TransactionType.NetworkFees) || []
+    () => this.categoriesState.categories().find(c => c.id === this.rootId())?.children?.filter(c => c.id !== SystemCategory.NetworkFees) || []
   );
 
   /**

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { take, firstValueFrom } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
 import { RefreshCoordinator } from './refresh-coordinator';
 import { AuthService } from './auth.service';
 
@@ -39,13 +40,19 @@ function makeAuth(performRefreshReturn: Observable<string> | (() => Observable<s
   };
 }
 
+function createCoordinator(auth: AuthService): RefreshCoordinator {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [{ provide: AuthService, useValue: auth }] });
+  return TestBed.inject(RefreshCoordinator);
+}
+
 describe('RefreshCoordinator', () => {
   it('invokes performRefresh exactly once when refresh() is called 3 times in parallel', () => {
     // Defer the refresh HTTP so we can subscribe from many callers
     // before the underlying "request" resolves.
     const refresh$: Subject<string> = new Subject<string>();
     const auth = makeAuth(refresh$.asObservable()) as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     // Three concurrent callers (simulating three parallel 401s).
     const s1: string[] = [];
@@ -78,7 +85,7 @@ describe('RefreshCoordinator', () => {
   it('does not call logout() on a successful refresh shared by concurrent callers', () => {
     const refresh$: Subject<string> = new Subject<string>();
     const auth = makeAuth(refresh$.asObservable()) as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     coordinator.refresh().subscribe();
     coordinator.refresh().subscribe();
@@ -94,7 +101,7 @@ describe('RefreshCoordinator', () => {
     const authError = new Error('refresh failed');
     const refresh$: Subject<string> = new Subject<string>();
     const auth = makeAuth(refresh$.asObservable()) as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     const error1 = firstValueFrom(coordinator.refresh()).catch(e => e);
     const error2 = firstValueFrom(coordinator.refresh()).catch(e => e);
@@ -132,7 +139,7 @@ describe('RefreshCoordinator', () => {
         });
       });
     }) as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     const first = await firstValueFrom(coordinator.refresh().pipe(take(1)));
     expect(first).toBe('t1');
@@ -150,7 +157,7 @@ describe('RefreshCoordinator', () => {
       logout: vi.fn(),
       getRefreshToken: vi.fn(() => null),
     } as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     let received: string | null = null;
     let errorMessage: string | null = null;
@@ -186,7 +193,7 @@ describe('RefreshCoordinator', () => {
         });
       });
     }) as unknown as AuthService;
-    const coordinator = new RefreshCoordinator(auth);
+    const coordinator = createCoordinator(auth);
 
     // Round 1 fails.
     const failed = await firstValueFrom(coordinator.refresh()).catch(e => e);

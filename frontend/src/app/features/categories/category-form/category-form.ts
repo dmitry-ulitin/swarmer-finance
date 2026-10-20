@@ -9,8 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { CategoriesState } from '../../../core/categories.state';
 import { NotificationService } from '../../../core/notification.service';
-import { findAncestors, findCategoryById, type Category } from '../../../models/category';
-import { TransactionType } from '../../../models/transaction';
+import { findAncestors, findCategoryById, SystemCategory, type Category } from '../../../models/category';
 
 /** What the category dialog works on: an existing category, or a new one. */
 export interface CategoryFormData {
@@ -59,7 +58,7 @@ export class CategoryForm {
 
   private readonly initialParent = this.editing
     ? findCategoryById(this.editing.parent_id ?? undefined, this.categories())
-    : this.context.data.parent ?? findCategoryById(this.rootId ?? TransactionType.Expense, this.categories());
+    : this.context.data.parent ?? findCategoryById(this.rootId ?? SystemCategory.Expenses, this.categories());
 
   readonly form = new FormGroup({
     parent: new FormControl<Category | null>(this.initialParent, { nonNullable: true, validators: [Validators.required] }),
@@ -73,7 +72,7 @@ export class CategoryForm {
   /** The predefined icons, led by the plus / minus sign of the parent's root. */
   readonly icons = computed(() => {
     const root = this.parent()?.root_id;
-    const sign = root === TransactionType.Income ? ['circle-plus'] : root === TransactionType.Expense ? ['circle-minus'] : [];
+    const sign = root === SystemCategory.Income ? ['circle-plus'] : root === SystemCategory.Expenses ? ['circle-minus'] : [];
     return [...sign, ...PREDEFINED_ICONS];
   });
 
@@ -113,7 +112,7 @@ export class CategoryForm {
             name, color, icon,
             ...(parent && parent.id !== this.editing.parent_id ? { parentId: parent.id } : {}),
           })
-        : this.categoriesState.create({ name, parentId: parent?.id ?? TransactionType.Expense, color, icon });
+        : this.categoriesState.create({ name, parentId: parent?.id ?? SystemCategory.Expenses, color, icon });
       const response = await firstValueFrom(request);
       this.context.completeWith(response.data);
     } catch (e) {

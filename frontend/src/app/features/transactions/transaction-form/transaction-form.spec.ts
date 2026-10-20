@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
@@ -335,5 +335,20 @@ describe('TransactionForm transfer accounts', () => {
     const form = transfer();
     form.form.controls.fromAccount.setValue(c);
     expect(form.form.controls.toAccount.value).toEqual(b);
+  });
+});
+
+describe('TransactionForm submit', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('asks for an account instead of failing when none is picked', () => {
+    const form = configure({});
+    const showError = vi.spyOn(TestBed.inject(NotificationService), 'showError');
+    const completeWith = vi.spyOn(TestBed.inject(POLYMORPHEUS_CONTEXT) as { completeWith: () => void }, 'completeWith');
+    form.form.controls.creditAmount.setValue(10);
+
+    expect(() => form.onSubmit()).not.toThrow();
+    expect(showError).toHaveBeenCalledWith('Select an account');
+    expect(completeWith).not.toHaveBeenCalled();
   });
 });

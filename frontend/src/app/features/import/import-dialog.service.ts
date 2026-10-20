@@ -26,15 +26,21 @@ export class ImportDialogService {
   private readonly notifications = inject(NotificationService);
 
   async open(account: Account): Promise<ImportReconcileResult | null> {
-    const parsed = await this.openUpload(account);
-    if (!parsed) return null;
+    let result: ImportReconcileResult | null;
+    try {
+      const parsed = await this.openUpload(account);
+      if (!parsed) return null;
 
-    if (parsed.rows.length === 0) {
-      this.notifications.showError('This statement has no transactions to import');
+      if (parsed.rows.length === 0) {
+        this.notifications.showError('This statement has no transactions to import');
+        return null;
+      }
+
+      result = await this.openReview(parsed);
+    } catch (e) {
+      this.notifications.showError(e, 'Failed to open import');
       return null;
     }
-
-    const result = await this.openReview(parsed);
     if (!result) return null;
 
     // Reconcile reports only counts, so the lists have to be refetched;

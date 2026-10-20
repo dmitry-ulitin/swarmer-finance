@@ -28,21 +28,34 @@ function configure(dialogs: Partial<AccountDialogService> = {}) {
   return TestBed.inject(Accounts);
 }
 
-describe('Accounts danger actions', () => {
+describe('Accounts admin actions', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
   it('are offered to the owner and to admins only', () => {
     const screen = configure();
     const offered = accounts.map(a => {
       screen.setAsSelected(a);
-      return screen.canPurge();
+      return screen.canManage();
     });
     // No access_level means an account of the user's own, as in AccountsState.
     expect(offered).toEqual([true, true, false, true]);
   });
 
+  it('do not open the edit or delete dialog on an account the user cannot manage', async () => {
+    const openEdit = vi.fn(async () => {});
+    const openDelete = vi.fn(async () => true);
+    const screen = configure({ openEdit, openDelete });
+    screen.setAsSelected(accounts[2]);
+
+    await screen.openEditDialog();
+    await screen.openDeleteDialog();
+
+    expect(openEdit).not.toHaveBeenCalled();
+    expect(openDelete).not.toHaveBeenCalled();
+  });
+
   it('are not offered without a selection', () => {
-    expect(configure().canPurge()).toBe(false);
+    expect(configure().canManage()).toBe(false);
   });
 
   it('clears the selection once the account is deleted with its transactions', async () => {

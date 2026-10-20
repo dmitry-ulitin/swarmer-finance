@@ -1,6 +1,5 @@
 import { inject, Injectable, INJECTOR } from '@angular/core';
 import { TuiDialogService } from '@taiga-ui/core';
-import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TUI_CONFIRM } from '@taiga-ui/kit';
 import type { TuiConfirmData } from '@taiga-ui/kit';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
@@ -43,6 +42,15 @@ export function buildCreateDefaults(
   return { date: today, debit_account: preferredAccount, currency: preferredAccount.currency };
 }
 
+/**
+ * Today as `YYYY-MM-DD` in the user's time zone. Formatted by hand: TuiDay
+ * would pull Taiga's date-time package into the initial bundle.
+ */
+function localToday(): string {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map(n => String(n).padStart(2, '0')).join('-');
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransactionDialogService {
   private readonly dialogs = inject(TuiDialogService);
@@ -66,7 +74,7 @@ export class TransactionDialogService {
       return !!account && writable.has(account.id);
     });
     const preferredAccount = targets.find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || targets[0];
-    const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, TuiDay.currentLocal().toJSON())!;
+    const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, localToday())!;
     try {
       const result = await firstValueFrom(
         this.dialogs.open<TransactionRequest | null>(

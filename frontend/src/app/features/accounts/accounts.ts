@@ -43,8 +43,8 @@ export class Accounts {
     if (id === null) return null;
     return this.accountsState.visibleAccounts().find(a => a.id === id) ?? null;
   });
-  /** Owner or admin. */
-  readonly canPurge = computed(() => {
+  /** Owner or admin: the backend requires that to edit or delete an account. */
+  readonly canManage = computed(() => {
     const account = this.selectedAccount();
     return !!account && accessLevelOf(account) >= 3;
   });
@@ -62,7 +62,7 @@ export class Accounts {
 
   async openEditDialog(): Promise<void> {
     const account = this.selectedAccount();
-    if (!account) return;
+    if (!account || !this.canManage()) return;
     await this.accountDialogs.openEdit(account);
   }
 
@@ -74,7 +74,7 @@ export class Accounts {
 
   async openDeleteDialog(): Promise<void> {
     const account = this.selectedAccount();
-    if (!account) return;
+    if (!account || !this.canManage()) return;
     if (await this.accountDialogs.openDelete(account)) {
       this.selectedId.set(null);
     }

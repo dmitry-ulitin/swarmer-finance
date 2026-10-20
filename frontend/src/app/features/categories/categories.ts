@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { CategoriesState } from '../../core/categories.state';
 import { TuiTree } from '@taiga-ui/kit';
-import { Category, findAncestors, findCategoryById, flattenCategories } from '../../models/category';
+import { Category, findAncestors, findCategoryById, flattenCategories, SystemCategory } from '../../models/category';
 import { TuiHandler } from '@taiga-ui/cdk';
 import { TuiButton, TuiIcon, TuiLoader } from '@taiga-ui/core';
-import { TransactionType } from '../../models/transaction';
 import { CategoryDialogService } from './category-dialog.service';
 import { AuthService } from '../../core/auth.service';
 
@@ -21,30 +20,29 @@ export class Categories {
   private readonly auth = inject(AuthService);
 
   protected readonly handler: TuiHandler<Category, readonly Category[]> = (item) => (item.children ?? []).filter((c: Category) => c.user_id !== null);
-  protected readonly map = new Map<Category, boolean>();
-  readonly categories = computed(() => {
-    const newCategories = this.categoriesState.categories().map(c => ({ ...c }));
-    const expandedIds = new Set<number>();
-    this.map.forEach((expanded, category) => {
-      if (expanded) expandedIds.add(category.id);
-    });
-    this.map.clear();
-    flattenCategories(newCategories).forEach(cat => {
-      if (expandedIds.has(cat.id)) {
-        this.map.set(cat, true);
-      }
-    });
-    return newCategories;
-  });
+  readonly categories = computed(() => this.categoriesState.categories().map(c => ({ ...c })));
   readonly selectedId = signal<number | null>(null);
-  readonly selectedCategory = computed(() => {
-    const selectedId = this.selectedId();
-    if (selectedId === null) return null;
-    const categories = this.categories();
-    const ancestors = findAncestors(selectedId, categories);
-    ancestors?.forEach(ancestor => this.map.set(ancestor, true));
-    return findCategoryById(selectedId, categories);
+  /**
+   * Expanded nodes by id, so the state survives a reload replacing the node
+   * objects. The selected category's branch is opened too — once it is in
+   * the tree, which for a just-created one is only after the reload.
+   */
+  private readonly expandedIds = linkedSignal<{ categories: Category[]; selectedId: number | null }, ReadonlySet<number>>({
+    source: () => ({ categories: this.categories(), selectedId: this.selectedId() }),
+    computation: ({ categories, selectedId }, previous) => {
+      const ancestors = (selectedId === null ? null : findAncestors(selectedId, categories)) ?? [];
+      return new Set([...(previous?.value ?? []), ...ancestors.map(a => a.id)]);
+    },
   });
+  /**
+   * What the tree reads, keyed by node object. The tree's controller writes
+   * a toggle into it too, after `toggled` has already updated `expandedIds`.
+   */
+  protected readonly map = computed(() => {
+    const ids = this.expandedIds();
+    return new Map(flattenCategories(this.categories()).filter(c => ids.has(c.id)).map(c => [c, true]));
+  });
+  readonly selectedCategory = computed(() => findCategoryById(this.selectedId() ?? undefined, this.categories()));
   /**
    * The tree shows one node per path, spanning everyone the user shares
    * accounts with, so a row here may belong to a co-owner. Only the user's
@@ -67,7 +65,15 @@ export class Categories {
     this.selectedId.set(node.id);
   }
 
+  /** Called before the tree flips the node, so its new state is the opposite of the current one. */
   onToggled(node: Category): void {
+    const expand = !this.map().get(node);
+    this.expandedIds.update(ids => {
+      const next = new Set(ids);
+      if (expand) next.add(node.id);
+      else next.delete(node.id);
+      return next;
+    });
     const selectedId = this.selectedId();
     if (selectedId === null) return;
     if (findCategoryById(selectedId, node.children ?? [])) {
@@ -76,7 +82,7 @@ export class Categories {
   }
 
   async openCreateDialog(): Promise<void> {
-    const parent = this.selectedCategory() || findCategoryById(TransactionType.Expense, this.categories());
+    const parent = this.selectedCategory() || findCategoryById(SystemCategory.Expenses, this.categories());
     const category = await this.categoryDialogs.openCreate(parent ?? null);
     if (category !== null) {
       this.selectedId.set(category.id);

@@ -12,7 +12,7 @@ import { CategoriesState } from '../../../core/categories.state';
 import { AccountsState } from '../../../core/accounts.state';
 import { TransactionType, type Transaction, type TransactionAccount } from '../../../models/transaction';
 import { ADDRESS_EXPLORERS, TX_EXPLORERS } from '../../../models/account';
-import type { Category } from '../../../models/category';
+import { SystemCategory, type Category } from '../../../models/category';
 import type { TransactionRequest } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { CategorySelect } from '../../categories/category-select/category-select';
@@ -61,7 +61,7 @@ export class TransactionForm {
 
   readonly lock = syncedLock(this.data, this.accountsState.trackedIds());
   /** Network fees are written by sync only: neither category nor type can change. */
-  readonly isNetworkFee = this.data.category?.id === TransactionType.NetworkFees;
+  readonly isNetworkFee = this.data.category?.id === SystemCategory.NetworkFees;
 
   readonly activeTypeIndex = signal(TYPE_ORDER.indexOf(
     this.data.debit_account && this.data.credit_account ? TransactionType.Transfer
@@ -73,9 +73,9 @@ export class TransactionForm {
   readonly isIncome = computed(() => this.type() === TransactionType.Income);
   readonly isTransfer = computed(() => this.type() === TransactionType.Transfer);
   /** 1 = Income, 2 = Expenses; drives which branch the picker offers. */
-  readonly categoryRootId = computed(() => (this.isIncome() ? TransactionType.Income : TransactionType.Expense));
+  readonly categoryRootId = computed(() => (this.isIncome() ? SystemCategory.Income : SystemCategory.Expenses));
   readonly uncategorized = computed(() => {
-    const id = this.isIncome() ? TransactionType.UncategorizedIncome : TransactionType.UncategorizedExpense;
+    const id = this.isIncome() ? SystemCategory.UncategorizedIncome : SystemCategory.UncategorizedExpense;
     const root = this.categoriesState.categories().find(c => c.id === this.categoryRootId());
     return root?.children?.find(c => c.id === id) ?? null;
   });
@@ -221,6 +221,11 @@ export class TransactionForm {
       return;
     }
 
+    if ((!this.isIncome() && !fromAccount) || (!this.isExpense() && !toAccount)) {
+      this.notifications.showError('Select an account');
+      return;
+    }
+
     if (this.isSameCurrency()) {
       debitAmount = creditAmount = this.isIncome() ? (creditAmount ?? debitAmount) : (debitAmount ?? creditAmount);
     }
@@ -250,7 +255,7 @@ export class TransactionForm {
     const category = c.category.value;
     switch (type) {
       case TransactionType.Expense:
-        if (category?.root_id !== TransactionType.Expense) {
+        if (category?.root_id !== SystemCategory.Expenses) {
           c.category.setValue(this.uncategorized());
         }
         c.toAccount.setValue(null);
@@ -260,7 +265,7 @@ export class TransactionForm {
         }
         break;
       case TransactionType.Income:
-        if (category?.root_id !== TransactionType.Income) {
+        if (category?.root_id !== SystemCategory.Income) {
           c.category.setValue(this.uncategorized());
         }
         c.fromAccount.setValue(null);

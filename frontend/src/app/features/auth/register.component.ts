@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiIcon, TuiInput, TuiLink } from '@taiga-ui/core';
 import { TuiPassword } from '@taiga-ui/kit';
 import { AuthService } from '../../core/auth.service';
-import { firstValueFrom } from 'rxjs/internal/firstValueFrom';
+import { firstValueFrom } from 'rxjs';
 import { NotificationService } from '../../core/notification.service';
 
 @Component({
@@ -23,7 +23,8 @@ export class RegisterComponent {
     email: new FormControl('', [Validators.required, Validators.email]),
     password: new FormControl('', [Validators.required, Validators.minLength(6)]),
     name: new FormControl(''),
-    currency: new FormControl('')
+    // Optional; the backend takes 3 or 4 letter codes (EUR, USDT), upper case.
+    currency: new FormControl('', [Validators.pattern(/^\s*[A-Za-z]{3,4}\s*$/)])
   });
 
   loading = signal(false);
@@ -42,7 +43,7 @@ export class RegisterComponent {
         this.form.value.email!,
         this.form.value.password!,
         this.form.value.name!,
-        this.form.value.currency || 'EUR'
+        this.form.value.currency?.trim().toUpperCase() || 'EUR'
       ));
       this.router.navigate(['/dashboard']);
     } catch (err) {

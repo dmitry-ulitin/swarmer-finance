@@ -1,8 +1,9 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
+import type { ApiResponse } from './api.service';
 
 export interface User {
   id: number;
@@ -18,32 +19,20 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
-export interface ApiResponse<T> {
-  data: T | null;
-  error: string | null;
-}
-
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+
   private accessToken = signal<string | null>(localStorage.getItem('accessToken'));
-  private userSignal = signal<User | null>(null);
+  private userSignal = signal<User | null>(this.accessToken() ? this.storedUser() : null);
 
   readonly isAuthenticated = computed(() => !!this.accessToken());
   readonly user = computed(() => this.userSignal());
 
-  constructor(private http: HttpClient, private router: Router) {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      this.accessToken.set(token);
-      this.loadUser();
-    }
-  }
-
-  private loadUser() {
+  private storedUser(): User | null {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      this.userSignal.set(JSON.parse(storedUser));
-    }
+    return storedUser ? JSON.parse(storedUser) : null;
   }
 
   register(email: string, password: string, name: string, currency: string) {

@@ -17,15 +17,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/api/auth/login') ||
     req.url.includes('/api/auth/register');
 
-  // Guard against refresh-loop on retry: if the request is already
-  // a retry after a refresh and the retry itself fails with 401,
-  // we must not try to refresh again.
-  const alreadyRetried = req.headers.has('X-Retry-After-Refresh');
-
   const token = authService.getToken();
   return next(token ? withToken(req, token) : req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status !== 401 || isAuthEndpoint || alreadyRetried) {
+      // A retry goes straight to `next`, past this handler, so a retry that
+      // 401s again fails as is rather than starting another refresh.
+      if (error.status !== 401 || isAuthEndpoint) {
         return throwError(() => error);
       }
 
@@ -36,19 +33,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       // triggering a redundant /api/auth/refresh call.
       const currentToken = authService.getToken();
       if (currentToken && currentToken !== token) {
-        return next(withToken(req, currentToken).clone({
-          setHeaders: { 'X-Retry-After-Refresh': '1' },
-        }));
+        return next(withToken(req, currentToken));
       }
 
       // Single-flight: all concurrent 401s share one /api/auth/refresh call.
       return refreshCoordinator.refresh().pipe(
-        switchMap(newToken =>
-          next(withToken(req, newToken).clone({
-            setHeaders: { 'X-Retry-After-Refresh': '1' },
-          }))
-        ),
-        catchError(refreshErr => throwError(() => refreshErr)),
+        switchMap(newToken => next(withToken(req, newToken))),
       );
     }),
   );

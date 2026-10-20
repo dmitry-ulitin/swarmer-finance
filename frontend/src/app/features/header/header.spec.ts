@@ -12,23 +12,25 @@ import { ImportDialogService } from '../import/import-dialog.service';
 import { AccountSyncService } from '../accounts/account-sync.service';
 
 const wallet = { id: 7, name: 'Wallet' };
+const shared = { id: 9, name: 'Shared', access_level: 2 };
 
 function configure(selectedAccountIds: number[]) {
   const openSharing = vi.fn(async () => {});
+  const openEdit = vi.fn(async () => {});
   TestBed.configureTestingModule({
     providers: [
       Header,
       { provide: AuthService, useValue: {} },
-      { provide: AccountsState, useValue: { visibleAccounts: signal([wallet, { id: 8, name: 'Cash' }]), trackedIds: signal(new Set()) } },
+      { provide: AccountsState, useValue: { visibleAccounts: signal([wallet, { id: 8, name: 'Cash' }, shared]), trackedIds: signal(new Set()) } },
       { provide: TransactionsState, useValue: { selectedAccountIds: signal(selectedAccountIds), selectedTransaction: signal(null) } },
       { provide: CategoryDialogService, useValue: {} },
-      { provide: AccountDialogService, useValue: { openSharing } },
+      { provide: AccountDialogService, useValue: { openSharing, openEdit } },
       { provide: TransactionDialogService, useValue: {} },
       { provide: ImportDialogService, useValue: {} },
       { provide: AccountSyncService, useValue: {} },
     ],
   });
-  return { header: TestBed.inject(Header), openSharing };
+  return { header: TestBed.inject(Header), openSharing, openEdit };
 }
 
 describe('Header sharing', () => {
@@ -44,5 +46,23 @@ describe('Header sharing', () => {
     const { header, openSharing } = configure([7, 8]);
     header.shareFilteredAccount();
     expect(openSharing).not.toHaveBeenCalled();
+  });
+});
+
+describe('Header edit', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('edits a filtered account the user manages', () => {
+    const { header, openEdit } = configure([7]);
+    expect(header.canEditFiltered()).toBe(true);
+    header.editFilteredAccount();
+    expect(openEdit).toHaveBeenCalledWith(wallet);
+  });
+
+  it('does not offer editing below co-owner', () => {
+    const { header, openEdit } = configure([9]);
+    expect(header.canEditFiltered()).toBe(false);
+    header.editFilteredAccount();
+    expect(openEdit).not.toHaveBeenCalled();
   });
 });

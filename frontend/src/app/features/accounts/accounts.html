@@ -3,13 +3,13 @@
         [iconStart]="'@tui.refresh-cw'">Refresh</button>
     <button tuiButton appearance="outline" size="s" (click)="openCreateDialog()"
         [iconStart]="'@tui.plus'">Add Account</button>
-    <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
+    <button tuiButton appearance="outline" size="s" [disabled]="!canManage()"
         [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
     <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
         [iconStart]="'@tui.users'" (click)="openSharingDialog()">Share</button>
-    <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
+    <button tuiButton appearance="outline" size="s" [disabled]="!canManage()"
         [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
-    @if (canPurge()) {
+    @if (canManage()) {
         <button tuiButton tuiChevron appearance="outline-destructive" size="s" type="button"
             [iconStart]="'@tui.triangle-alert'" [tuiDropdown]="danger" tuiDropdownAuto>Danger</button>
         <ng-template #danger let-close>

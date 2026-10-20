@@ -43,7 +43,7 @@ describe('authInterceptor', () => {
     // Request A (e.g. accounts): 401s immediately with the stale token.
     const reqA = new HttpRequest('GET', '/api/accounts');
     const nextA: HttpHandlerFn = (r) =>
-      r.headers.has('X-Retry-After-Refresh')
+      r.headers.get('Authorization') === `Bearer ${newToken}`
         ? (of({} as HttpEvent<unknown>))
         : throwError(() => new HttpErrorResponse({ status: 401 }));
 
@@ -52,7 +52,7 @@ describe('authInterceptor', () => {
     // completed and cleared the gate.
     const lateFailure = new Subject<HttpEvent<unknown>>();
     const nextB: HttpHandlerFn = (r) =>
-      r.headers.has('X-Retry-After-Refresh')
+      r.headers.get('Authorization') === `Bearer ${newToken}`
         ? of({} as HttpEvent<unknown>)
         : (lateFailure.asObservable() as Observable<HttpEvent<unknown>>);
 
@@ -76,5 +76,31 @@ describe('authInterceptor', () => {
     // It must NOT start a second refresh round -- the token is already
     // fresh, so it should just retry with the current token.
     expect(refreshCoordinator.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails a retry that 401s again instead of refreshing a second time', () => {
+    let currentToken = 'old-token';
+    const authService = { getToken: vi.fn(() => currentToken) } as unknown as AuthService;
+    const refreshCoordinator = {
+      refresh: vi.fn(() => {
+        currentToken = 'new-token';
+        return of('new-token');
+      }),
+    } as unknown as RefreshCoordinator;
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: RefreshCoordinator, useValue: refreshCoordinator },
+      ],
+    });
+    const next = vi.fn<HttpHandlerFn>(() => throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    const errors: unknown[] = [];
+    TestBed.runInInjectionContext(() => authInterceptor(new HttpRequest('GET', '/api/accounts'), next))
+      .subscribe({ error: e => errors.push(e) });
+
+    expect(refreshCoordinator.refresh).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(errors).toHaveLength(1);
   });
 });

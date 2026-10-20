@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, Subject, Subscription, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
@@ -30,9 +30,8 @@ import { AuthService } from './auth.service';
  */
 @Injectable({ providedIn: 'root' })
 export class RefreshCoordinator {
+  private readonly auth = inject(AuthService);
   private inflight: { subject: Subject<string>; subscription: Subscription } | null = null;
-
-  constructor(private readonly auth: AuthService) {}
 
   refresh(): Observable<string> {
     if (this.inflight) {

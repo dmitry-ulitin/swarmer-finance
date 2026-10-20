@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { MoneyPipe } from '../../../../core/money.pipe';
 import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectAccounts, collectUserBalance, sumByCurrency } from '../../../../core/account-tree';
 import { amountsHint } from '../../../../core/money-hint';
@@ -29,7 +29,7 @@ export class AccountTreeNode {
   private readonly importDialog = inject(ImportDialogService);
   protected readonly sync = inject(AccountSyncService);
   private readonly money = inject(MoneyPipe);
-  protected hovered = false;
+  protected readonly hovered = signal(false);
 
   protected readonly nodeAccountIds = computed(() => {
     const item = this.item();
@@ -67,13 +67,7 @@ export class AccountTreeNode {
     return item as AccountLeafItem;
   }
 
-  protected get indent(): string {
-    return `calc(0.25rem + ${this.depth()}rem)`;
-  }
-
-  protected onHovered(hovered: boolean): void {
-    this.hovered = hovered;
-  }
+  protected readonly indent = computed(() => `calc(0.25rem + ${this.depth()}rem)`);
 
   protected onImport(account: Account): void {
     void this.importDialog.open(account);

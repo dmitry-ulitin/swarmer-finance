@@ -58,9 +58,6 @@ export enum TransactionType {
     Transfer = 0,
     Income,
     Expense,
-    UncategorizedIncome,
-    UncategorizedExpense,
-    NetworkFees
 }
 
 export interface TransactionView extends Transaction {
