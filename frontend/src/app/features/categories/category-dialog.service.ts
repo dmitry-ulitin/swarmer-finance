@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import type { Category } from '../../models/category';
 import type { CategoryFormData } from './category-form/category-form';
 import { CategoriesState } from '../../core/categories.state';
+import { TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
 
 @Injectable({ providedIn: 'root' })
@@ -13,6 +14,7 @@ export class CategoryDialogService {
   private readonly dialogs = inject(TuiDialogService);
   private readonly injector = inject(INJECTOR);
   private readonly categoriesState = inject(CategoriesState);
+  private readonly transactions = inject(TransactionsState);
   private readonly notifications = inject(NotificationService);
 
   async openManager(): Promise<void> {
@@ -48,13 +50,16 @@ export class CategoryDialogService {
   async openEdit(category: Category): Promise<void> {
     try {
       const { CategoryForm } = await import('./category-form/category-form');
-      await firstValueFrom(
+      const saved = await firstValueFrom(
         this.dialogs.open<Category | null>(
           new PolymorpheusComponent(CategoryForm, this.injector),
           { data: { category } satisfies CategoryFormData, label: 'Edit Category', size: 's' }
         ),
         { defaultValue: null }
       );
+      // A rename or a move changes the paths the transactions and the
+      // summary show.
+      if (saved) this.transactions.reload();
     } catch (e) {
       this.notifications.showError(e, 'Failed to open category form');
     }

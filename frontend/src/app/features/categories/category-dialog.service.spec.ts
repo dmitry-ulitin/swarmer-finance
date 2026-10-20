@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CategoryDialogService } from './category-dialog.service';
 import { CategoriesState } from '../../core/categories.state';
 import { NotificationService } from '../../core/notification.service';
+import { TransactionsState } from '../../core/transactions.state';
 import type { Category } from '../../models/category';
 
 const category: Category = {
@@ -27,6 +28,7 @@ describe('CategoryDialogService.openDelete', () => {
         { provide: TuiDialogService, useValue: { open: dialogOpen } },
         { provide: CategoriesState, useValue: { delete: deleteCategory } },
         { provide: NotificationService, useValue: { showError } },
+        { provide: TransactionsState, useValue: { reload: vi.fn() } },
       ],
     });
     service = TestBed.inject(CategoryDialogService);
@@ -49,5 +51,36 @@ describe('CategoryDialogService.openDelete', () => {
     deleteCategory.mockReturnValue(throwError(() => err));
     expect(await service.openDelete(category)).toBe(false);
     expect(showError).toHaveBeenCalledWith(err, 'Failed to delete category');
+  });
+});
+
+describe('CategoryDialogService.openEdit', () => {
+  let service: CategoryDialogService;
+  let dialogOpen: ReturnType<typeof vi.fn>;
+  let reload: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    dialogOpen = vi.fn(() => of(category));
+    reload = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: TuiDialogService, useValue: { open: dialogOpen } },
+        { provide: CategoriesState, useValue: {} },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: TransactionsState, useValue: { reload } },
+      ],
+    });
+    service = TestBed.inject(CategoryDialogService);
+  });
+
+  it('reloads the transactions and the summary once saved', async () => {
+    await service.openEdit(category);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload when cancelled', async () => {
+    dialogOpen.mockReturnValue(of(null));
+    await service.openEdit(category);
+    expect(reload).not.toHaveBeenCalled();
   });
 });

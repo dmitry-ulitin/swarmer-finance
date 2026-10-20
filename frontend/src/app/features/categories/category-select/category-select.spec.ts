@@ -7,6 +7,7 @@ import { CategorySelect } from './category-select';
 import { CategoriesState } from '../../../core/categories.state';
 import { AuthService } from '../../../core/auth.service';
 import { CategoryDialogService } from '../category-dialog.service';
+import { TransactionsState } from '../../../core/transactions.state';
 import type { Category } from '../../../models/category';
 
 const ME = 1;
@@ -161,6 +162,7 @@ describe('CategorySelect', () => {
           provideTaiga(),
           { provide: CategoriesState, useValue: { categories: signal(tree) } },
           { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+          { provide: TransactionsState, useValue: {} },
         ],
       });
       const fixture = TestBed.createComponent(RootHost);
@@ -202,6 +204,7 @@ describe('CategorySelect in a form', () => {
       providers: [
         { provide: CategoriesState, useValue: { categories: signal(tree) } },
         { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+        { provide: TransactionsState, useValue: {} },
       ],
     });
     const fixture = TestBed.createComponent(Host);
@@ -219,6 +222,7 @@ describe('CategorySelect in a form', () => {
       providers: [
         { provide: CategoriesState, useValue: { categories: signal(tree) } },
         { provide: AuthService, useValue: { user: signal({ id: ME }) } },
+        { provide: TransactionsState, useValue: {} },
       ],
     });
     const fixture = TestBed.createComponent(Host);
