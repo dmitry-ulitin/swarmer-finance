@@ -13,15 +13,23 @@
     list-style: none;
 }
 
-.member {
-    display: flex;
+// Rows and the add form share columns: who / level / action.
+.member,
+.add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 9rem var(--tui-height-xs);
     align-items: center;
     gap: 0.5rem;
 }
 
+// Without management controls there are no buttons, so the level takes the action column too.
+.readonly .level-label {
+    grid-column: 2 / -1;
+    justify-self: end;
+}
+
 .who {
     display: flex;
-    flex: 1;
     flex-direction: column;
     min-width: 0;
 }
@@ -31,20 +39,6 @@
     font-size: 0.8125rem;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.level {
-    flex: 0 0 9rem;
-}
-
-.add {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.5rem;
-
-    .email-field {
-        flex: 1;
-    }
 }
 
 .actions {

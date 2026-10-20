@@ -1,4 +1,4 @@
-<div class="sharing" tuiTextfieldSize="s">
+<div class="sharing" tuiTextfieldSize="s" [class.readonly]="!canManage()">
     <tui-loader [loading]="loading()">
         @if (!loading() && members().length === 0) {
             <!-- A loaded list always holds the creator, so empty means the load failed. -->
@@ -29,7 +29,7 @@
 
     @if (canManage()) {
         <form [formGroup]="form" (ngSubmit)="add()" class="add">
-            <tui-textfield class="email-field">
+            <tui-textfield>
                 <label tuiLabel>Email</label>
                 <input tuiInput type="email" formControlName="email" placeholder="user@example.com" />
             </tui-textfield>
@@ -38,7 +38,8 @@
                 <input tuiSelect formControlName="level" />
                 <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
             </tui-textfield>
-            <button tuiButton size="s" type="submit" [disabled]="busy() || form.invalid">Add</button>
+            <button tuiIconButton type="submit" size="xs" appearance="flat" iconStart="@tui.plus" aria-label="Add" data-test="add"
+                [disabled]="busy() || form.invalid"></button>
         </form>
     }
 

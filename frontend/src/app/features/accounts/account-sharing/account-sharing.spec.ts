@@ -74,7 +74,7 @@ describe('AccountSharing', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(component.canManage()).toBe(false);
     const buttons = Array.from(el.querySelectorAll('button')).map(b => b.textContent?.trim());
-    expect(buttons).not.toContain('Add');
+    expect(el.querySelector('[data-test="add"]')).toBeNull();
     expect(el.querySelector('[data-test="remove"]')).toBeNull();
     expect(buttons).toContain('Leave account');
   });
