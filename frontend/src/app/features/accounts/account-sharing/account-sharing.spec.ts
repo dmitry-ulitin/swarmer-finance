@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { TuiDialogService } from '@taiga-ui/core';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { AccountSharing } from './account-sharing';
@@ -178,6 +178,22 @@ describe('AccountSharing', () => {
     await component.changeLevel(CO_OWNER, 1);
     http.expectNone('/api/accounts/7/shares/2');
     expect(component.members()).toEqual([CO_CREATOR, CO_OWNER]);
+  });
+
+  it('ignores a second change while a confirm is open', async () => {
+    const { component, http, dialogOpen } = setup(1, [OWNER, READER]);
+    const answer = new Subject<boolean>();
+    dialogOpen.mockReturnValue(answer);
+    const first = component.changeLevel(READER, 3);
+    await flushAsync();
+    expect(component.busy()).toBe(true);
+    await component.remove(READER);
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    answer.next(false);
+    answer.complete();
+    await first;
+    expect(component.busy()).toBe(false);
+    http.expectNone('/api/accounts/7/shares/2');
   });
 
   it('leaving closes the dialog', async () => {

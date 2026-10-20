@@ -59,34 +59,53 @@ export class AccountSharing {
     return member.user_id === this.me()?.user_id;
   }
 
-  async add(): Promise<void> {
-    if (this.form.invalid) return;
-    const { email, level } = this.form.getRawValue();
-    if (level === 3 && !await this.confirmCoOwner(email.trim())) return;
-    const ok = await this.mutate(this.api.addAccountShare(this.account.id, email.trim(), level));
-    if (ok) this.form.reset();
+  add(): Promise<void> {
+    return this.exclusive(async () => {
+      if (this.form.invalid) return;
+      const { email, level } = this.form.getRawValue();
+      if (level === 3 && !await this.confirmCoOwner(email.trim())) return;
+      const ok = await this.mutate(this.api.addAccountShare(this.account.id, email.trim(), level));
+      if (ok) this.form.reset();
+    });
   }
 
-  async changeLevel(member: AccountMember, level: ShareLevel): Promise<void> {
-    if (level === member.level) return;
-    if (!await this.confirmLevelChange(member, level)) {
-      this.refreshRows();
-      return;
-    }
-    if (!await this.mutate(this.api.updateAccountShare(this.account.id, member.user_id, level))) this.refreshRows();
+  changeLevel(member: AccountMember, level: ShareLevel): Promise<void> {
+    return this.exclusive(async () => {
+      if (level === member.level) return;
+      if (!await this.confirmLevelChange(member, level)) {
+        this.refreshRows();
+        return;
+      }
+      if (!await this.mutate(this.api.updateAccountShare(this.account.id, member.user_id, level))) this.refreshRows();
+    });
   }
 
-  async remove(member: AccountMember): Promise<void> {
+  remove(member: AccountMember): Promise<void> {
     if (this.isMe(member)) return this.leave();
-    const content = `Remove ${member.name || member.email} from "${this.account.name}"? Their income and expenses on this account pass to the owner.`;
-    if (!await this.confirm('Remove member', content, 'Remove')) return;
-    await this.mutate(this.api.removeAccountShare(this.account.id, member.user_id));
+    return this.exclusive(async () => {
+      const content = `Remove ${member.name || member.email} from "${this.account.name}"? Their income and expenses on this account pass to the owner.`;
+      if (!await this.confirm('Remove member', content, 'Remove')) return;
+      await this.mutate(this.api.removeAccountShare(this.account.id, member.user_id));
+    });
   }
 
-  async leave(): Promise<void> {
-    const me = this.me();
-    if (!me || !await this.confirm('Leave account', `Leave "${this.account.name}"? You will lose access to it.`, 'Leave')) return;
-    if (await this.mutate(this.api.removeAccountShare(this.account.id, me.user_id))) this.context.completeWith();
+  leave(): Promise<void> {
+    return this.exclusive(async () => {
+      const me = this.me();
+      if (!me || !await this.confirm('Leave account', `Leave "${this.account.name}"? You will lose access to it.`, 'Leave')) return;
+      if (await this.mutate(this.api.removeAccountShare(this.account.id, me.user_id))) this.context.completeWith();
+    });
+  }
+
+  /** Runs one change at a time; the controls stay disabled while its confirm is open too. */
+  private async exclusive(action: () => Promise<void>): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    try {
+      await action();
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Asks first when a level change gives up ownership or the right to manage access. */
@@ -131,7 +150,6 @@ export class AccountSharing {
   }
 
   private async mutate(request: Observable<ApiResponse<AccountMember[]>>): Promise<boolean> {
-    this.busy.set(true);
     try {
       const r = await firstValueFrom(request);
       const members = r.data ?? [];
@@ -145,8 +163,6 @@ export class AccountSharing {
     } catch (e) {
       this.notifications.showError(e, 'Failed to update sharing');
       return false;
-    } finally {
-      this.busy.set(false);
     }
   }
 }
