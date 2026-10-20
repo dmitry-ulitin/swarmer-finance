@@ -287,6 +287,26 @@ describe('Account share management', () => {
     expect(transferRow.rows[0].user_id).toBe(bId);
   });
 
+  it('leaving member history moves to the owner', async () => {
+    await grant(acc, bId, 2);
+    const lunch = await makeCategory(bId, 'Leaving lunch', 2);
+    const expense = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ debitAccountId: acc, categoryId: lunch, debit: 4, credit: 4, date: '2026-03-03', description: 'Lunch before leaving' });
+    expect(expense.status).toBe(200);
+
+    const res = await remove(tokenB, bId);
+    expect(res.status).toBe(200);
+
+    const row = await pool.query(
+      `SELECT t.user_id, c.user_id AS category_user_id, c.name
+         FROM transactions t JOIN categories c ON c.id = t.category_id WHERE t.id = $1`,
+      [expense.body.data.id]
+    );
+    expect(row.rows[0]).toEqual({ user_id: aId, category_user_id: aId, name: 'Leaving lunch' });
+  });
+
   it('third-party category does not block removal', async () => {
     await grant(acc, bId, 2);
     // C shares an account with B, so B could legitimately use C's category.

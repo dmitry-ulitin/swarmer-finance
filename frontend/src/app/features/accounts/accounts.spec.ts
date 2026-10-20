@@ -55,6 +55,26 @@ describe('Accounts danger actions', () => {
   });
 });
 
+describe('Accounts sharing', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('opens sharing for the selected account', async () => {
+    const openSharing = vi.fn(async () => {});
+    const screen = configure({ openSharing });
+    screen.setAsSelected(accounts[2]);
+
+    await screen.openSharingDialog();
+
+    expect(openSharing).toHaveBeenCalledWith(accounts[2]);
+  });
+
+  it('does nothing without a selection', async () => {
+    const openSharing = vi.fn(async () => {});
+    await configure({ openSharing }).openSharingDialog();
+    expect(openSharing).not.toHaveBeenCalled();
+  });
+});
+
 describe('Accounts sections', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
