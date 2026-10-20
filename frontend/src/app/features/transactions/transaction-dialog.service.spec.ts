@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { buildCreateDefaults } from './transaction-dialog.service';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
+import { TuiDialogService } from '@taiga-ui/core';
+import { buildCreateDefaults, TransactionDialogService } from './transaction-dialog.service';
+import { TransactionsState } from '../../core/transactions.state';
+import { AccountsState } from '../../core/accounts.state';
+import { NotificationService } from '../../core/notification.service';
 import type { Transaction, TransactionAccount } from '../../models/transaction';
 import type { Account } from '../../models/account';
 
@@ -88,5 +95,66 @@ describe('buildCreateDefaults', () => {
 
   it('returns null when there is no last transaction and no preferred account', () => {
     expect(buildCreateDefaults(undefined, undefined, '2026-09-14')).toBeNull();
+  });
+});
+
+describe('TransactionDialogService.openCreate', () => {
+  const cash = makeAccount(1, 'Cash');
+  const shared = makeAccount(2, 'Shared read-only');
+  let open: ReturnType<typeof vi.fn>;
+  let showError: ReturnType<typeof vi.fn>;
+  let transactions: ReturnType<typeof signal<Transaction[]>>;
+  let transferTargets: ReturnType<typeof signal<Account[]>>;
+  let service: TransactionDialogService;
+
+  const prefill = () => open.mock.lastCall![1].data as Partial<Transaction>;
+
+  beforeEach(() => {
+    open = vi.fn(() => of(null));
+    showError = vi.fn();
+    transactions = signal<Transaction[]>([]);
+    transferTargets = signal<Account[]>([cash]);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: TuiDialogService, useValue: { open } },
+        { provide: TransactionsState, useValue: { transactions, selectedAccountIds: signal([]) } },
+        {
+          provide: AccountsState,
+          useValue: { accounts: signal([cash, shared]), transferTargets, trackedIds: signal(new Set()) },
+        },
+        { provide: NotificationService, useValue: { showError } },
+      ],
+    });
+    service = TestBed.inject(TransactionDialogService);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults to the local date, not the UTC one', async () => {
+    vi.stubEnv('TZ', 'Europe/Moscow');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-20T22:30:00Z')); // 01:30 on the 21st in Moscow
+    await service.openCreate();
+    expect(prefill().date).toBe('2026-10-21');
+  });
+
+  it('skips a last transaction on an account the user cannot write to', async () => {
+    transactions.set([
+      makeTransaction({ id: 9, debit_account: makeTxAccount(2, 'Shared read-only') }),
+      makeTransaction({ id: 8, debit_account: makeTxAccount(1, 'Cash') }),
+    ]);
+    await service.openCreate();
+    expect(prefill().debit_account?.id).toBe(1);
+  });
+
+  it('refuses when no account is writable, even with a read-only last transaction', async () => {
+    transactions.set([makeTransaction({ debit_account: makeTxAccount(2, 'Shared read-only') })]);
+    transferTargets.set([]);
+    await service.openCreate();
+    expect(open).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith('No accounts available');
   });
 });

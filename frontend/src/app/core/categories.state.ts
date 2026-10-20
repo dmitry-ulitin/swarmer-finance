@@ -3,22 +3,30 @@ import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Category, CategoryCreatePayload, CategoryUpdatePayload } from '../models/category';
 import { ApiService } from './api.service';
+import { NotificationService } from './notification.service';
 
 @Injectable({ providedIn: 'root' })
 export class CategoriesState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   private readonly resource = resource<Category[], boolean>({
     params: () => this.auth.isAuthenticated(),
     loader: async ({ params }) => {
       if (!params) return [];
-      const r = await firstValueFrom(this.api.getCategories());
-      return r.data ?? [];
+      try {
+        const r = await firstValueFrom(this.api.getCategories());
+        return r.data ?? [];
+      } catch (e) {
+        this.notifications.showError(e, 'Failed to load categories');
+        throw e;
+      }
     }
   });
 
-  readonly categories = computed(() => this.resource.value() ?? []);
+  // value() throws while the resource is in its error state.
+  readonly categories = computed(() => (this.resource.hasValue() ? this.resource.value() : []));
   readonly loading = this.resource.isLoading;
 
   reload() {

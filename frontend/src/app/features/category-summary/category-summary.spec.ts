@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { CategorySummaryPanel } from './category-summary';
 import { ApiService } from '../../core/api.service';
 import { DateRange, TransactionsState } from '../../core/transactions.state';
+import { NotificationService } from '../../core/notification.service';
 import { CategorySummary, CategorySummaryItem } from '../../models/transaction';
 
 function item(name: string, total: number | null): CategorySummaryItem {
@@ -21,6 +22,7 @@ describe('CategorySummaryPanel', () => {
   let toggleCategory: ReturnType<typeof vi.fn>;
   let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
   let selectType: ReturnType<typeof vi.fn>;
+  let showError: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<CategorySummaryPanel>;
 
   function respond(summary: Partial<CategorySummary>): void {
@@ -47,9 +49,11 @@ describe('CategorySummaryPanel', () => {
     toggleCategory = vi.fn();
     selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
     selectType = vi.fn();
+    showError = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: ApiService, useValue: { getCategorySummary } },
+        { provide: NotificationService, useValue: { showError } },
         { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision, selectedCategoryIds, selectCategory, toggleCategory, selectedType, selectType } },
       ],
     });
@@ -93,6 +97,13 @@ describe('CategorySummaryPanel', () => {
     const el = await render();
 
     expect(el.querySelector('[data-type="expense"] .block-total')).toBeNull();
+  });
+
+  it('renders without blocks and reports the error when the load fails', async () => {
+    getCategorySummary.mockReturnValue(throwError(() => new Error('down')));
+    const el = await render();
+    expect(el.querySelector('.block')).toBeNull();
+    expect(showError).toHaveBeenCalledWith(expect.any(Error), 'Failed to load the summary');
   });
 
   it('says so when there is nothing to show', async () => {

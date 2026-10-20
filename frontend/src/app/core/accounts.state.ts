@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { Account, AccountPayload, accessLevelOf } from '../models/account';
 import { AccountSection, AccountTreeItem, buildAccountTree, groupIntoSections } from './account-tree';
 import { ApiService } from './api.service';
+import { NotificationService } from './notification.service';
 
 export interface BalanceSummary {
   currency: string;
@@ -16,17 +17,24 @@ export interface BalanceSummary {
 export class AccountsState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   private readonly resource = resource<Account[], boolean>({
     params: () => this.auth.isAuthenticated(),
     loader: async ({ params }) => {
       if (!params) return [];
-      const r = await firstValueFrom(this.api.getAccounts());
-      return r.data ?? [];
+      try {
+        const r = await firstValueFrom(this.api.getAccounts());
+        return r.data ?? [];
+      } catch (e) {
+        this.notifications.showError(e, 'Failed to load accounts');
+        throw e;
+      }
     }
   });
 
-  readonly accounts = computed(() => this.resource.value() ?? []);
+  // value() throws while the resource is in its error state.
+  readonly accounts = computed(() => (this.resource.hasValue() ? this.resource.value() : []));
   // Excludes soft-deleted accounts — for display in the accounts list UI.
   // Use `accounts` instead where deleted accounts must remain selectable
   // (e.g. editing an existing transaction that references one).

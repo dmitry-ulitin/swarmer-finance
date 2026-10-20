@@ -1,5 +1,6 @@
 import { inject, Injectable, INJECTOR } from '@angular/core';
 import { TuiDialogService } from '@taiga-ui/core';
+import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TUI_CONFIRM } from '@taiga-ui/kit';
 import type { TuiConfirmData } from '@taiga-ui/kit';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
@@ -10,7 +11,6 @@ import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { TransactionRequest } from '../../core/api.service';
-import { syncedLock } from './synced-lock';
 
 /**
  * Prefill for "Add transaction". Always defaults to Expense (a
@@ -53,17 +53,20 @@ export class TransactionDialogService {
 
   async openCreate(): Promise<Transaction | null> {
     const { TransactionForm } = await import('./transaction-form/transaction-form');
-    // Synced accounts take no hand-entered transactions, so neither the
-    // prefill nor the default account may point at one.
-    const tracked = this.accountState.trackedIds();
-    const ordinary = this.accountState.accounts().filter(a => !tracked.has(a.id));
-    const lastTransaction = this.transactionsState.transactions().find(t => !syncedLock(t, tracked).synced);
-    if (!lastTransaction && ordinary.length < 1) {
+    // The prefill and the default account must be ones a transaction can be
+    // entered against by hand: live, untracked and writable.
+    const targets = this.accountState.transferTargets();
+    if (targets.length < 1) {
       this.notifications.showError('No accounts available');
       return null;
     }
-    const preferredAccount = ordinary.find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || ordinary[0];
-    const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, new Date().toISOString().split('T')[0])!;
+    const writable = new Set(targets.map(a => a.id));
+    const lastTransaction = this.transactionsState.transactions().find(t => {
+      const account = t.debit_account ?? t.credit_account;
+      return !!account && writable.has(account.id);
+    });
+    const preferredAccount = targets.find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || targets[0];
+    const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, TuiDay.currentLocal().toJSON())!;
     try {
       const result = await firstValueFrom(
         this.dialogs.open<TransactionRequest | null>(

@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { TransactionsState } from './transactions.state';
 import { ApiService } from './api.service';
 import { AuthService } from './auth.service';
 import { AccountsState } from './accounts.state';
+import { NotificationService } from './notification.service';
 
 describe('TransactionsState.setDetails', () => {
   let state: TransactionsState;
@@ -17,7 +18,8 @@ describe('TransactionsState.setDetails', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions } },
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
       ],
     });
     state = TestBed.inject(TransactionsState);
@@ -62,7 +64,8 @@ describe('TransactionsState.setDateRange', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions } },
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
       ],
     });
     state = TestBed.inject(TransactionsState);
@@ -104,7 +107,8 @@ describe('TransactionsState category filter', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions } },
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
       ],
     });
     state = TestBed.inject(TransactionsState);
@@ -191,7 +195,8 @@ describe('TransactionsState.viewTransactions', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions: () => of({ data: [expense, income, transfer], error: null }) } },
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
       ],
     });
     state = TestBed.inject(TransactionsState);
@@ -235,7 +240,8 @@ describe('TransactionsState.reloadWithout', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions } },
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
       ],
     });
     state = TestBed.inject(TransactionsState);
@@ -273,7 +279,8 @@ describe('TransactionsState on logout', () => {
       providers: [
         { provide: ApiService, useValue: { getTransactions } },
         { provide: AuthService, useValue: { isAuthenticated } },
-        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
       ],
     });
     const state = TestBed.inject(TransactionsState);
@@ -294,5 +301,85 @@ describe('TransactionsState on logout', () => {
     isAuthenticated.set(true);
     state.reload();
     expect(getTransactions.mock.lastCall![0]).toEqual({ offset: 0, limit: 20 });
+  });
+});
+
+describe('TransactionsState fetch', () => {
+  let getTransactions: ReturnType<typeof vi.fn>;
+  let showError: ReturnType<typeof vi.fn>;
+  let state: TransactionsState;
+
+  beforeEach(() => {
+    getTransactions = vi.fn();
+    showError = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: NotificationService, useValue: { showError } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
+      ],
+    });
+    state = TestBed.inject(TransactionsState);
+  });
+
+  it('drops a response that arrives after the filters changed', async () => {
+    const first = new Subject<unknown>();
+    const second = new Subject<unknown>();
+    getTransactions.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    state.setDetails('a');
+    state.setDetails('ab');
+
+    second.next({ data: [{ id: 2 }], error: null });
+    second.complete();
+    await Promise.resolve();
+    first.next({ data: [{ id: 1 }], error: null });
+    first.complete();
+    await Promise.resolve();
+
+    expect(state.transactions().map(t => t.id)).toEqual([2]);
+    expect(state.loading()).toBe(false);
+  });
+
+  it('stays loading while the current request is in flight', async () => {
+    const first = new Subject<unknown>();
+    getTransactions.mockReturnValueOnce(first).mockReturnValueOnce(new Subject());
+    state.setDetails('a');
+    state.setDetails('ab');
+
+    first.next({ data: [{ id: 1 }], error: null });
+    first.complete();
+    await Promise.resolve();
+
+    expect(state.transactions()).toEqual([]);
+    expect(state.loading()).toBe(true);
+  });
+
+  it('reports a failed load', async () => {
+    const error = new Error('down');
+    getTransactions.mockReturnValue(throwError(() => error));
+    state.reload();
+    await Promise.resolve();
+
+    expect(showError).toHaveBeenCalledWith(error, 'Failed to load transactions');
+    expect(state.loading()).toBe(false);
+  });
+});
+
+describe('TransactionsState.selectAccounts', () => {
+  it('clears the filter when every visible account is selected, ignoring deleted ones', () => {
+    const getTransactions = vi.fn(() => of({ data: [], error: null }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]), visibleAccounts: signal([{ id: 1 }, { id: 2 }]) } },
+      ],
+    });
+    const state = TestBed.inject(TransactionsState);
+    state.selectAccount(1);
+    state.toggleAccount(2);
+    expect(state.selectedAccountIds()).toEqual([]);
   });
 });

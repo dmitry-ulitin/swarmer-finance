@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { Transaction, TransactionAccount, TransactionFilters, TransactionType, TransactionView, getTransactionType } from '../models/transaction';
 import { ApiService, TransactionRequest } from './api.service';
 import { AccountsState } from './accounts.state';
+import { NotificationService } from './notification.service';
 
 const PAGE_SIZE = 20;
 
@@ -58,6 +59,7 @@ export class TransactionsState {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly accounts = inject(AccountsState);
+  private readonly notifications = inject(NotificationService);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _offset = signal(0);
@@ -132,7 +134,7 @@ export class TransactionsState {
 
   selectAccounts(ids: number[]): void {
     const current = this._filters().accounts ?? [];
-    const next = this.accounts.accounts().every(a => ids.includes(a.id)) ? [] : ids;
+    const next = this.accounts.visibleAccounts().every(a => ids.includes(a.id)) ? [] : ids;
     if (sameAccountFilter(current, next)) return;
     this.patchFilters({ accounts: next.length ? next : undefined });
   }
@@ -221,19 +223,25 @@ export class TransactionsState {
 
   private async fetch(offset: number): Promise<void> {
     if (!this.auth.isAuthenticated()) return;
+    // A reload while this request is in flight makes its rows stale: they
+    // would land on the new list, under filters they were not fetched for.
+    const revision = this._revision();
     this._loading.set(true);
     try {
       const r = await firstValueFrom(
         this.api.getTransactions({ ...this._filters(), offset, limit: PAGE_SIZE })
       );
+      if (revision !== this._revision()) return;
       if (r.data) {
         const transactions = r.data;
         this._transactions.update(existing => [...existing, ...transactions]);
         this._hasMore.set(transactions.length === PAGE_SIZE);
         this._offset.set(offset + transactions.length);
       }
+    } catch (e) {
+      if (revision === this._revision()) this.notifications.showError(e, 'Failed to load transactions');
     } finally {
-      this._loading.set(false);
+      if (revision === this._revision()) this._loading.set(false);
     }
   }
 }

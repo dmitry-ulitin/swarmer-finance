@@ -4,6 +4,7 @@ import { TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { ApiService } from '../../core/api.service';
 import { TransactionsState } from '../../core/transactions.state';
 import { MoneyPipe } from '../../core/money.pipe';
+import { NotificationService } from '../../core/notification.service';
 import { amountsHint } from '../../core/money-hint';
 import { CategorySummaryItem } from '../../models/transaction';
 
@@ -35,6 +36,7 @@ export class CategorySummaryPanel {
   private readonly api = inject(ApiService);
   protected readonly transactions = inject(TransactionsState);
   private readonly money = inject(MoneyPipe);
+  private readonly notifications = inject(NotificationService);
 
   private readonly summary = resource({
     params: () => ({
@@ -43,22 +45,29 @@ export class CategorySummaryPanel {
       revision: this.transactions.revision(),
     }),
     loader: async ({ params }) => {
-      const r = await firstValueFrom(this.api.getCategorySummary({
-        accounts: params.accounts,
-        from: params.range?.from,
-        to: params.range?.to,
-      }));
-      return r.data;
+      try {
+        const r = await firstValueFrom(this.api.getCategorySummary({
+          accounts: params.accounts,
+          from: params.range?.from,
+          to: params.range?.to,
+        }));
+        return r.data;
+      } catch (e) {
+        this.notifications.showError(e, 'Failed to load the summary');
+        throw e;
+      }
     },
   });
+  // value() throws while the resource is in its error state.
+  private readonly value = computed(() => (this.summary.hasValue() ? this.summary.value() : null));
 
   protected readonly loading = this.summary.isLoading;
   protected readonly selected = computed(() => new Set(this.transactions.selectedCategoryIds()));
-  protected readonly currency = computed(() => this.summary.value()?.currency ?? '');
-  protected readonly scale = computed(() => this.summary.value()?.scale ?? 2);
+  protected readonly currency = computed(() => this.value()?.currency ?? '');
+  protected readonly scale = computed(() => this.value()?.scale ?? 2);
 
   protected readonly blocks = computed<SummaryBlock[]>(() => {
-    const summary = this.summary.value();
+    const summary = this.value();
     if (!summary) return [];
     const blocks: SummaryBlock[] = [
       this.block('income', 'Income', summary.income, summary.currency),
