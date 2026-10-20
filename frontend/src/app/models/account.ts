@@ -3,6 +3,20 @@ export type AccountType = 'cash' | 'bank' | 'crypto';
 /** 1 read, 2 transactions, 3 admin, 4 owner. */
 export type AccessLevel = 1 | 2 | 3 | 4;
 
+/** The levels that can be granted; 4 (owner) is never sent. */
+export type ShareLevel = 1 | 2 | 3;
+
+export const LEVEL_LABELS: Record<AccessLevel, string> = { 1: 'Read', 2: 'Transactions', 3: 'Co-owner', 4: 'Owner' };
+
+/** A user with access to an account; the creator comes first. */
+export interface AccountMember {
+  user_id: number;
+  name: string;
+  email: string;
+  level: AccessLevel;
+  is_creator: boolean;
+}
+
 export interface AccountSettings {
   cash: Record<string, never>;
   bank: { accountNumber?: string };

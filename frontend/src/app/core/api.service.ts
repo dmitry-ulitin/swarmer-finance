@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category, CategoryCreatePayload, CategoryUpdatePayload } from '../models/category';
-import { Account, AccountPayload, AccountPurgeResult, AccountSyncResult } from '../models/account';
+import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareLevel } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { Observable } from 'rxjs';
@@ -72,6 +72,22 @@ export class ApiService {
 
   syncAccount(id: number): Observable<ApiResponse<AccountSyncResult>> {
     return this.http.post<ApiResponse<AccountSyncResult>>(`/api/accounts/${id}/sync`, {});
+  }
+
+  getAccountShares(accountId: number): Observable<ApiResponse<AccountMember[]>> {
+    return this.http.get<ApiResponse<AccountMember[]>>(`/api/accounts/${accountId}/shares`);
+  }
+
+  addAccountShare(accountId: number, email: string, level: ShareLevel): Observable<ApiResponse<AccountMember[]>> {
+    return this.http.post<ApiResponse<AccountMember[]>>(`/api/accounts/${accountId}/shares`, { email, level });
+  }
+
+  updateAccountShare(accountId: number, userId: number, level: ShareLevel): Observable<ApiResponse<AccountMember[]>> {
+    return this.http.put<ApiResponse<AccountMember[]>>(`/api/accounts/${accountId}/shares/${userId}`, { level });
+  }
+
+  removeAccountShare(accountId: number, userId: number): Observable<ApiResponse<AccountMember[]>> {
+    return this.http.delete<ApiResponse<AccountMember[]>>(`/api/accounts/${accountId}/shares/${userId}`);
   }
 
   // Transactions

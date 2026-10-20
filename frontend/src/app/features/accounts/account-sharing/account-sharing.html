@@ -1,0 +1,44 @@
+<div class="sharing" tuiTextfieldSize="s">
+    <ul class="members">
+        @for (member of members(); track member) {
+            <li class="member">
+                <div class="who">
+                    <span class="name">{{ member.name }}@if (isMe(member)) { (you)}</span>
+                    <span class="email">{{ member.email }}</span>
+                </div>
+                @if (canManage() && member.level !== 4) {
+                    <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
+                        <input tuiSelect [ngModel]="member.level" [ngModelOptions]="{ standalone: true }" [disabled]="busy()"
+                            (ngModelChange)="changeLevel(member, $event)" />
+                        <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
+                    </tui-textfield>
+                    <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Remove" data-test="remove"
+                        [disabled]="busy()" (click)="remove(member)"></button>
+                } @else {
+                    <span class="level-label">{{ levelLabel(member.level) }}</span>
+                }
+            </li>
+        }
+    </ul>
+
+    @if (canManage()) {
+        <form [formGroup]="form" (ngSubmit)="add()" class="add">
+            <tui-textfield class="email-field">
+                <label tuiLabel>Email</label>
+                <input tuiInput type="email" formControlName="email" placeholder="user@example.com" />
+            </tui-textfield>
+            <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
+                <label tuiLabel>Access</label>
+                <input tuiSelect formControlName="level" />
+                <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
+            </tui-textfield>
+            <button tuiButton size="s" type="submit" [disabled]="busy() || form.invalid">Add</button>
+        </form>
+    }
+
+    @if (canLeave()) {
+        <div class="actions">
+            <button tuiButton size="s" type="button" appearance="outline" [disabled]="busy()" (click)="leave()">Leave account</button>
+        </div>
+    }
+</div>
