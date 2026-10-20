@@ -6,6 +6,8 @@
     <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
         [iconStart]="'@tui.pencil'" (click)="openEditDialog()">Edit</button>
     <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
+        [iconStart]="'@tui.users'" (click)="openSharingDialog()">Share</button>
+    <button tuiButton appearance="outline" size="s" [disabled]="!selectedAccount()"
         [iconStart]="'@tui.trash-2'" (click)="openDeleteDialog()">Delete</button>
     @if (canPurge()) {
         <button tuiButton tuiChevron appearance="outline-destructive" size="s" type="button"

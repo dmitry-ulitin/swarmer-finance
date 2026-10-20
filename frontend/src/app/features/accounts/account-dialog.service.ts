@@ -66,6 +66,21 @@ export class AccountDialogService {
     }
   }
 
+  async openSharing(account: Account): Promise<void> {
+    try {
+      const { AccountSharing } = await import('./account-sharing/account-sharing');
+      await firstValueFrom(
+        this.dialogs.open<void>(
+          new PolymorpheusComponent(AccountSharing, this.injector),
+          { data: account, label: `Sharing: ${account.name}`, size: 's' }
+        ),
+        { defaultValue: undefined }
+      );
+    } catch (e) {
+      this.notifications.showError(e, 'Failed to open sharing');
+    }
+  }
+
   async openDelete(account: Account): Promise<boolean> {
     const data: TuiConfirmData = {
       content: `Delete "${account.name}"?`,

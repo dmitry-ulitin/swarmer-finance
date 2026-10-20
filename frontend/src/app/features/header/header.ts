@@ -58,6 +58,11 @@ export class Header {
     if (account) void this.accountDialogs.openEdit(account);
   }
 
+  shareFilteredAccount(): void {
+    const account = this.filteredAccount();
+    if (account) void this.accountDialogs.openSharing(account);
+  }
+
   importFilteredAccount(): void {
     const account = this.filteredAccount();
     if (account) void this.importDialog.open(account);

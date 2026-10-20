@@ -66,6 +66,12 @@ export class Accounts {
     await this.accountDialogs.openEdit(account);
   }
 
+  async openSharingDialog(): Promise<void> {
+    const account = this.selectedAccount();
+    if (!account) return;
+    await this.accountDialogs.openSharing(account);
+  }
+
   async openDeleteDialog(): Promise<void> {
     const account = this.selectedAccount();
     if (!account) return;

@@ -166,3 +166,40 @@ describe('AccountDialogService syncs a newly tracked account', () => {
     expect(sync).not.toHaveBeenCalled();
   });
 });
+
+describe('AccountDialogService.openSharing', () => {
+  let service: AccountDialogService;
+  let dialogOpen: ReturnType<typeof vi.fn>;
+  let showError: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    dialogOpen = vi.fn(() => of(undefined));
+    showError = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: TuiDialogService, useValue: { open: dialogOpen } },
+        { provide: AccountsState, useValue: {} },
+        { provide: AuthService, useValue: { user: () => null } },
+        { provide: TransactionsState, useValue: { reload: vi.fn() } },
+        { provide: NotificationService, useValue: { showError } },
+        { provide: AccountSyncService, useValue: { sync: vi.fn() } },
+      ],
+    });
+    service = TestBed.inject(AccountDialogService);
+  });
+
+  it('opens a dialog labelled with the account name', async () => {
+    await service.openSharing(account);
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    const options = dialogOpen.mock.calls[0][1];
+    expect(options).toMatchObject({ data: account, label: 'Sharing: Wallet', size: 's' });
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('reports a failure to open instead of rejecting', async () => {
+    const err = new Error('boom');
+    dialogOpen.mockImplementation(() => { throw err; });
+    await service.openSharing(account);
+    expect(showError).toHaveBeenCalledWith(err, 'Failed to open sharing');
+  });
+});
