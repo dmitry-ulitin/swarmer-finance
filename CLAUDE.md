@@ -5,8 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A personal finance management web app: multi-user, with per-account sharing
-(read / write / admin) between users; permissions are granted by direct SQL
-for now, with no UI. Core scope for now: income/expense transactions with
+(read / write / admin) between users. Core scope for now: income/expense transactions with
 hierarchical categories, multi-currency accounts, manual entry (CSV
 bank-statement import planned, not built). Investments/assets and
 analytics/reports are deferred to later phases.
@@ -81,6 +80,15 @@ All API responses use this envelope format consistently.
   `services/access.ts` synthesises level 4 (owner) for owned accounts.
   Granting someone level 3 makes the account co-owned: it then resolves to
   level 3 for its owner too, so level 4 means "personal account".
+- `/api/accounts/:id/shares` manages members (`services/accountShares.ts`):
+  GET needs level 1, POST/PUT/DELETE level 3, except DELETE on yourself
+  (leave) at any level. Removing the owner or setting them below 3 moves
+  ownership — to the co-owner acting, or, when the owner acts on themselves,
+  to the earliest-granted other co-owner; with none (personal account) it is
+  refused with "Delete the account instead". When a member loses access their
+  expense/income rows on that account are re-assigned to the owner with the
+  categories copied into the owner's tree, so `transactions.user_id` means
+  "who entered it, or the owner who inherited it".
 - Clean-up for mistaken/test accounts (ADMIN on the account, WRITE on every
   transfer peer): `DELETE /api/accounts/:id/transactions` removes all its
   transactions, `DELETE /api/accounts/:id?withTransactions=true` also removes

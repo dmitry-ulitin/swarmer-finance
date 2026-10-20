@@ -114,6 +114,8 @@ describe('Account share management', () => {
 
   beforeEach(async () => {
     await pool.query('DELETE FROM account_shares WHERE account_id = $1', [acc]);
+    // Some tests move ownership away from A.
+    await pool.query('UPDATE accounts SET user_id = $1 WHERE id = $2', [aId, acc]);
   });
 
   it('lists the creator and shares for a level-1 member', async () => {
@@ -217,13 +219,6 @@ describe('Account share management', () => {
     expect(del.body.error).toBe('Not a member of this account');
   });
 
-  it('400 removing the creator', async () => {
-    await grant(acc, bId, 3);
-    const res = await remove(tokenB, aId);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Delete the account instead');
-  });
-
   it('member leaves at level 1', async () => {
     await grant(acc, bId, 1);
     const res = await remove(tokenB, bId);
@@ -325,5 +320,85 @@ describe('Account share management', () => {
     expect((await remove(tokenA, bId)).status).toBe(200);
     const row = await pool.query('SELECT user_id, category_id FROM transactions WHERE id = $1', [inserted.rows[0].id]);
     expect(row.rows[0]).toEqual({ user_id: aId, category_id: 4 });
+  });
+  const accessLevel = async (token: string): Promise<number | undefined> => {
+    const accounts = await request(app).get('/api/accounts').set('Authorization', `Bearer ${token}`);
+    return accounts.body.data.find((x: { id: number }) => x.id === acc)?.access_level;
+  };
+  const ownerOf = async (): Promise<number> =>
+    (await pool.query('SELECT user_id FROM accounts WHERE id = $1', [acc])).rows[0].user_id;
+
+  it('co-owner removes the creator and becomes owner', async () => {
+    await grant(acc, bId, 3);
+    const res = await remove(tokenB, aId);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { user_id: bId, name: 'Bob', email: bEmail, level: 4, is_creator: true },
+    ]);
+    expect(await ownerOf()).toBe(bId);
+    expect(await accessLevel(tokenA)).toBeUndefined();
+    expect(await accessLevel(tokenB)).toBe(4);
+  });
+
+  it('creator downgrades self on a co-owned account', async () => {
+    await pool.query(
+      `INSERT INTO account_shares (account_id, user_id, level, created_at) VALUES
+         ($1, $2, 3, now() - interval '2 days'), ($1, $3, 3, now() - interval '1 day')`,
+      [acc, bId, cId]
+    );
+    const res = await setLevel(tokenA, aId, 1);
+    expect(res.status).toBe(200);
+    expect(await ownerOf()).toBe(bId);
+    expect(res.body.data).toEqual([
+      { user_id: bId, name: 'Bob', email: bEmail, level: 3, is_creator: true },
+      { user_id: cId, name: 'Carol', email: cEmail, level: 3, is_creator: false },
+      { user_id: aId, name: 'Alice', email: aEmail, level: 1, is_creator: false },
+    ]);
+  });
+
+  it('personal-account owner cannot leave or downgrade', async () => {
+    await grant(acc, bId, 2);
+    const del = await remove(tokenA, aId);
+    expect(del.status).toBe(400);
+    expect(del.body.error).toBe('Delete the account instead');
+    const put = await setLevel(tokenA, aId, 1);
+    expect(put.status).toBe(400);
+    expect(put.body.error).toBe('Delete the account instead');
+    expect(await ownerOf()).toBe(aId);
+  });
+
+  it('creator history moves to the new owner on removal', async () => {
+    const foodRow = await pool.query(
+      `SELECT id FROM categories WHERE user_id = $1 AND name = 'Food' AND parent_id = 2`, [aId]
+    );
+    const snacks = await makeCategory(aId, 'Snacks', foodRow.rows[0].id);
+    const expense = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ debitAccountId: acc, categoryId: snacks, debit: 2, credit: 2, date: '2026-03-05', description: 'Snacks by A' });
+    expect(expense.status).toBe(200);
+
+    await grant(acc, bId, 3);
+    expect((await remove(tokenB, aId)).status).toBe(200);
+
+    const row = await pool.query('SELECT user_id, category_id FROM transactions WHERE id = $1', [expense.body.data.id]);
+    expect(row.rows[0].user_id).toBe(bId);
+    const cat = await pool.query(
+      `SELECT c.user_id, c.name, p.user_id AS parent_owner, p.name AS parent_name
+         FROM categories c JOIN categories p ON p.id = c.parent_id WHERE c.id = $1`,
+      [row.rows[0].category_id]
+    );
+    expect(cat.rows[0]).toEqual({ user_id: bId, name: 'Snacks', parent_owner: bId, parent_name: 'Food' });
+  });
+
+  it('setting the co-owned creator to co-owner is a no-op', async () => {
+    await grant(acc, bId, 3);
+    const res = await setLevel(tokenB, aId, 3);
+    expect(res.status).toBe(200);
+    expect(await ownerOf()).toBe(aId);
+    expect(res.body.data).toEqual([
+      { user_id: aId, name: 'Alice', email: aEmail, level: 3, is_creator: true },
+      { user_id: bId, name: 'Bob', email: bEmail, level: 3, is_creator: false },
+    ]);
   });
 });

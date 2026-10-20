@@ -86,12 +86,12 @@ export const getAccountMembers = async (accountId: number): Promise<AccountMembe
 export const insertShare = async (
   accountId: number,
   userId: number,
-  level: 1 | 2 | 3
+  level: 1 | 2 | 3,
+  tx?: Tx
 ): Promise<void> => {
-  await execute(
-    'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',
-    [accountId, userId, level]
-  );
+  const sql = 'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)';
+  const params = [accountId, userId, level];
+  await (tx ? tx.query(sql, params) : execute(sql, params));
 };
 
 /** The member's stored level, or null when they hold no share row. */
@@ -158,4 +158,24 @@ export const moveHistoryToOwner = async (
         AND t.user_id = $2`,
     [accountId, fromUserId, ownerId, [...categoryMap.keys()], [...categoryMap.values()]]
   );
+};
+
+/** The co-owner (level 3) granted first, other than `excludeUserId`, or null. */
+export const getEarliestCoOwner = async (
+  accountId: number,
+  excludeUserId: number
+): Promise<number | null> => {
+  const row = await queryOne<{ user_id: number }>(
+    `SELECT user_id FROM account_shares
+      WHERE account_id = $1 AND level = 3 AND user_id <> $2
+      ORDER BY created_at, user_id LIMIT 1`,
+    [accountId, excludeUserId]
+  );
+  return row?.user_id ?? null;
+};
+
+/** Make `newOwnerId` the creator; ownership is not a share, so drop theirs. */
+export const transferOwnership = async (tx: Tx, accountId: number, newOwnerId: number): Promise<void> => {
+  await tx.query('UPDATE accounts SET user_id = $2 WHERE id = $1', [accountId, newOwnerId]);
+  await deleteShare(tx, accountId, newOwnerId);
 };

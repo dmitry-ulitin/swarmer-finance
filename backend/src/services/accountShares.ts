@@ -3,9 +3,11 @@ import {
   deleteShare,
   getAccountMembers,
   getAuthoredCategoryIds,
+  getEarliestCoOwner,
   getShareLevel,
   insertShare,
   moveHistoryToOwner,
+  transferOwnership,
   updateShareLevel,
 } from '../db/queries/accountShares';
 import { findOrCreateCategoryPath, getCategoryPath } from '../db/queries/categories';
@@ -48,6 +50,19 @@ export const addMember = async (
 
 const NOT_A_MEMBER = { statusCode: 404, message: 'Not a member of this account' };
 
+/**
+ * Who takes over when the creator is removed or set below co-owner: the
+ * co-owner acting, or — when the creator acts on themselves — the
+ * earliest-granted remaining co-owner. A personal account has none.
+ */
+async function nextOwner(accountId: number, userId: number, creatorId: number): Promise<number> {
+  const owner = userId !== creatorId ? userId : await getEarliestCoOwner(accountId, creatorId);
+  if (owner === null) {
+    throw { statusCode: 400, message: 'Delete the account instead' };
+  }
+  return owner;
+}
+
 export const setMemberLevel = async (
   accountId: number,
   userId: number,
@@ -55,6 +70,20 @@ export const setMemberLevel = async (
   level: 1 | 2 | 3
 ): Promise<AccountMember[]> => {
   await requireLevel(accountId, userId, LEVEL.ADMIN);
+
+  const creator = (await getAccountMembers(accountId)).find(m => m.is_creator)!;
+  if (targetUserId === creator.user_id) {
+    // A co-owned creator already resolves to 3.
+    if (level === 3 && creator.level === 3) return getAccountMembers(accountId);
+    const ownerId = await nextOwner(accountId, userId, creator.user_id);
+    // The old creator keeps access, so their history stays theirs.
+    await withTransaction(async tx => {
+      await transferOwnership(tx, accountId, ownerId);
+      await insertShare(accountId, creator.user_id, level, tx);
+    });
+    return getAccountMembers(accountId);
+  }
+
   if ((await getShareLevel(accountId, targetUserId)) === null) {
     throw NOT_A_MEMBER;
   }
@@ -85,7 +114,8 @@ async function buildCategoryMap(
 /**
  * Revoke a member's access, or leave when the target is the caller. Their
  * expense/income rows on the account pass to the creator so the account's
- * history stays with someone who can still see and edit it.
+ * history stays with someone who can still see and edit it. Removing the
+ * creator moves ownership (see nextOwner) and their history with it.
  *
  * The member list is returned without an access check: a leaver no longer
  * has one but still gets a response.
@@ -100,7 +130,13 @@ export const removeMember = async (
   const members = await getAccountMembers(accountId);
   const creator = members.find(m => m.is_creator)!;
   if (targetUserId === creator.user_id) {
-    throw { statusCode: 400, message: 'Delete the account instead' };
+    const ownerId = await nextOwner(accountId, userId, creator.user_id);
+    const creatorMap = await buildCategoryMap(accountId, creator.user_id, ownerId);
+    await withTransaction(async tx => {
+      await transferOwnership(tx, accountId, ownerId);
+      await moveHistoryToOwner(tx, accountId, creator.user_id, ownerId, creatorMap);
+    });
+    return getAccountMembers(accountId);
   }
   if (!members.some(m => m.user_id === targetUserId)) {
     throw NOT_A_MEMBER;
