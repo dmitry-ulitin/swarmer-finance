@@ -118,10 +118,13 @@ export class AccountSharing {
     this.busy.set(true);
     try {
       const r = await firstValueFrom(request);
-      this.members.set(r.data ?? []);
+      const members = r.data ?? [];
+      this.members.set(members);
       this.accountsState.reload();
       this.categoriesState.reload();
-      this.transactionsState.reload();
+      // A filter still naming an account the user just left would show nothing.
+      if (members.some(m => m.user_id === this.auth.user()?.id)) this.transactionsState.reload();
+      else this.transactionsState.reloadWithout(this.account.id);
       return true;
     } catch (e) {
       this.notifications.showError(e, 'Failed to update sharing');

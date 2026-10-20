@@ -22,7 +22,7 @@ function setup(myId: number, members: AccountMember[]) {
   const completeWith = vi.fn();
   const accounts = { reload: vi.fn() };
   const categories = { reload: vi.fn() };
-  const transactions = { reload: vi.fn() };
+  const transactions = { reload: vi.fn(), reloadWithout: vi.fn() };
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -157,5 +157,15 @@ describe('AccountSharing', () => {
     req.flush({ data: [OWNER], error: null });
     await done;
     expect(completeWith).toHaveBeenCalled();
+  });
+
+  it('leaving drops the account from the transaction filter', async () => {
+    const { component, http, transactions } = setup(2, [OWNER, READER]);
+    const done = component.leave();
+    await flushAsync();
+    http.expectOne('/api/accounts/7/shares/2').flush({ data: [OWNER], error: null });
+    await done;
+    expect(transactions.reloadWithout).toHaveBeenCalledWith(7);
+    expect(transactions.reload).not.toHaveBeenCalled();
   });
 });

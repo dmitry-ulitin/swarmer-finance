@@ -225,6 +225,46 @@ describe('TransactionsState.viewTransactions', () => {
   });
 });
 
+describe('TransactionsState.reloadWithout', () => {
+  let state: TransactionsState;
+  let getTransactions: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    getTransactions = vi.fn(() => of({ data: [], error: null }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions } },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: AccountsState, useValue: { accounts: signal([{ id: 1 }, { id: 2 }, { id: 3 }]) } },
+      ],
+    });
+    state = TestBed.inject(TransactionsState);
+  });
+
+  it('drops the account from the filter and reloads once', () => {
+    state.selectAccounts([1, 2]);
+    getTransactions.mockClear();
+    state.reloadWithout(2);
+    expect(state.selectedAccountIds()).toEqual([1]);
+    expect(getTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the filter when the account was the only one selected', () => {
+    state.selectAccount(2);
+    state.reloadWithout(2);
+    expect(state.selectedAccountIds()).toEqual([]);
+    expect(getTransactions.mock.lastCall![0].accounts).toBeUndefined();
+  });
+
+  it('just reloads when the account is not filtered', () => {
+    state.selectAccount(1);
+    getTransactions.mockClear();
+    state.reloadWithout(2);
+    expect(state.selectedAccountIds()).toEqual([1]);
+    expect(getTransactions).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('TransactionsState on logout', () => {
   it('drops the filters and loaded transactions', () => {
     const isAuthenticated = signal(true);

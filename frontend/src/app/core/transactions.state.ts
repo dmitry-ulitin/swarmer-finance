@@ -137,6 +137,12 @@ export class TransactionsState {
     this.patchFilters({ accounts: next.length ? next : undefined });
   }
 
+  /** Reloads with an account the user can no longer reach dropped from the filter. */
+  reloadWithout(accountId: number): void {
+    const accounts = this._filters().accounts?.filter(id => id !== accountId);
+    this.patchFilters({ accounts: accounts?.length ? accounts : undefined });
+  }
+
   toggleAccounts(ids: number[]): void {
     const current = this._filters().accounts ?? [];
     const allSelected = ids.every(id => current.includes(id));
