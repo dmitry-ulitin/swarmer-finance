@@ -3,10 +3,13 @@ import {
   deleteShare,
   getAccountMembers,
   getAuthoredCategoryIds,
+  AuthorCategoryRemap,
   getEarliestCoOwner,
+  getOthersRowsWithCategoriesOf,
   getShareLevel,
   insertShare,
   moveHistoryToOwner,
+  remapAuthorCategories,
   transferOwnership,
   updateShareLevel,
 } from '../db/queries/accountShares';
@@ -112,6 +115,21 @@ async function buildCategoryMap(
 }
 
 /**
+ * Rows others entered on the account with the departing member's categories
+ * (an import by a co-owner resolves categories against the creator) keep
+ * their author; each category is copied by path into that author's tree,
+ * since the departing member's categories leave the author's reach.
+ */
+async function buildAuthorRemaps(accountId: number, fromUserId: number): Promise<AuthorCategoryRemap[]> {
+  const remaps: AuthorCategoryRemap[] = [];
+  for (const row of await getOthersRowsWithCategoriesOf(accountId, fromUserId)) {
+    const toId = await findOrCreateCategoryPath(row.author_id, await getCategoryPath(row.category_id));
+    remaps.push({ authorId: row.author_id, fromId: row.category_id, toId });
+  }
+  return remaps;
+}
+
+/**
  * Revoke a member's access, or leave when the target is the caller. Their
  * expense/income rows on the account pass to the creator so the account's
  * history stays with someone who can still see and edit it. Removing the
@@ -132,9 +150,11 @@ export const removeMember = async (
   if (targetUserId === creator.user_id) {
     const ownerId = await nextOwner(accountId, userId, creator.user_id);
     const creatorMap = await buildCategoryMap(accountId, creator.user_id, ownerId);
+    const remaps = await buildAuthorRemaps(accountId, creator.user_id);
     await withTransaction(async tx => {
       await transferOwnership(tx, accountId, ownerId);
       await moveHistoryToOwner(tx, accountId, creator.user_id, ownerId, creatorMap);
+      await remapAuthorCategories(tx, accountId, remaps);
     });
     return getAccountMembers(accountId);
   }
@@ -145,8 +165,10 @@ export const removeMember = async (
   // Built outside the transaction: copying a path is idempotent, so a copy
   // left behind by a failed removal is harmless.
   const categoryMap = await buildCategoryMap(accountId, targetUserId, creator.user_id);
+  const remaps = await buildAuthorRemaps(accountId, targetUserId);
   await withTransaction(async tx => {
     await moveHistoryToOwner(tx, accountId, targetUserId, creator.user_id, categoryMap);
+    await remapAuthorCategories(tx, accountId, remaps);
     await deleteShare(tx, accountId, targetUserId);
   });
   return getAccountMembers(accountId);

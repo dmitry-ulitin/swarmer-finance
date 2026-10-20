@@ -160,6 +160,53 @@ export const moveHistoryToOwner = async (
   );
 };
 
+/**
+ * Distinct (author, category) pairs of expense/income rows on the account that
+ * carry `categoryOwnerId`'s categories but were entered by someone else — e.g.
+ * an import by a co-owner, which resolves categories against the creator.
+ */
+export const getOthersRowsWithCategoriesOf = async (
+  accountId: number,
+  categoryOwnerId: number
+): Promise<{ author_id: number; category_id: number }[]> => {
+  return query<{ author_id: number; category_id: number }>(
+    `SELECT DISTINCT t.user_id AS author_id, t.category_id FROM transactions t
+       JOIN categories c ON c.id = t.category_id
+      WHERE ((t.debit_account_id = $1 AND t.credit_account_id IS NULL)
+          OR (t.credit_account_id = $1 AND t.debit_account_id IS NULL))
+        AND c.user_id = $2 AND t.user_id <> $2`,
+    [accountId, categoryOwnerId]
+  );
+};
+
+export interface AuthorCategoryRemap {
+  authorId: number;
+  fromId: number;
+  toId: number;
+}
+
+/**
+ * Re-point the categories of other authors' expense/income rows on the
+ * account; their author stays. Selecting by author is a data move, not an
+ * access filter.
+ */
+export const remapAuthorCategories = async (
+  tx: Tx,
+  accountId: number,
+  remaps: AuthorCategoryRemap[]
+): Promise<void> => {
+  if (remaps.length === 0) return;
+  await tx.query(
+    `UPDATE transactions t
+        SET category_id = m.to_id
+       FROM unnest($2::int[], $3::int[], $4::int[]) AS m(author_id, from_id, to_id)
+      WHERE ((t.debit_account_id = $1 AND t.credit_account_id IS NULL)
+          OR (t.credit_account_id = $1 AND t.debit_account_id IS NULL))
+        AND t.user_id = m.author_id AND t.category_id = m.from_id`,
+    [accountId, remaps.map(r => r.authorId), remaps.map(r => r.fromId), remaps.map(r => r.toId)]
+  );
+};
+
 /** The co-owner (level 3) granted first, other than `excludeUserId`, or null. */
 export const getEarliestCoOwner = async (
   accountId: number,

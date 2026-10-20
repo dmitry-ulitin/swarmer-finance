@@ -391,6 +391,91 @@ describe('Account share management', () => {
     expect(cat.rows[0]).toEqual({ user_id: bId, name: 'Snacks', parent_owner: bId, parent_name: 'Food' });
   });
 
+  it('co-owner downgrades the creator and becomes owner', async () => {
+    await grant(acc, bId, 3);
+    const res = await setLevel(tokenB, aId, 2);
+    expect(res.status).toBe(200);
+    expect(await ownerOf()).toBe(bId);
+    expect(res.body.data).toEqual([
+      { user_id: bId, name: 'Bob', email: bEmail, level: 4, is_creator: true },
+      { user_id: aId, name: 'Alice', email: aEmail, level: 2, is_creator: false },
+    ]);
+  });
+
+  it('creator removes self from a co-owned account', async () => {
+    await pool.query(
+      `INSERT INTO account_shares (account_id, user_id, level, created_at) VALUES
+         ($1, $2, 3, now() - interval '2 days'), ($1, $3, 3, now() - interval '1 day')`,
+      [acc, bId, cId]
+    );
+    const inserted = await pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, 4, $2, 150, 150, '2026-03-06') RETURNING id`,
+      [aId, acc]
+    );
+    const res = await remove(tokenA, aId);
+    expect(res.status).toBe(200);
+    expect(await ownerOf()).toBe(bId);
+    expect(res.body.data).toEqual([
+      { user_id: bId, name: 'Bob', email: bEmail, level: 3, is_creator: true },
+      { user_id: cId, name: 'Carol', email: cEmail, level: 3, is_creator: false },
+    ]);
+    const row = await pool.query('SELECT user_id FROM transactions WHERE id = $1', [inserted.rows[0].id]);
+    expect(row.rows[0].user_id).toBe(bId);
+  });
+
+  it("another author's rows with the departing creator's category stay theirs", async () => {
+    const aCat = await makeCategory(aId, 'Imported by B', 2);
+    // A bank import by co-owner B resolves categories against the creator.
+    const inserted = await pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, $2, $3, 400, 400, '2026-03-07') RETURNING id`,
+      [bId, aCat, acc]
+    );
+    const id = inserted.rows[0].id as number;
+    await grant(acc, bId, 3);
+    expect((await remove(tokenB, aId)).status).toBe(200);
+
+    const row = await pool.query(
+      `SELECT t.user_id, c.user_id AS cat_owner, c.name, c.parent_id FROM transactions t
+         JOIN categories c ON c.id = t.category_id WHERE t.id = $1`,
+      [id]
+    );
+    expect(row.rows[0]).toEqual({ user_id: bId, cat_owner: bId, name: 'Imported by B', parent_id: 2 });
+
+    const edited = await request(app)
+      .put(`/api/transactions/${id}`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ description: 'renamed' });
+    expect(edited.status).toBe(200);
+  });
+
+  it("another member's rows with the departing member's category move to their own tree", async () => {
+    await grant(acc, bId, 2);
+    await grant(acc, cId, 2);
+    const bCat = await makeCategory(bId, 'Bob tag', 2);
+    const inserted = await pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, $2, $3, 500, 500, '2026-03-08') RETURNING id`,
+      [cId, bCat, acc]
+    );
+    const id = inserted.rows[0].id as number;
+    expect((await remove(tokenA, bId)).status).toBe(200);
+
+    const row = await pool.query(
+      `SELECT t.user_id, c.user_id AS cat_owner, c.name, c.parent_id FROM transactions t
+         JOIN categories c ON c.id = t.category_id WHERE t.id = $1`,
+      [id]
+    );
+    expect(row.rows[0]).toEqual({ user_id: cId, cat_owner: cId, name: 'Bob tag', parent_id: 2 });
+
+    const edited = await request(app)
+      .put(`/api/transactions/${id}`)
+      .set('Authorization', `Bearer ${tokenC}`)
+      .send({ description: 'renamed' });
+    expect(edited.status).toBe(200);
+  });
+
   it('setting the co-owned creator to co-owner is a no-op', async () => {
     await grant(acc, bId, 3);
     const res = await setLevel(tokenB, aId, 3);
