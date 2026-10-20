@@ -69,7 +69,12 @@ export class AccountSharing {
 
   async changeLevel(member: AccountMember, level: ShareLevel): Promise<void> {
     if (level === member.level) return;
-    if (level === 3 && !await this.confirmCoOwner(member.name || member.email)) {
+    const who = member.name || member.email;
+    // Moving another creator below co-owner hands ownership to the caller.
+    const confirmed = member.is_creator && level < 3 && !this.isMe(member)
+      ? await this.confirm('Change level', `${who} created "${this.account.name}". Changing their level makes you the owner.`, 'Change level')
+      : level !== 3 || await this.confirmCoOwner(who);
+    if (!confirmed) {
       this.refreshRows();
       return;
     }
@@ -78,6 +83,8 @@ export class AccountSharing {
 
   async remove(member: AccountMember): Promise<void> {
     if (this.isMe(member)) return this.leave();
+    const content = `Remove ${member.name || member.email} from "${this.account.name}"? Their income and expenses on this account pass to the owner.`;
+    if (!await this.confirm('Remove member', content, 'Remove')) return;
     await this.mutate(this.api.removeAccountShare(this.account.id, member.user_id));
   }
 

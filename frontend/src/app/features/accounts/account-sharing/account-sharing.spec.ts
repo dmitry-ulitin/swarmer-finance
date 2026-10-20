@@ -96,6 +96,58 @@ describe('AccountSharing', () => {
     await done;
   });
 
+  it('confirms before removing a member', async () => {
+    const { component, http, dialogOpen } = setup(1, [OWNER, READER]);
+    const done = component.remove(READER);
+    await flushAsync();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect((dialogOpen.mock.calls[0] as unknown[])[1]).toMatchObject({
+      data: { content: 'Remove Bob from "Wallet"? Their income and expenses on this account pass to the owner.' },
+    });
+    const req = http.expectOne('/api/accounts/7/shares/2');
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ data: [OWNER], error: null });
+    await done;
+    expect(component.members()).toEqual([OWNER]);
+  });
+
+  it('does not remove a member when cancelled', async () => {
+    const { component, http, dialogOpen } = setup(1, [OWNER, READER]);
+    dialogOpen.mockReturnValue(of(false));
+    await component.remove(READER);
+    http.expectNone('/api/accounts/7/shares/2');
+    expect(component.members()).toEqual([OWNER, READER]);
+  });
+
+  const CO_CREATOR: AccountMember = { ...OWNER, level: 3 };
+  const CO_OWNER: AccountMember = { user_id: 2, name: '', email: 'bob@x', level: 3, is_creator: false };
+
+  it("confirms before changing the creator's level", async () => {
+    const { component, http, dialogOpen } = setup(2, [CO_CREATOR, CO_OWNER]);
+    const done = component.changeLevel(CO_CREATOR, 1);
+    await flushAsync();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect((dialogOpen.mock.calls[0] as unknown[])[1]).toMatchObject({
+      data: { content: 'Alice created "Wallet". Changing their level makes you the owner.' },
+    });
+    const req = http.expectOne('/api/accounts/7/shares/1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ level: 1 });
+    req.flush({ data: [{ ...CO_OWNER, level: 4, is_creator: true }, { ...OWNER, level: 1, is_creator: false }], error: null });
+    await done;
+  });
+
+  it("keeps the creator's level when the change is cancelled", async () => {
+    const { component, http, dialogOpen } = setup(2, [CO_CREATOR, CO_OWNER]);
+    dialogOpen.mockReturnValue(of(false));
+    const before = component.members();
+    await component.changeLevel(CO_CREATOR, 1);
+    http.expectNone('/api/accounts/7/shares/1');
+    expect(component.members()).toEqual([CO_CREATOR, CO_OWNER]);
+    // A fresh array re-renders the rows, putting the select back.
+    expect(component.members()).not.toBe(before);
+  });
+
   it('leaving closes the dialog', async () => {
     const { component, http, completeWith } = setup(2, [OWNER, READER]);
     const done = component.leave();
