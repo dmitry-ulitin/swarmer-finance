@@ -20,7 +20,7 @@ export interface CategoryCreatePayload {
   icon?: string;
 }
 
-export type CategoryUpdatePayload = Partial<Omit<CategoryCreatePayload, 'parentId'>>;
+export type CategoryUpdatePayload = Partial<CategoryCreatePayload>;
 
 export const findCategoryById = (id: number | undefined, categories: Category[]): Category | null => {
   if (id === undefined) return null;

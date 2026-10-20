@@ -17,6 +17,7 @@ const createCategorySchema = z.object({
 
 const updateCategorySchema = z.object({
   name: z.string().min(1).max(255).optional(),
+  parentId: z.number().int().positive().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
 });
@@ -43,8 +44,8 @@ router.post('/', validate(createCategorySchema), async (req: AuthRequest, res, n
 router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const { name, color, icon } = req.body;
-    const category = await categoryService.updateCategory(id, req.userId!, name, color, icon);
+    const { name, color, icon, parentId } = req.body;
+    const category = await categoryService.updateCategory(id, req.userId!, name, color, icon, parentId);
     res.json({ data: category, error: null });
   } catch (error) {
     next(error);

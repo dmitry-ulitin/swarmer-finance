@@ -80,10 +80,10 @@ describe('CategoryForm', () => {
     expect(completeWith).toHaveBeenCalledWith({ id: 99 });
   });
 
-  it('edits in place: the parent is fixed and not offered the category itself', async () => {
+  it('edits in place: the parent stays and is not offered the category itself', async () => {
     const { form, update, create } = configure({ category: snacks });
     expect(form.isEdit).toBe(true);
-    expect(form.form.controls.parent.disabled).toBe(true);
+    expect(form.form.controls.parent.enabled).toBe(true);
     expect(form.form.controls.parent.value).toBe(food);
     expect(form.treeHandler(food)).toEqual([]);
 
@@ -91,5 +91,13 @@ describe('CategoryForm', () => {
     await form.onSubmit();
     expect(update).toHaveBeenCalledWith(13, { name: 'Treats', color: snacks.color, icon: snacks.icon });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('moves the category when another parent is picked, keeping its look', async () => {
+    const { form, update } = configure({ category: snacks });
+    form.form.controls.parent.setValue(expenses);
+
+    await form.onSubmit();
+    expect(update).toHaveBeenCalledWith(13, { name: snacks.name, color: snacks.color, icon: snacks.icon, parentId: 2 });
   });
 });

@@ -220,20 +220,49 @@ export const updateCategory = async (
   userId: number,
   name?: string,
   color?: string,
-  icon?: string
+  icon?: string,
+  parentId?: number
 ): Promise<Category> => {
   if (id === 1 || id === 2 || id === 3 || id === 4 || id === 5) {
     throw { statusCode: 403, message: 'Cannot edit system categories' };
   }
 
+  // Without a move the name only matters for the conflict message, and the
+  // request carries it when it can collide.
+  let currentName = name;
+  let resolvedParentId: number | undefined;
+  if (parentId !== undefined) {
+    const category = await categoryQueries.getCategoryById(id);
+    if (!category || category.user_id !== userId) {
+      throw { statusCode: 404, message: 'Category not found or not owned by user' };
+    }
+    const parent = await categoryQueries.getCategoryById(parentId);
+    if (!parent) {
+      throw { statusCode: 404, message: 'Parent category not found' };
+    }
+    // Switching roots would turn the category's expenses into income or
+    // the other way round.
+    if (parent.root_id !== category.root_id) {
+      throw { statusCode: 400, message: 'Cannot move a category to another root' };
+    }
+    // As in createCategory: a co-owner's parent row is reproduced under
+    // this user, so the category never hangs off someone else's row.
+    resolvedParentId = await resolveCategoryForOwner(parentId, userId);
+    const ancestry = await categoryQueries.getCategoryPath(resolvedParentId);
+    if (ancestry.some(node => node.id === id)) {
+      throw { statusCode: 400, message: 'Cannot move a category under itself or its descendant' };
+    }
+    currentName = name ?? category.name;
+  }
+
   let updated: Category | null;
   try {
-    updated = await categoryQueries.updateCategory(id, userId, name, color, icon);
+    updated = await categoryQueries.updateCategory(id, userId, name, color, icon, resolvedParentId);
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw {
         statusCode: 409,
-        message: `A sibling category named "${name}" already exists under this parent`,
+        message: `A sibling category named "${currentName}" already exists under this parent`,
       };
     }
     throw err;

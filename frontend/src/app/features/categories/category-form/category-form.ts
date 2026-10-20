@@ -82,11 +82,9 @@ export class CategoryForm {
 
   constructor() {
     const c = this.form.controls;
-    // An edit keeps the category where it is: the API cannot move it.
-    if (this.isEdit) {
-      c.parent.disable();
-    } else {
-      // A new category takes its parent's look until the user picks one.
+    // A new category takes its parent's look until the user picks one; an
+    // edited one keeps its own look when it moves.
+    if (!this.isEdit) {
       c.parent.valueChanges.pipe(takeUntilDestroyed()).subscribe(parent => {
         if (!parent) return;
         c.color.setValue(parent.color);
@@ -111,7 +109,10 @@ export class CategoryForm {
       this.loading.set(true);
       const { parent, name, color, icon } = this.form.getRawValue();
       const request = this.editing
-        ? this.categoriesState.update(this.editing.id, { name, color, icon })
+        ? this.categoriesState.update(this.editing.id, {
+            name, color, icon,
+            ...(parent && parent.id !== this.editing.parent_id ? { parentId: parent.id } : {}),
+          })
         : this.categoriesState.create({ name, parentId: parent?.id ?? TransactionType.Expense, color, icon });
       const response = await firstValueFrom(request);
       this.context.completeWith(response.data);

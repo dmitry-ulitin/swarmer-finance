@@ -183,14 +183,16 @@ export const updateCategory = async (
   userId: number,
   name?: string,
   color?: string,
-  icon?: string
+  icon?: string,
+  parentId?: number
 ): Promise<Category | null> => {
   // See createCategory: re-read to pick up fullName and root_id, which a
-  // rename can change for this category and its descendants.
+  // rename or a move can change for this category and its descendants.
   const result = await query<{ id: number }>(
-    `UPDATE categories SET name = COALESCE($1, name), color = COALESCE($2, color), icon = COALESCE($3, icon)
+    `UPDATE categories SET name = COALESCE($1, name), color = COALESCE($2, color), icon = COALESCE($3, icon),
+            parent_id = COALESCE($6, parent_id)
      WHERE id = $4 AND user_id = $5 AND id NOT IN (1, 2, 3, 4) RETURNING id`,
-    [name, color, icon, id, userId]
+    [name, color, icon, id, userId, parentId]
   );
   return result[0] ? await getCategoryById(result[0].id) : null;
 };

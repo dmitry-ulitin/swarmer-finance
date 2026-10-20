@@ -168,6 +168,71 @@ describe('Categories API', () => {
       expect(res.body.data.name).toBe('Keep Me');
     });
 
+    describe('moving to another parent', () => {
+      const create = async (name: string, parentId: number) => {
+        const res = await request(app)
+          .post('/api/categories')
+          .set({ Authorization: `Bearer ${token}` })
+          .send({ name, parentId });
+        expect(res.status).toBe(200);
+        return res.body.data;
+      };
+      const move = (id: number, parentId: number) =>
+        request(app)
+          .put(`/api/categories/${id}`)
+          .set({ Authorization: `Bearer ${token}` })
+          .send({ parentId });
+      const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      it('moves the category with its children', async () => {
+        const target = await create(`Target-${suffix()}`, 1);
+        const child = await create('Child', categoryId);
+
+        const res = await move(categoryId, target.id);
+        expect(res.status).toBe(200);
+        expect(res.body.data.parent_id).toBe(target.id);
+        expect(res.body.data.fullName).toBe(`${target.name} / ${res.body.data.name}`);
+
+        const moved = await pool.query('SELECT parent_id FROM categories WHERE id = $1', [child.id]);
+        expect(moved.rows[0].parent_id).toBe(categoryId);
+        const tree = await request(app).get('/api/categories').set({ Authorization: `Bearer ${token}` });
+        const income = tree.body.data.find((c: { id: number }) => c.id === 1);
+        const targetNode = income.children.find((c: { id: number }) => c.id === target.id);
+        expect(targetNode.children[0].children[0].fullName).toBe(`${target.name} / ${res.body.data.name} / Child`);
+      });
+
+      it('refuses to move a category under itself or its descendant', async () => {
+        const child = await create('Child', categoryId);
+
+        const self = await move(categoryId, categoryId);
+        expect(self.status).toBe(400);
+        const below = await move(categoryId, child.id);
+        expect(below.status).toBe(400);
+        expect(below.body.error).toMatch(/under itself or its descendant/);
+      });
+
+      it('refuses to move a category to another root', async () => {
+        const res = await move(categoryId, 2);
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/another root/);
+      });
+
+      it('returns 404 for a missing parent', async () => {
+        const res = await move(categoryId, 99999);
+        expect(res.status).toBe(404);
+      });
+
+      it('rejects a move onto a sibling with the same name', async () => {
+        const target = await create(`Target-${suffix()}`, 1);
+        const current = await pool.query('SELECT name FROM categories WHERE id = $1', [categoryId]);
+        await create(current.rows[0].name, target.id);
+
+        const res = await move(categoryId, target.id);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toContain(`"${current.rows[0].name}"`);
+      });
+    });
+
     it('should not allow editing system categories', async () => {
       const res = await request(app)
         .put('/api/categories/1')
