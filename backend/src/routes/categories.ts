@@ -52,6 +52,16 @@ router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res,
   }
 });
 
+router.get('/:id/delete-preview', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const preview = await categoryService.getDeletePreview(id, req.userId!);
+    res.json({ data: preview, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id as string, 10);

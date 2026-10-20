@@ -33,6 +33,10 @@ export class CategoriesState {
     return this.api.updateCategory(id, data).pipe(tap(() => this.reload()));
   }
 
+  deletePreview(id: number) {
+    return this.api.getCategoryDeletePreview(id);
+  }
+
   delete(id: number) {
     return this.api.deleteCategory(id).pipe(tap(() => this.reload()));
   }

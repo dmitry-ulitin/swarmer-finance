@@ -275,17 +275,76 @@ export const updateCategory = async (
   return updated;
 };
 
-export const deleteCategory = async (id: number, userId: number): Promise<void> => {
+export interface DeletePreview {
+  transactions: number;
+  subcategories: number;
+  /** Where the transactions go: the parent's path, or "Uncategorized". */
+  transactionsTo: string;
+  /** Where the subcategories go: the parent's path, or the root's name. */
+  subcategoriesTo: string;
+  /** Subcategory names the new parent already has; deleting is refused. */
+  conflicts: string[];
+}
+
+/**
+ * Where deleting `id` sends its transactions and children: both to the
+ * parent when it is the user's own, otherwise the transactions to the
+ * root's Uncategorized and the children to the system parent itself.
+ */
+const deleteTargets = async (id: number, userId: number) => {
   if (id === 1 || id === 2 || id === 3 || id === 4 || id === 5) {
     throw { statusCode: 403, message: 'Cannot delete system categories' };
   }
-  
-  const hasChildren = await categoryQueries.hasChildren(id);
-  if (hasChildren) {
-    throw { statusCode: 400, message: 'Cannot delete category with children' };
+  const category = await categoryQueries.getCategoryById(id);
+  if (!category || category.user_id !== userId) {
+    throw { statusCode: 404, message: 'Category not found or not owned by user' };
   }
-  
-  const deleted = await categoryQueries.deleteCategory(id, userId);
+  const parent = (await categoryQueries.getCategoryById(category.parent_id!))!;
+  const toParent = parent.user_id !== null;
+  return {
+    parent,
+    transactionsTo: toParent ? parent.id : (category.root_id === 1 ? 3 : 4),
+    transactionsToName: toParent ? parent.fullName : 'Uncategorized',
+  };
+};
+
+export const getDeletePreview = async (id: number, userId: number): Promise<DeletePreview> => {
+  const { parent, transactionsToName } = await deleteTargets(id, userId);
+  const impact = await categoryQueries.getDeleteImpact(id, parent.id);
+  return {
+    transactions: impact.transactions,
+    subcategories: impact.subcategories,
+    transactionsTo: transactionsToName,
+    subcategoriesTo: parent.fullName || parent.name,
+    conflicts: impact.conflicts,
+  };
+};
+
+const renameFirst = (name: string, parent: Category) => ({
+  statusCode: 409,
+  message: `Rename "${name}" first: "${parent.fullName || parent.name}" already has a subcategory with that name`,
+});
+
+export const deleteCategory = async (id: number, userId: number): Promise<void> => {
+  const { parent, transactionsTo } = await deleteTargets(id, userId);
+  const { conflicts } = await categoryQueries.getDeleteImpact(id, parent.id);
+  if (conflicts.length > 0) {
+    throw renameFirst(conflicts[0], parent);
+  }
+
+  let deleted: boolean;
+  try {
+    deleted = await categoryQueries.deleteCategory(id, userId, parent.id, transactionsTo);
+  } catch (err) {
+    // A same-named sibling created since the check above.
+    if (isUniqueViolation(err)) {
+      throw {
+        statusCode: 409,
+        message: `"${parent.fullName || parent.name}" already has a subcategory with the same name; rename it first`,
+      };
+    }
+    throw err;
+  }
   if (!deleted) {
     throw { statusCode: 404, message: 'Category not found or not owned by user' };
   }

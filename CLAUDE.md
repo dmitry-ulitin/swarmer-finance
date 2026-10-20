@@ -68,6 +68,10 @@ All API responses use this envelope format consistently.
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
+- Deleting a category moves its transactions to its parent (or the root's
+  Uncategorized when the parent is a system category) and its children under
+  the parent; it is refused (409) when a child's name is already taken
+  there. `GET /api/categories/:id/delete-preview` reports this up front.
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
 - An account's `scale` (decimal places of its stored integers) is set by the
   backend from the currency (`services/currencyScale.ts`: ISO minor units,

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Category, CategoryCreatePayload, CategoryUpdatePayload } from '../models/category';
+import { Category, CategoryCreatePayload, CategoryDeletePreview, CategoryUpdatePayload } from '../models/category';
 import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareLevel } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
@@ -39,6 +39,10 @@ export class ApiService {
 
   updateCategory(id: number, data: CategoryUpdatePayload): Observable<ApiResponse<Category>> {
     return this.http.put<ApiResponse<Category>>(`/api/categories/${id}`, data);
+  }
+
+  getCategoryDeletePreview(id: number): Observable<ApiResponse<CategoryDeletePreview>> {
+    return this.http.get<ApiResponse<CategoryDeletePreview>>(`/api/categories/${id}/delete-preview`);
   }
 
   deleteCategory(id: number): Observable<ApiResponse<{ success: boolean }>> {

@@ -22,6 +22,16 @@ export interface CategoryCreatePayload {
 
 export type CategoryUpdatePayload = Partial<CategoryCreatePayload>;
 
+/** What deleting a category would do; see GET /api/categories/:id/delete-preview. */
+export interface CategoryDeletePreview {
+  transactions: number;
+  subcategories: number;
+  transactionsTo: string;
+  subcategoriesTo: string;
+  /** Subcategory names already taken under the new parent; deleting is refused. */
+  conflicts: string[];
+}
+
 export const findCategoryById = (id: number | undefined, categories: Category[]): Category | null => {
   if (id === undefined) return null;
   for (const category of categories) {

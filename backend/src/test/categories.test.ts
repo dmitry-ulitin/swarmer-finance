@@ -387,4 +387,119 @@ describe('Categories API', () => {
       expect(res.body.error).toContain('Cannot delete system categories');
     });
   });
+
+  describe('deleting a category in use', () => {
+    const auth = () => ({ Authorization: `Bearer ${token}` });
+    let accountId: number;
+    let parentId: number;
+    let childId: number;
+
+    const create = async (name: string, parent: number): Promise<number> => {
+      const res = await request(app).post('/api/categories').set(auth()).send({ name, parentId: parent });
+      return res.body.data.id;
+    };
+    const addExpense = async (categoryId: number): Promise<number> => {
+      const res = await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 100, 100, '2026-01-01') RETURNING id`,
+        [testUserId, categoryId, accountId]
+      );
+      return res.rows[0].id;
+    };
+    const categoryOf = async (transactionId: number): Promise<number> =>
+      (await pool.query('SELECT category_id FROM transactions WHERE id = $1', [transactionId])).rows[0].category_id;
+    const parentOf = async (categoryId: number): Promise<number | undefined> =>
+      (await pool.query('SELECT parent_id FROM categories WHERE id = $1', [categoryId])).rows[0]?.parent_id;
+
+    beforeAll(async () => {
+      const res = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, scale, start_balance) VALUES ($1, 'Del', 'USD', 2, 0) RETURNING id`,
+        [testUserId]
+      );
+      accountId = res.rows[0].id;
+    });
+
+    afterAll(async () => {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [testUserId]);
+      await pool.query('DELETE FROM accounts WHERE id = $1', [accountId]);
+    });
+
+    beforeEach(async () => {
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      parentId = await create(`Bills-${unique}`, 2);
+      childId = await create('Subscriptions', parentId);
+    });
+
+    it('moves transactions and subcategories to a user parent', async () => {
+      const tx = await addExpense(childId);
+      const grandchild = await create('Streaming', childId);
+
+      const preview = await request(app).get(`/api/categories/${childId}/delete-preview`).set(auth());
+      expect(preview.status).toBe(200);
+      expect(preview.body.data).toEqual({
+        transactions: 1,
+        subcategories: 1,
+        transactionsTo: expect.stringMatching(/^Bills-/),
+        subcategoriesTo: expect.stringMatching(/^Bills-/),
+        conflicts: [],
+      });
+
+      const res = await request(app).delete(`/api/categories/${childId}`).set(auth());
+      expect(res.status).toBe(200);
+      expect(await categoryOf(tx)).toBe(parentId);
+      expect(await parentOf(grandchild)).toBe(parentId);
+      expect(await parentOf(childId)).toBeUndefined();
+    });
+
+    it('moves transactions to Uncategorized and subcategories to the root under a system parent', async () => {
+      const tx = await addExpense(parentId);
+
+      const preview = await request(app).get(`/api/categories/${parentId}/delete-preview`).set(auth());
+      expect(preview.body.data).toMatchObject({
+        transactions: 1,
+        subcategories: 1,
+        transactionsTo: 'Uncategorized',
+        subcategoriesTo: 'Expenses',
+      });
+
+      const res = await request(app).delete(`/api/categories/${parentId}`).set(auth());
+      expect(res.status).toBe(200);
+      expect(await categoryOf(tx)).toBe(4);
+      expect(await parentOf(childId)).toBe(2);
+    });
+
+    it('refuses when a subcategory name is already taken under the new parent', async () => {
+      await create('Streaming', childId);
+      await create('Streaming', parentId);
+      const tx = await addExpense(childId);
+
+      const preview = await request(app).get(`/api/categories/${childId}/delete-preview`).set(auth());
+      expect(preview.body.data.conflicts).toEqual(['Streaming']);
+
+      const res = await request(app).delete(`/api/categories/${childId}`).set(auth());
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('Rename "Streaming" first');
+      expect(await categoryOf(tx)).toBe(childId);
+      expect(await parentOf(childId)).toBe(parentId);
+    });
+
+    it('does not preview or delete another user\'s category', async () => {
+      const email = `catother${Date.now()}@example.com`;
+      const other = await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+      const otherAuth = { Authorization: `Bearer ${other.body.data.accessToken}` };
+      try {
+        const preview = await request(app).get(`/api/categories/${childId}/delete-preview`).set(otherAuth);
+        expect(preview.status).toBe(404);
+        const res = await request(app).delete(`/api/categories/${childId}`).set(otherAuth);
+        expect(res.status).toBe(404);
+      } finally {
+        await pool.query('DELETE FROM users WHERE email = $1', [email]);
+      }
+    });
+
+    it('does not preview system categories', async () => {
+      const res = await request(app).get('/api/categories/4/delete-preview').set(auth());
+      expect(res.status).toBe(403);
+    });
+  });
 });

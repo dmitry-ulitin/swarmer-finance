@@ -3,7 +3,7 @@ import { TUI_CONFIRM, TuiConfirmData } from '@taiga-ui/kit';
 import { tuiDialog, TuiDialogService } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
-import type { Category } from '../../models/category';
+import type { Category, CategoryDeletePreview } from '../../models/category';
 import type { CategoryFormData } from './category-form/category-form';
 import { CategoriesState } from '../../core/categories.state';
 import { TransactionsState } from '../../core/transactions.state';
@@ -66,18 +66,33 @@ export class CategoryDialogService {
   }
 
   async openDelete(category: Category): Promise<boolean> {
-    const data: TuiConfirmData = {
-      content: `Delete "${category.name}"?`,
-      yes: 'Delete',
-      no: 'Cancel',
-    };
     try {
+      const preview = (await firstValueFrom(this.categoriesState.deletePreview(category.id))).data!;
+      if (preview.conflicts.length > 0) {
+        await firstValueFrom(
+          this.dialogs.open(
+            `"${preview.subcategoriesTo}" already has a subcategory named "${preview.conflicts[0]}". ` +
+              `Please rename one of them before deleting "${category.name}".`,
+            { label: 'Cannot Delete Category', size: 's' }
+          ),
+          { defaultValue: undefined }
+        );
+        return false;
+      }
+      const data: TuiConfirmData = {
+        content: deleteMessage(category, preview),
+        yes: 'Delete',
+        no: 'Cancel',
+      };
       const confirmed = await firstValueFrom(
         this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Delete Category', size: 's', data }),
         { defaultValue: false }
       );
       if (!confirmed) return false;
       await firstValueFrom(this.categoriesState.delete(category.id));
+      // Moved transactions and subcategories change the paths the
+      // transactions and the summary show.
+      if (preview.transactions > 0 || preview.subcategories > 0) this.transactions.reload();
       return true;
     } catch (e) {
       this.notifications.showError(e, 'Failed to delete category');
@@ -85,3 +100,17 @@ export class CategoryDialogService {
     }
   }
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** The confirmation text, saying where the category's contents will go. */
+export const deleteMessage = (category: Category, preview: CategoryDeletePreview): string => {
+  let message = `Are you sure you want to delete "${category.name}"?`;
+  if (preview.transactions > 0) {
+    message += ` ${plural(preview.transactions, 'transaction', 'transactions')} will be moved to "${preview.transactionsTo}".`;
+  }
+  if (preview.subcategories > 0) {
+    message += ` ${plural(preview.subcategories, 'subcategory', 'subcategories')} will be moved under "${preview.subcategoriesTo}".`;
+  }
+  return message;
+};

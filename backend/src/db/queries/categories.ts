@@ -1,4 +1,4 @@
-import { query, queryOne, execute, withTransaction, Tx } from '../index';
+import { query, queryOne, withTransaction, Tx } from '../index';
 import { Category } from '../../types';
 
 /**
@@ -197,19 +197,49 @@ export const updateCategory = async (
   return result[0] ? await getCategoryById(result[0].id) : null;
 };
 
-export const deleteCategory = async (id: number, userId: number): Promise<boolean> => {
-  if (id === 1 || id === 2 || id === 3 || id === 4) return false;
-  const count = await execute(
-    'DELETE FROM categories WHERE id = $1 AND user_id = $2 AND id NOT IN (1, 2, 3, 4)',
-    [id, userId]
+/** What deleting a category would touch: its transactions and its direct children. */
+export const getDeleteImpact = async (
+  id: number,
+  parentId: number
+): Promise<{ transactions: number; subcategories: number; conflicts: string[] }> => {
+  const counts = await queryOne<{ transactions: string; subcategories: string }>(
+    `SELECT (SELECT COUNT(*) FROM transactions WHERE category_id = $1) AS transactions,
+            (SELECT COUNT(*) FROM categories WHERE parent_id = $1) AS subcategories`,
+    [id]
   );
-  return count > 0;
+  // Children keep their owner when they move up, so a name is taken only
+  // by a sibling-to-be of that same owner (see uq_categories_sibling).
+  const conflicts = await query<{ name: string }>(
+    `SELECT DISTINCT c.name FROM categories c
+     JOIN categories s ON s.parent_id = $2 AND s.user_id = c.user_id AND s.name = c.name
+     WHERE c.parent_id = $1
+     ORDER BY c.name`,
+    [id, parentId]
+  );
+  return {
+    transactions: parseInt(counts!.transactions, 10),
+    subcategories: parseInt(counts!.subcategories, 10),
+    conflicts: conflicts.map(r => r.name),
+  };
 };
 
-export const hasChildren = async (categoryId: number): Promise<boolean> => {
-  const result = await queryOne<{ count: string }>(
-    'SELECT COUNT(*) as count FROM categories WHERE parent_id = $1',
-    [categoryId]
-  );
-  return result ? parseInt(result.count, 10) > 0 : false;
+/**
+ * Delete a category after moving its transactions to `transactionsTo` and
+ * its children under `parentId`, all in one transaction.
+ */
+export const deleteCategory = async (
+  id: number,
+  userId: number,
+  parentId: number,
+  transactionsTo: number
+): Promise<boolean> => {
+  return withTransaction(async (tx: Tx) => {
+    await tx.query('UPDATE transactions SET category_id = $2 WHERE category_id = $1', [id, transactionsTo]);
+    await tx.query('UPDATE categories SET parent_id = $2 WHERE parent_id = $1', [id, parentId]);
+    const deleted = await tx.query<{ id: number }>(
+      'DELETE FROM categories WHERE id = $1 AND user_id = $2 AND id NOT IN (1, 2, 3, 4, 5) RETURNING id',
+      [id, userId]
+    );
+    return deleted.length > 0;
+  });
 };
