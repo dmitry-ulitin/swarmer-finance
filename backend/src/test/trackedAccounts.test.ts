@@ -152,6 +152,14 @@ describe('Tracked (blockchain-synced) accounts', () => {
       expect(Number(res.body.data.start_balance)).toBe(0);
     });
 
+    it('zeroes the start balance when tracking is switched on for an account with transactions', async () => {
+      const plain = await create({ name: 'Funded tx', currency: 'BTC', startBalance: 1, type: 'crypto', settings: {} });
+      await addTransaction(plain.body.data.id);
+      const res = await update(plain.body.data.id, { name: 'Funded tx', currency: 'BTC', startBalance: 0, ...WALLET });
+      expect(res.status).toBe(200);
+      expect(Number(res.body.data.start_balance)).toBe(0);
+    });
+
     it('keeps the seen set when a tracked account is saved again', async () => {
       const w = await create({ name: 'Kept', currency: 'BTC', startBalance: 0, ...WALLET });
       const id = w.body.data.id;

@@ -89,14 +89,13 @@ export const updateAccount = async (
  * (no transactions) and soft delete (transactions exist).
  */
 export const hasTransactions = async (accountId: number): Promise<boolean> => {
-  const result = await queryOne<{ count: string }>(
-    `SELECT (
-       (SELECT COUNT(*) FROM transactions WHERE debit_account_id = $1) +
-       (SELECT COUNT(*) FROM transactions WHERE credit_account_id = $1)
-     )::text AS count`,
+  const result = await queryOne<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM transactions WHERE debit_account_id = $1 OR credit_account_id = $1
+     ) AS exists`,
     [accountId]
   );
-  return result ? parseInt(result.count, 10) > 0 : false;
+  return result?.exists ?? false;
 };
 
 export const softDeleteAccount = async (id: number): Promise<boolean> => {

@@ -122,12 +122,15 @@ export const updateAccount = async (
   }
   const user = await getUserOrThrow(userId);
 
+  let hasTx: boolean | undefined;
+  const hasTransactions = async () => hasTx ??= await accountQueries.hasTransactions(id);
+
   const currency = data.currency ?? existing.currency;
   let scale = existing.scale;
   if (getCurrencyScale(currency) !== existing.scale) {
     // Stored amounts are integers at the account's scale; rescaling an
     // account that already holds some would silently change every one.
-    if (!await accountQueries.hasTransactions(id)) {
+    if (!await hasTransactions()) {
       scale = getCurrencyScale(currency);
     } else if (currency !== existing.currency) {
       throw {
@@ -178,7 +181,7 @@ export const updateAccount = async (
   // visibly. Switching tracking on zeroes it on purpose (the chain owns it).
   if (!enablesTracking && startBalance !== undefined
     && startBalance !== Number(existing.start_balance)
-    && await accountQueries.hasTransactions(id)) {
+    && await hasTransactions()) {
     throw {
       statusCode: 400,
       message: 'Cannot change the start balance: the account already has transactions; add a correcting transaction instead',
@@ -196,7 +199,11 @@ export const updateAccount = async (
     if (walletChanges) await clearSeenTxids(tx, id);
     return accountQueries.updateAccount(id, { ...data, scale, startBalance }, tx);
   });
-  const [withBal] = await withBalances([account!]);
+  // Soft-deleted by a concurrent request since the check above.
+  if (!account) {
+    throw { statusCode: 404, message: 'Account is deleted' };
+  }
+  const [withBal] = await withBalances([account]);
   const [converted] = await withConvertedBalances(user, [withBal]);
   return toDecimalDTO(converted, user.currency_scale);
 };

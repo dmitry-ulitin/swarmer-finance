@@ -2,6 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { createTestApp } from './testApp';
 import { pool } from '../db';
+import * as accountQueries from '../db/queries/accounts';
 
 const app = createTestApp();
 
@@ -305,6 +306,21 @@ describe('Accounts API — balance field', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.name).toBe('Renamed');
       expect(res.body.data.balance).toBe(60); // 50 + 10
+    });
+
+    it('returns 404 when the account is deleted while the update runs', async () => {
+      const spy = jest.spyOn(accountQueries, 'updateAccount').mockResolvedValueOnce(null);
+      try {
+        const res = await request(app)
+          .put(`/api/accounts/${accountId}`)
+          .set({ Authorization: `Bearer ${token}` })
+          .send({ name: 'Gone', type: 'cash', settings: {} });
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toMatch(/deleted/i);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 
