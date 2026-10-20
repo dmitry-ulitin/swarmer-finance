@@ -84,6 +84,17 @@ describe('AccountSharing', () => {
     expect(transactions.reload).toHaveBeenCalled();
   });
 
+  it('accepts an email only when it is well-formed once trimmed', () => {
+    const { component } = setup(1, [OWNER]);
+    const email = component.form.controls.email;
+    email.setValue('   ');
+    expect(email.valid).toBe(false);
+    email.setValue('bob');
+    expect(email.valid).toBe(false);
+    email.setValue(' bob@example.com ');
+    expect(email.valid).toBe(true);
+  });
+
   it('confirms before granting co-owner on a personal account', async () => {
     const { component, http, dialogOpen } = setup(1, [OWNER, READER]);
     const done = component.changeLevel(READER, 3);

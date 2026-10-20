@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { type AbstractControl, FormControl, FormGroup, FormsModule, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
 import { TuiButton, TuiDialogService, TuiInput } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiDataListWrapper, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
@@ -14,6 +14,12 @@ import { NotificationService } from '../../../core/notification.service';
 import { LEVEL_LABELS, type Account, type AccountMember, type ShareLevel } from '../../../models/account';
 
 const SHARE_LEVELS: readonly ShareLevel[] = [1, 2, 3];
+
+/** Required and well-formed once trimmed, so a pasted address with stray spaces still passes. */
+function trimmedEmail(control: AbstractControl<string>): ValidationErrors | null {
+  const value = control.value.trim();
+  return value ? Validators.email(new FormControl(value)) : { required: true };
+}
 
 @Component({
   selector: 'app-account-sharing',
@@ -44,7 +50,7 @@ export class AccountSharing {
   readonly canLeave = computed(() => !!this.me() && this.me()!.level !== 4);
 
   readonly form = new FormGroup({
-    email: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
+    email: new FormControl<string>('', { nonNullable: true, validators: [trimmedEmail] }),
     level: new FormControl<ShareLevel>(1, { nonNullable: true }),
   });
 
