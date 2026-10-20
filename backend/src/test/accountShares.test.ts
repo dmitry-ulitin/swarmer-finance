@@ -62,6 +62,23 @@ describe('Account share management', () => {
       .post(`/api/accounts/${acc}/shares`)
       .set('Authorization', `Bearer ${token}`)
       .send({ email, level });
+  const setLevel = (token: string, target: number, level: unknown) =>
+    request(app)
+      .put(`/api/accounts/${acc}/shares/${target}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ level });
+  const remove = (token: string, target: number) =>
+    request(app)
+      .delete(`/api/accounts/${acc}/shares/${target}`)
+      .set('Authorization', `Bearer ${token}`);
+  // A user-owned child category of a system root, returning its id.
+  const makeCategory = async (userId: number, name: string, parentId: number) => {
+    const res = await pool.query(
+      'INSERT INTO categories (user_id, name, parent_id) VALUES ($1, $2, $3) RETURNING id',
+      [userId, name, parentId]
+    );
+    return res.rows[0].id as number;
+  };
 
   beforeAll(async () => {
     const stamp = Date.now();
@@ -84,6 +101,12 @@ describe('Account share management', () => {
 
   afterAll(async () => {
     await pool.query('DELETE FROM account_shares WHERE account_id = $1', [acc]);
+    await pool.query(
+      `DELETE FROM transactions WHERE debit_account_id IN (SELECT id FROM accounts WHERE user_id = ANY($1::int[]))
+          OR credit_account_id IN (SELECT id FROM accounts WHERE user_id = ANY($1::int[]))`,
+      [[aId, bId, cId]]
+    );
+    await pool.query('DELETE FROM account_shares WHERE user_id = ANY($1::int[])', [[aId, bId, cId]]);
     await pool.query('DELETE FROM accounts WHERE user_id = ANY($1::int[])', [[aId, bId, cId]]);
     await pool.query('DELETE FROM categories WHERE user_id = ANY($1::int[])', [[aId, bId, cId]]);
     await pool.query('DELETE FROM users WHERE id = ANY($1::int[])', [[aId, bId, cId]]);
@@ -161,5 +184,146 @@ describe('Account share management', () => {
   it('400 for level 4 in the body', async () => {
     const res = await add(tokenA, cEmail, 4);
     expect(res.status).toBe(400);
+  });
+
+  it('co-owner changes a member level', async () => {
+    await grant(acc, bId, 1);
+    const res = await setLevel(tokenA, bId, 2);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toContainEqual(
+      { user_id: bId, name: 'Bob', email: bEmail, level: 2, is_creator: false }
+    );
+  });
+
+  it('400 for level 4 when changing a level', async () => {
+    await grant(acc, bId, 1);
+    const res = await setLevel(tokenA, bId, 4);
+    expect(res.status).toBe(400);
+  });
+
+  it('403 changing or removing at level 2', async () => {
+    await grant(acc, bId, 2);
+    await grant(acc, cId, 1);
+    expect((await setLevel(tokenB, cId, 2)).status).toBe(403);
+    expect((await remove(tokenB, cId)).status).toBe(403);
+  });
+
+  it('404 for a non-member target', async () => {
+    const put = await setLevel(tokenA, cId, 2);
+    expect(put.status).toBe(404);
+    expect(put.body.error).toBe('Not a member of this account');
+    const del = await remove(tokenA, cId);
+    expect(del.status).toBe(404);
+    expect(del.body.error).toBe('Not a member of this account');
+  });
+
+  it('400 removing the creator', async () => {
+    await grant(acc, bId, 3);
+    const res = await remove(tokenB, aId);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Delete the account instead');
+  });
+
+  it('member leaves at level 1', async () => {
+    await grant(acc, bId, 1);
+    const res = await remove(tokenB, bId);
+    expect(res.status).toBe(200);
+    const accounts = await request(app).get('/api/accounts').set('Authorization', `Bearer ${tokenB}`);
+    expect(accounts.body.data.map((x: { id: number }) => x.id)).not.toContain(acc);
+  });
+
+  it('removing the last co-owner makes it personal again', async () => {
+    await grant(acc, bId, 3);
+    const res = await remove(tokenA, bId);
+    expect(res.status).toBe(200);
+    const accounts = await request(app).get('/api/accounts').set('Authorization', `Bearer ${tokenA}`);
+    const found = accounts.body.data.find((x: { id: number }) => x.id === acc);
+    expect(found.access_level).toBe(4);
+  });
+
+  it('removed member history moves to the owner', async () => {
+    await grant(acc, bId, 2);
+    // Registration seeds 'Food' for every user, A included, so the copy
+    // lands under A's existing 'Food'.
+    const foodRow = await pool.query(
+      `SELECT id FROM categories WHERE user_id = $1 AND name = 'Food' AND parent_id = 2`, [bId]
+    );
+    const food = foodRow.rows[0].id as number;
+    const lunch = await makeCategory(bId, 'Lunch', food);
+    const bAcc = await makeAccount(bId, 'B own');
+
+    const expense = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ debitAccountId: acc, categoryId: lunch, debit: 5, credit: 5, date: '2026-03-02', description: 'Lunch by B' });
+    expect(expense.status).toBe(200);
+    const expenseId = expense.body.data.id as number;
+
+    const transfer = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ debitAccountId: acc, creditAccountId: bAcc, debit: 3, credit: 3, date: '2026-03-02', description: 'To B' });
+    expect(transfer.status).toBe(200);
+    const transferId = transfer.body.data.id as number;
+
+    const res = await remove(tokenA, bId);
+    expect(res.status).toBe(200);
+
+    const row = await pool.query('SELECT user_id, category_id FROM transactions WHERE id = $1', [expenseId]);
+    expect(row.rows[0].user_id).toBe(aId);
+    // The category now belongs to A under the same path.
+    const cat = await pool.query('SELECT user_id, name FROM categories WHERE id = $1', [row.rows[0].category_id]);
+    expect(cat.rows[0]).toEqual({ user_id: aId, name: 'Lunch' });
+    const parent = await pool.query(
+      'SELECT p.user_id, p.name FROM categories c JOIN categories p ON p.id = c.parent_id WHERE c.id = $1',
+      [row.rows[0].category_id]
+    );
+    expect(parent.rows[0]).toEqual({ user_id: aId, name: 'Food' });
+
+    // A can re-categorise it to one of A's own categories.
+    const aCat = await makeCategory(aId, 'A groceries', 2);
+    const edited = await request(app)
+      .put(`/api/transactions/${expenseId}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ categoryId: aCat });
+    expect(edited.status).toBe(200);
+
+    const transferRow = await pool.query('SELECT user_id FROM transactions WHERE id = $1', [transferId]);
+    expect(transferRow.rows[0].user_id).toBe(bId);
+  });
+
+  it('third-party category does not block removal', async () => {
+    await grant(acc, bId, 2);
+    // C shares an account with B, so B could legitimately use C's category.
+    const cAcc = await makeAccount(cId, 'C shared');
+    await grant(cAcc, bId, 2);
+    const cCat = await makeCategory(cId, 'Carol stuff', 2);
+    const inserted = await pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, $2, $3, 700, 700, '2026-03-03') RETURNING id`,
+      [bId, cCat, acc]
+    );
+
+    const res = await remove(tokenA, bId);
+    expect(res.status).toBe(200);
+
+    const row = await pool.query(
+      `SELECT t.user_id, c.user_id AS cat_owner, c.name FROM transactions t
+         JOIN categories c ON c.id = t.category_id WHERE t.id = $1`,
+      [inserted.rows[0].id]
+    );
+    expect(row.rows[0]).toEqual({ user_id: aId, cat_owner: aId, name: 'Carol stuff' });
+  });
+
+  it('system categories pass through unchanged', async () => {
+    await grant(acc, bId, 2);
+    const inserted = await pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, 4, $2, 100, 100, '2026-03-04') RETURNING id`,
+      [bId, acc]
+    );
+    expect((await remove(tokenA, bId)).status).toBe(200);
+    const row = await pool.query('SELECT user_id, category_id FROM transactions WHERE id = $1', [inserted.rows[0].id]);
+    expect(row.rows[0]).toEqual({ user_id: aId, category_id: 4 });
   });
 });

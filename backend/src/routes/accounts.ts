@@ -83,6 +83,10 @@ const addShareSchema = z.strictObject({
   level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
 });
 
+const setShareLevelSchema = z.strictObject({
+  level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+});
+
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const accounts = await accountService.getAccounts(req.userId!);
@@ -161,6 +165,28 @@ router.post('/:id/shares', validate(addShareSchema), async (req: AuthRequest, re
   try {
     const id = parseInt(req.params.id as string, 10);
     const members = await shareService.addMember(id, req.userId!, req.body.email, req.body.level);
+    res.json({ data: members, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:id/shares/:userId', validate(setShareLevelSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const targetId = parseInt(req.params.userId as string, 10);
+    const members = await shareService.setMemberLevel(id, req.userId!, targetId, req.body.level);
+    res.json({ data: members, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id/shares/:userId', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const targetId = parseInt(req.params.userId as string, 10);
+    const members = await shareService.removeMember(id, req.userId!, targetId);
     res.json({ data: members, error: null });
   } catch (error) {
     next(error);
