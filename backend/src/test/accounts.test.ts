@@ -138,6 +138,43 @@ describe('Accounts API — balance field', () => {
       expect(wallet.balance).toBe(60);  // 100 - 40
       expect(savings.balance).toBe(40); // 0 + 40
     });
+
+    it('returns last_transaction_date: null without transactions, else the latest date on either side', async () => {
+      const result = await pool.query(
+        `INSERT INTO accounts (user_id, name, currency, start_balance, scale)
+         VALUES ($1, 'Savings', 'USD', 0, 2) RETURNING id`,
+        [testUserId]
+      );
+      const savingsId = result.rows[0].id;
+
+      let res = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+      expect(res.body.data.find((a: { id: number }) => a.id === accountId).last_transaction_date).toBeNull();
+
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-01-05')`,
+        [testUserId, expenseCategoryId, accountId]
+      );
+      await pool.query(
+        `INSERT INTO transactions (user_id, debit_account_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-02-01')`,
+        [testUserId, savingsId, accountId]
+      );
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-01-20')`,
+        [testUserId, incomeCategoryId, accountId]
+      );
+
+      res = await request(app)
+        .get('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` });
+      const accounts = res.body.data as Array<{ id: number; last_transaction_date: string | null }>;
+      expect(accounts.find(a => a.id === accountId)!.last_transaction_date).toBe('2026-02-01');
+      expect(accounts.find(a => a.id === savingsId)!.last_transaction_date).toBe('2026-02-01');
+    });
   });
 
   describe('POST /api/accounts', () => {
@@ -235,7 +272,7 @@ describe('Accounts API — balance field', () => {
       expect(res.body.data.balance).toBe(80);
     });
 
-    it('reflects updated startBalance combined with existing transactions', async () => {
+    it('rejects a startBalance change when the account has transactions', async () => {
       await pool.query(
         `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
          VALUES ($1, $2, $3, 1000, 1000, '2026-01-10')`,
@@ -247,8 +284,27 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` })
         .send({ type: 'cash', startBalance: 30, settings: {} });
 
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/start balance/i);
+      const stored = await pool.query('SELECT start_balance FROM accounts WHERE id = $1', [accountId]);
+      expect(Number(stored.rows[0].start_balance)).toBe(5000);
+    });
+
+    it('accepts an unchanged startBalance when the account has transactions', async () => {
+      await pool.query(
+        `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 1000, 1000, '2026-01-10')`,
+        [testUserId, incomeCategoryId, accountId]
+      );
+
+      const res = await request(app)
+        .put(`/api/accounts/${accountId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Renamed', type: 'cash', startBalance: 50, settings: {} });
+
       expect(res.status).toBe(200);
-      expect(res.body.data.balance).toBe(40); // 30 + 10
+      expect(res.body.data.name).toBe('Renamed');
+      expect(res.body.data.balance).toBe(60); // 50 + 10
     });
   });
 

@@ -67,6 +67,9 @@ export class AccountForm {
   readonly balancePrecision = computed(() => currencyScale(this.currency() ?? ''));
   readonly balanceQuantum = computed(() => 1 / Math.pow(10, this.balancePrecision()));
 
+  /** The backend refuses a new start balance once the account has transactions. */
+  readonly hasTransactions = signal(this.context.data?.last_transaction_date != null);
+
   /** Mirrors backend isTracked: transactions will come from the chain. */
   readonly tracked = signal(false);
   /** Currencies the chosen chain syncs; null while the account is not tracked. */
@@ -123,6 +126,11 @@ export class AccountForm {
       // Nothing to choose on a one-asset chain or for a wallet already tracked.
       if (allowed.length === 1 || sameTrackedWallet) currency.disable();
       else currency.enable();
+    } else if (this.hasTransactions()) {
+      // Back to the stored value after a sync switch-on zeroed it.
+      startBalance.setValue(data?.start_balance ?? 0);
+      startBalance.disable();
+      currency.enable();
     } else {
       startBalance.enable();
       currency.enable();

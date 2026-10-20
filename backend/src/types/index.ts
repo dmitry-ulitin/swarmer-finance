@@ -37,6 +37,8 @@ export interface Account {
   scale: number;
   balance: number;
   user_balance?: number | null;
+  /** Date (YYYY-MM-DD) of the latest transaction on either side; null when none. Set by services/accounts.ts. */
+  last_transaction_date?: string | null;
   created_at: Date;
   deleted?: boolean;
   type: AccountType;

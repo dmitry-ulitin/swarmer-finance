@@ -73,6 +73,10 @@ All API responses use this envelope format consistently.
   the parent; it is refused (409) when a child's name is already taken
   there. `GET /api/categories/:id/delete-preview` reports this up front.
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
+- Once an account has transactions its `start_balance` cannot change (400;
+  a correcting transaction fixes a mismatch instead). Account responses
+  carry `last_transaction_date` (null when none), which the form uses to
+  lock the field.
 - An account's `scale` (decimal places of its stored integers) is set by the
   backend from the currency (`services/currencyScale.ts`: ISO minor units,
   BTC/ETH 8, USDT/USDC/TRX 6, SOL/TON 9); the API does not accept it, and a

@@ -44,6 +44,11 @@ interface AccountBase {
   owner_name?: string;
   /** Transactions come from the blockchain; computed by the backend. */
   tracked?: boolean;
+  /**
+   * Date (YYYY-MM-DD) of the latest transaction on the account; null when it
+   * has none. Optional so existing fixtures need not supply it.
+   */
+  last_transaction_date?: string | null;
 }
 
 // A union over type, so `@if (account.type === 'crypto')` narrows

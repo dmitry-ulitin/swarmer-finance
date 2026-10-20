@@ -22,11 +22,14 @@ async function withBalances(accounts: Account[]): Promise<Account[]> {
   const rows = await getAccountBalances(accounts.map(a => a.id));
   return accounts.map(account => {
     let balance = Number(account.start_balance);
+    let lastDate: string | null = null;
     for (const row of rows) {
       if (row.credit_account_id === account.id) balance += row.credit;
       if (row.debit_account_id === account.id) balance -= row.debit;
+      if ((row.credit_account_id === account.id || row.debit_account_id === account.id)
+        && (lastDate === null || row.last_date > lastDate)) lastDate = row.last_date;
     }
-    return { ...account, balance };
+    return { ...account, balance, last_transaction_date: lastDate };
   });
 }
 
@@ -94,7 +97,7 @@ export const createAccount = async (
   settings = normalizeSettings(provider, settings);
   const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
-  const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance) }]);
+  const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), last_transaction_date: null }]);
   return toDecimalDTO(converted, user.currency_scale);
 };
 
@@ -170,6 +173,17 @@ export const updateAccount = async (
   const startBalance = enablesTracking
     ? 0
     : data.startBalance != null ? toCents(data.startBalance, scale) : undefined;
+  // Changing the opening balance would silently shift every balance after
+  // it; once there are transactions a correcting transaction does that
+  // visibly. Switching tracking on zeroes it on purpose (the chain owns it).
+  if (!enablesTracking && startBalance !== undefined
+    && startBalance !== Number(existing.start_balance)
+    && await accountQueries.hasTransactions(id)) {
+    throw {
+      statusCode: 400,
+      message: 'Cannot change the start balance: the account already has transactions; add a correcting transaction instead',
+    };
+  }
   const account = await withTransaction(async tx => {
     if (enablesTracking) {
       // Reconciliation on the first sync can re-point rows of other

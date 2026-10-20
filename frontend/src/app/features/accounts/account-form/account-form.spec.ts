@@ -166,6 +166,36 @@ describe('AccountForm tracked wallet', () => {
   });
 });
 
+describe('AccountForm start balance with transactions', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const withTransactions = { id: 7, currency: 'USD', type: 'cash', settings: {}, start_balance: 50, last_transaction_date: '2026-02-01' } as Partial<Account>;
+
+  it('locks the start balance of an account that has transactions', () => {
+    const form = createForm(withTransactions);
+
+    expect(form.hasTransactions()).toBe(true);
+    expect(form.form.controls.startBalance.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 50 });
+  });
+
+  it('keeps it locked, at the stored value, when sync is switched off again', () => {
+    const form = createForm(withTransactions);
+    form.form.patchValue({ type: 'crypto', address: 'bc1qxy2k', blockchain: 'bitcoin' });
+    form.form.patchValue({ address: '' });
+
+    expect(form.form.controls.startBalance.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 50 });
+  });
+
+  it('leaves the start balance editable without transactions', () => {
+    const form = createForm({ ...withTransactions, last_transaction_date: null });
+
+    expect(form.hasTransactions()).toBe(false);
+    expect(form.form.controls.startBalance.enabled).toBe(true);
+  });
+});
+
 describe('AccountForm start balance precision', () => {
   beforeEach(() => TestBed.resetTestingModule());
 

@@ -24,6 +24,10 @@
         </tui-textfield>
     </div>
 
+    @if (hasTransactions() && !tracked()) {
+        <p class="hint">The account has transactions: to correct its balance, add a correcting transaction.</p>
+    }
+
     @if (type() === 'bank') {
         <tui-textfield>
             <label tuiLabel>Account Number</label>
