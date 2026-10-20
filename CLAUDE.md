@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A personal finance management web app: multi-user, with per-account sharing
-(read / write / admin) between users. Core scope for now: income/expense transactions with
-hierarchical categories, multi-currency accounts, manual entry (CSV
-bank-statement import planned, not built). Investments/assets and
+(read / write / admin) between users. Core scope for now: income/expense
+transactions with hierarchical categories, multi-currency accounts, manual
+entry (CSV bank-statement import planned, not built). Investments/assets and
 analytics/reports are deferred to later phases.
 
 Local-only deployment for now; no hosted/prod environment exists.## Commands
@@ -88,7 +88,9 @@ All API responses use this envelope format consistently.
   refused with "Delete the account instead". When a member loses access their
   expense/income rows on that account are re-assigned to the owner with the
   categories copied into the owner's tree, so `transactions.user_id` means
-  "who entered it, or the owner who inherited it".
+  "who entered it, or the owner who inherited it". Rows others entered there
+  with the departing member's categories keep their author and get the
+  category copied into that author's tree.
 - Clean-up for mistaken/test accounts (ADMIN on the account, WRITE on every
   transfer peer): `DELETE /api/accounts/:id/transactions` removes all its
   transactions, `DELETE /api/accounts/:id?withTransactions=true` also removes
@@ -149,8 +151,9 @@ between accounts of different currencies simply carry two amounts
 
 Visibility follows accounts, not `transactions.user_id`: a transaction is
 visible when the user can reach at least one of its accounts.
-`transactions.user_id` records who entered the row and must never be used as
-an access filter. Permission checks live in the service layer via
+`transactions.user_id` records who entered the row (or the owner who
+inherited it, see account shares above) and must never be used as an access
+filter. Permission checks live in the service layer via
 `requireLevel` / `requireLevelOnAll`; `db/queries/*` filter by account id
 only.
 
