@@ -1,4 +1,5 @@
-import { query } from '../index';
+import { query, execute } from '../index';
+import { AccountMember } from '../../types';
 
 export interface AccessRow {
   account_id: number;
@@ -53,5 +54,42 @@ export const getAccessRows = async (userId: number): Promise<AccessRow[]> => {
      UNION ALL
      SELECT account_id, level FROM account_shares WHERE user_id = $1`,
     [userId]
+  );
+};
+
+/**
+ * The creator (accounts.user_id) plus everyone in account_shares. The creator
+ * resolves to 3 when someone holds 3, else 4 — the same co-owned rule as
+ * getAccessRows. Creator first, then strongest level, then name.
+ */
+export const getAccountMembers = async (accountId: number): Promise<AccountMember[]> => {
+  return query<AccountMember>(
+    `SELECT user_id, name, email, level, is_creator FROM (
+       SELECT u.id AS user_id, u.name, u.email,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM account_shares s
+                WHERE s.account_id = a.id AND s.level = 3
+              ) THEN 3 ELSE 4 END AS level,
+              true AS is_creator
+         FROM accounts a JOIN users u ON u.id = a.user_id
+        WHERE a.id = $1
+       UNION ALL
+       SELECT u.id, u.name, u.email, s.level, false
+         FROM account_shares s JOIN users u ON u.id = s.user_id
+        WHERE s.account_id = $1
+     ) m
+     ORDER BY is_creator DESC, level DESC, name`,
+    [accountId]
+  );
+};
+
+export const insertShare = async (
+  accountId: number,
+  userId: number,
+  level: 1 | 2 | 3
+): Promise<void> => {
+  await execute(
+    'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',
+    [accountId, userId, level]
   );
 };

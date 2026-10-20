@@ -87,6 +87,14 @@ export interface TransactionDTO {
   created_at: Date;
 }
 
+export interface AccountMember {
+  user_id: number;
+  name: string;
+  email: string;
+  level: 1 | 2 | 3 | 4;
+  is_creator: boolean;
+}
+
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;

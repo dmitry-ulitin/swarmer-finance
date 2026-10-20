@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import * as accountService from '../services/accounts';
 import * as chainSync from '../services/chainSync';
+import * as shareService from '../services/accountShares';
 
 const router = Router();
 
@@ -77,6 +78,11 @@ const updateAccountSchema = z.discriminatedUnion('type', [
   z.strictObject({ ...updateBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
 ]);
 
+const addShareSchema = z.strictObject({
+  email: z.string().trim().min(1),
+  level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+});
+
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const accounts = await accountService.getAccounts(req.userId!);
@@ -136,6 +142,26 @@ router.post('/:id/sync', async (req: AuthRequest, res, next) => {
     const id = parseInt(req.params.id as string, 10);
     const result = await chainSync.syncAccount(req.userId!, id);
     res.json({ data: result, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/shares', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const members = await shareService.listMembers(id, req.userId!);
+    res.json({ data: members, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/shares', validate(addShareSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const members = await shareService.addMember(id, req.userId!, req.body.email, req.body.level);
+    res.json({ data: members, error: null });
   } catch (error) {
     next(error);
   }

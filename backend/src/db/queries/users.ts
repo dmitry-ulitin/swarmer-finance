@@ -25,3 +25,11 @@ export const createUser = async (
   );
   return result[0];
 };
+
+export const getUserIdByEmail = async (email: string): Promise<number | null> => {
+  const row = await queryOne<{ id: number }>(
+    'SELECT id FROM users WHERE lower(email) = lower($1)',
+    [email]
+  );
+  return row ? row.id : null;
+};
