@@ -83,7 +83,7 @@ export class AccountDialogService {
 
   async openDelete(account: Account): Promise<boolean> {
     const data: TuiConfirmData = {
-      content: `Delete "${account.name}"?`,
+      content: `Are you sure you want to delete "${account.name}"?`,
       yes: 'Delete',
       no: 'Cancel',
     };
@@ -104,7 +104,7 @@ export class AccountDialogService {
   /** Deletes every transaction of the account; transfers stay on their other account. */
   async openPurgeTransactions(account: Account): Promise<boolean> {
     const data: TuiConfirmData = {
-      content: `Delete all transactions of "${account.name}"? Transfers stay on their other account `
+      content: `Are you sure you want to delete all transactions of "${account.name}"? Transfers stay on their other account `
         + 'as uncategorized income or expense. This cannot be undone.',
       yes: 'Delete transactions',
       no: 'Cancel',
@@ -124,7 +124,7 @@ export class AccountDialogService {
   /** Deletes the account for good, with its transactions, as openPurgeTransactions does. */
   async openDeleteWithTransactions(account: Account): Promise<boolean> {
     const data: TuiConfirmData = {
-      content: `Delete "${account.name}" and all its transactions? Transfers stay on their other account `
+      content: `Are you sure you want to delete "${account.name}" and all its transactions? Transfers stay on their other account `
         + 'as uncategorized income or expense. This cannot be undone.',
       yes: 'Delete account',
       no: 'Cancel',

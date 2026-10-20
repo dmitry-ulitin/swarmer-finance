@@ -108,7 +108,7 @@ export class TransactionDialogService {
         this.dialogs.open<boolean>(TUI_CONFIRM, {
           label: 'Delete Transaction',
           size: 's',
-          data: { content: `Delete "${description}"?`, yes: 'Delete', no: 'Cancel' } satisfies TuiConfirmData,
+          data: { content: `Are you sure you want to delete "${description}"?`, yes: 'Delete', no: 'Cancel' } satisfies TuiConfirmData,
         }),
         { defaultValue: false }
       );
