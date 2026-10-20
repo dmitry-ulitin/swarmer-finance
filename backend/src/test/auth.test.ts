@@ -33,6 +33,20 @@ describe('Auth API', () => {
       expect(res.body.error).toBe('Email already registered');
     });
 
+    it('treats emails case-insensitively: stores lowercase, logs in and refuses duplicates in any case', async () => {
+      const email = `Mixed${Date.now()}@Example.com`;
+      const reg = await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+      expect(reg.status).toBe(200);
+      expect(reg.body.data.user.email).toBe(email.toLowerCase());
+
+      const login = await request(app).post('/api/auth/login').send({ email: email.toUpperCase(), password: 'password123' });
+      expect(login.status).toBe(200);
+
+      const dup = await request(app).post('/api/auth/register').send({ email: email.toLowerCase(), password: 'password123' });
+      expect(dup.status).toBe(400);
+      expect(dup.body.error).toBe('Email already registered');
+    });
+
     it('should return error for invalid email', async () => {
       const res = await request(app)
         .post('/api/auth/register')

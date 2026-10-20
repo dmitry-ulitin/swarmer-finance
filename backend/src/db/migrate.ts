@@ -52,4 +52,5 @@ async function runMigrations() {
   }
 }
 
-runMigrations().catch(console.error);
+// runMigrations has logged the error; the exit code tells scripts it failed.
+runMigrations().catch(() => { process.exitCode = 1; });

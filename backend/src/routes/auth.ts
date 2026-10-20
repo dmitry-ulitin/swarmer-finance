@@ -12,15 +12,19 @@ const currencySchema = z
   .string()
   .regex(/^[A-Z]{3,4}$/, 'Currency must be 3 or 4 uppercase ASCII letters (e.g. USD, EUR, USDT)');
 
+// Emails are stored and looked up lowercase, so Bob@x and bob@x are one
+// user (migration 017 enforces it).
+const emailSchema = z.string().trim().toLowerCase().email();
+
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(6),
   name: z.string().optional(),
   currency: currencySchema.optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string(),
 });
 

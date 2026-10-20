@@ -27,6 +27,13 @@ describe('readStatement — LHV', () => {
     );
   });
 
+  it('refuses a date that does not exist', () => {
+    const csv = lhvCsv('2026-02-31,MERCHANT 001,D,10.00,Description 1,EUR,1400000000,ASR0000001');
+    expect(() => readStatement(csv, PROFILES.lhv, 'EUR')).toThrow(
+      expect.objectContaining({ statusCode: 400, message: "Unreadable date '2026-02-31'" })
+    );
+  });
+
   it('skips rows in a currency other than the account\'s', () => {
     const csv = lhvCsv(
       '2026-07-01,MERCHANT 001,D,10.00,Description 1,EUR,1400000000,ASR0000001',

@@ -1,6 +1,7 @@
 import { parseCsv } from './csv';
 import { isWorkbook, parseWorkbook } from './workbook';
 import { headerRow, Profile } from './profiles';
+import { isIsoDate } from '../date';
 
 export interface ParsedRow {
   index: number;
@@ -15,6 +16,13 @@ export interface ParsedRow {
 }
 
 function parseDate(value: string, format: Profile['dateFormat']): string {
+  const date = readDate(value, format);
+  // The patterns check the shape only; 31.02.2026 must not reach Postgres.
+  if (!isIsoDate(date)) throw { statusCode: 400, message: `Unreadable date '${value}'` };
+  return date;
+}
+
+function readDate(value: string, format: Profile['dateFormat']): string {
   const v = value.trim();
   if (format === 'iso') {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {

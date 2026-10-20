@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { validate } from '../middleware/validation';
+import { isoDateSchema, validate } from '../middleware/validation';
 import * as importService from '../services/import';
 
 const router = Router();
@@ -19,7 +19,7 @@ const reconcileSchema = z.object({
   accountId: z.number().int().positive(),
   rows: z.array(
     z.object({
-      date: z.string(),
+      date: isoDateSchema,
       amount: z.number(),
       description: z.string().optional(),
       payee: z.string().nullish(),

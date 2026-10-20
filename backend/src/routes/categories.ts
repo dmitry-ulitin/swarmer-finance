@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { validate } from '../middleware/validation';
+import { validate, validateIdParam } from '../middleware/validation';
 import * as categoryService from '../services/categories';
 
 const router = Router();
 
 router.use(authMiddleware);
+router.param('id', validateIdParam);
 
 const createCategorySchema = z.object({
   name: z.string().min(1).max(255),

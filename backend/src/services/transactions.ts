@@ -319,7 +319,10 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
   const existingCreditAccount = existing.credit_account_id != null
     ? await accountQueries.getAccountById(existing.credit_account_id)
     : null;
-  const existingScale = existingDebitAccount?.scale ?? existingCreditAccount?.scale ?? 2;
+  // Each side at its own account's scale: a cross-currency transfer's two
+  // amounts can differ in decimal places (EUR cents vs BTC satoshis).
+  const existingDebitScale = existingDebitAccount?.scale ?? existingCreditAccount?.scale ?? 2;
+  const existingCreditScale = existingCreditAccount?.scale ?? existingDebitAccount?.scale ?? 2;
 
   // Merge input with existing values to re-validate the full resulting state.
   // null in input means "clear this field"; undefined means "keep existing".
@@ -327,8 +330,8 @@ export const updateTransaction = async (id: number, userId: number, input: Updat
     categoryId: input.categoryId !== undefined ? (input.categoryId ?? undefined) : (existing.category_id ?? undefined),
     debitAccountId: input.debitAccountId !== undefined ? (input.debitAccountId ?? undefined) : (existing.debit_account_id ?? undefined),
     creditAccountId: input.creditAccountId !== undefined ? (input.creditAccountId ?? undefined) : (existing.credit_account_id ?? undefined),
-    debit: input.debit ?? toDecimal(existing.debit, existingScale),
-    credit: input.credit ?? toDecimal(existing.credit, existingScale),
+    debit: input.debit ?? toDecimal(existing.debit, existingDebitScale),
+    credit: input.credit ?? toDecimal(existing.credit, existingCreditScale),
     date: input.date ?? existing.date,
     description: input.description !== undefined ? (input.description ?? undefined) : existing.description,
     payee: input.payee !== undefined ? (input.payee ?? undefined) : (existing.payee ?? undefined),

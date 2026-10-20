@@ -41,6 +41,10 @@ async function refreshRate(from: string, to: string): Promise<void> {
     }
   }
 
+  // Nothing new landed: note the attempt so the next requests serve the
+  // cache instead of asking again (see isRateFresh).
+  await exchangeRateQueries.markRateChecked(from, to);
+
   if (failures === PROVIDERS.length) {
     // Nothing answered. Any rate served for this pair now comes from the
     // cache and may be arbitrarily old.
@@ -55,11 +59,12 @@ async function refreshRate(from: string, to: string): Promise<void> {
 }
 
 // Shared cache/refresh/fallback policy for a single currency pair:
-// use the latest cached rate if any row is dated today or later -> otherwise
-// refresh via the provider chain -> re-check the latest cache -> null if
-// nothing exists. The freshness check is done in SQL (hasRateSince).
+// use the latest cached rate if it is dated today or later, or was refreshed
+// within the hour -> otherwise refresh via the provider chain -> re-check the
+// latest cache -> null if nothing exists. The freshness check is done in SQL
+// (isRateFresh).
 async function getCachedRate(from: string, to: string): Promise<number | null> {
-  if (await exchangeRateQueries.hasRateSince(from, to, today())) {
+  if (await exchangeRateQueries.isRateFresh(from, to, today())) {
     const latest = await exchangeRateQueries.getLatestRate(from, to);
     if (latest) return Number(latest.rate);
   }

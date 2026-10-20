@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { validate } from '../middleware/validation';
+import { isoDateSchema, validate, validateIdParam } from '../middleware/validation';
 import * as transactionService from '../services/transactions';
 import { TransactionFilters } from '../db/queries/transactions';
 
 const router = Router();
 
 router.use(authMiddleware);
+router.param('id', validateIdParam);
 
 const createTransactionSchema = z.object({
   categoryId: z.number().int().positive().nullish(),
@@ -15,7 +16,7 @@ const createTransactionSchema = z.object({
   creditAccountId: z.number().int().positive().nullish(),
   debit: z.number().positive(),
   credit: z.number().positive(),
-  date: z.string(),
+  date: isoDateSchema,
   description: z.string().nullish(),
   payee: z.string().nullish(),
 });
@@ -28,8 +29,8 @@ const arrayOfIds = z.preprocess(
 );
 
 const filtersSchema = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
   categories: arrayOfIds,
   accounts: arrayOfIds,
   details: z.string().optional(),
@@ -65,8 +66,8 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
 });
 
 const summarySchema = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
   accounts: arrayOfIds,
 });
 

@@ -110,6 +110,20 @@ describe('Account scale follows the currency', () => {
     expect(res.body.data.scale).toBe(2);
   });
 
+  it('keeps both amounts of a EUR -> BTC transfer when only its description is edited', async () => {
+    const eur = (await create('EUR', 100)).body.data.id;
+    const btc = (await create('BTC')).body.data.id;
+    const t = await request(app).post('/api/transactions').set(auth())
+      .send({ debitAccountId: eur, creditAccountId: btc, debit: 50, credit: 0.001, date: '2026-01-01' });
+    expect(t.status).toBe(200);
+
+    const res = await request(app).put(`/api/transactions/${t.body.data.id}`).set(auth())
+      .send({ description: 'renamed' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.debit).toBe(50);
+    expect(res.body.data.credit).toBe(0.001);
+  });
+
   it('migration 014 moves accounts to their currency scale without changing amounts', async () => {
     const acc = (currency: string, scale: number, start: number) =>
       pool.query(

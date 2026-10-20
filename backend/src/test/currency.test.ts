@@ -33,6 +33,36 @@ describe('getOrRefreshRate', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('reuses a rate dated before today (weekend, before ECB publication) within the hour', async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: yesterday, rates: { EUR: 0.91 } }),
+    }) as unknown as typeof fetch;
+
+    expect(await getOrRefreshRate('USD', 'EUR')).toBe(0.91);
+    expect(await getOrRefreshRate('USD', 'EUR')).toBe(0.91);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a failed refresh within the hour', async () => {
+    await pool.query(
+      `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)
+       VALUES ('GBP', 'EUR', 1.17, '2020-01-01')`
+    );
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+      expect(await getOrRefreshRate('GBP', 'EUR')).toBe(1.17);
+      const calls = (global.fetch as jest.Mock).mock.calls.length;
+      expect(await getOrRefreshRate('GBP', 'EUR')).toBe(1.17);
+      expect(global.fetch).toHaveBeenCalledTimes(calls);
+    } finally {
+      console.error = origError;
+    }
+  });
+
   it('falls back to a stale cached rate when Frankfurter is unreachable', async () => {
     await pool.query(
       `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)

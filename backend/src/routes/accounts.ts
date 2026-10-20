@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { validate } from '../middleware/validation';
+import { validate, validateIdParam } from '../middleware/validation';
 import * as accountService from '../services/accounts';
 import * as chainSync from '../services/chainSync';
 import * as shareService from '../services/accountShares';
@@ -9,6 +9,8 @@ import * as shareService from '../services/accountShares';
 const router = Router();
 
 router.use(authMiddleware);
+router.param('id', validateIdParam);
+router.param('userId', validateIdParam);
 
 // Currency code: 3 uppercase ASCII letters (ISO 4217, e.g. USD, EUR, GBP)
 // or 4 uppercase ASCII letters (crypto-style tickers like USDT, USDC).
