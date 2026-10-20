@@ -147,7 +147,8 @@ describe('CategorySummaryPanel', () => {
     expect(headers[0].getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('filters by transfers, even with no income or expenses', async () => {
+  it('filters by transfers', async () => {
+    respond({ expense: [item('Food', 75)] });
     const el = await render();
     const transfers = el.querySelector<HTMLButtonElement>('.transfers')!;
 
@@ -156,7 +157,13 @@ describe('CategorySummaryPanel', () => {
     expect(selectType).toHaveBeenCalledExactlyOnceWith('transfer');
   });
 
+  it('hides transfers when there is no income or expenses', async () => {
+    const el = await render();
+    expect(el.querySelector('.transfers')).toBeNull();
+  });
+
   it('marks transfers when selected', async () => {
+    respond({ expense: [item('Food', 75)] });
     selectedType.set('transfer');
     const el = await render();
     const transfers = el.querySelector('.transfers')!;
