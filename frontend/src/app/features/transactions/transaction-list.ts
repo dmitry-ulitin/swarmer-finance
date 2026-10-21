@@ -25,8 +25,6 @@ export class TransactionList {
 
   constructor() {
     afterNextRender(() => {
-      this.state.reload();
-
       const observer = new IntersectionObserver(
         entries => { if (entries[0].isIntersecting) this.state.loadMore(); },
         { rootMargin: '0px 0px 400px 0px' }
