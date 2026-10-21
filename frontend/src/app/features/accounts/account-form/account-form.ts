@@ -20,6 +20,9 @@ const TYPE_LABELS: Record<AccountType, string> = {
   crypto: 'Crypto',
 };
 
+/** The combo box takes free text; the backend wants an upper-case code. */
+const normalizeCurrency = (currency: string): string => currency.trim().toUpperCase();
+
 @Component({
   selector: 'app-account-form',
   imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat],
@@ -64,7 +67,7 @@ export class AccountForm {
     initialValue: this.form.controls.currency.value,
   });
   /** The backend stores the account at its currency's scale. */
-  readonly balancePrecision = computed(() => currencyScale(this.currency() ?? ''));
+  readonly balancePrecision = computed(() => currencyScale(normalizeCurrency(this.currency() ?? '')));
   readonly balanceQuantum = computed(() => 1 / Math.pow(10, this.balancePrecision()));
 
   /** The backend refuses a new start balance once the account has transactions. */
@@ -142,7 +145,7 @@ export class AccountForm {
   // stored settings hold only keys the user actually filled in.
   buildPayload(): AccountPayload {
     const raw = this.form.getRawValue();
-    const base = { name: raw.name, currency: raw.currency, startBalance: raw.startBalance };
+    const base = { name: raw.name, currency: normalizeCurrency(raw.currency), startBalance: raw.startBalance };
     const clean = (value: string): string | undefined => {
       const trimmed = value.trim();
       return trimmed === '' ? undefined : trimmed;

@@ -30,9 +30,20 @@ export class Header {
   readonly sync = inject(AccountSyncService);
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
+  /** Changing a transaction takes write access on every account it touches, as the backend requires. */
+  readonly canWrite = computed(() => {
+    const t = this.selectedTransaction();
+    if (!t) return false;
+    const accounts = this.accountState.accounts();
+    return [t.debit_account, t.credit_account].every(side => {
+      if (!side) return true;
+      const account = accounts.find(a => a.id === side.id);
+      return !!account && accessLevelOf(account) >= 2;
+    });
+  });
   readonly canDelete = computed(() => {
     const t = this.selectedTransaction();
-    return !!t && !syncedLock(t, this.accountState.trackedIds()).synced;
+    return !!t && this.canWrite() && !syncedLock(t, this.accountState.trackedIds()).synced;
   });
   /** The account the filters narrow to, when exactly one is selected. */
   readonly filteredAccount = computed(() => {
@@ -44,6 +55,11 @@ export class Header {
   readonly canEditFiltered = computed(() => {
     const account = this.filteredAccount();
     return !!account && accessLevelOf(account) >= 3;
+  });
+  /** Importing and syncing take write access. */
+  readonly canWriteFiltered = computed(() => {
+    const account = this.filteredAccount();
+    return !!account && accessLevelOf(account) >= 2;
   });
 
   categories(): void {
@@ -71,12 +87,12 @@ export class Header {
 
   importFilteredAccount(): void {
     const account = this.filteredAccount();
-    if (account) void this.importDialog.open(account);
+    if (account && this.canWriteFiltered()) void this.importDialog.open(account);
   }
 
   syncFilteredAccount(): void {
     const account = this.filteredAccount();
-    if (account) void this.sync.sync(account);
+    if (account && this.canWriteFiltered()) void this.sync.sync(account);
   }
 
   addTransaction(): void {

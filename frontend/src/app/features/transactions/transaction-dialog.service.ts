@@ -30,6 +30,7 @@ export function buildCreateDefaults(
       created_at: undefined,
       description: '',
       payee: '',
+      txid: null,
       category: null,
       debit: undefined,
       credit: undefined,
@@ -60,7 +61,6 @@ export class TransactionDialogService {
   private readonly notifications = inject(NotificationService);
 
   async openCreate(): Promise<Transaction | null> {
-    const { TransactionForm } = await import('./transaction-form/transaction-form');
     // The prefill and the default account must be ones a transaction can be
     // entered against by hand: live, untracked and writable.
     const targets = this.accountState.transferTargets();
@@ -76,6 +76,7 @@ export class TransactionDialogService {
     const preferredAccount = targets.find(a => a.id === this.transactionsState.selectedAccountIds()[0]) || targets[0];
     const defaultData = buildCreateDefaults(lastTransaction, preferredAccount, localToday())!;
     try {
+      const { TransactionForm } = await import('./transaction-form/transaction-form');
       const result = await firstValueFrom(
         this.dialogs.open<TransactionRequest | null>(
           new PolymorpheusComponent(TransactionForm, this.injector),

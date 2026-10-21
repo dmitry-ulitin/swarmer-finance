@@ -92,6 +92,8 @@ export class TransactionsState {
     effect(() => {
       if (this.auth.isAuthenticated()) return;
       untracked(() => {
+        // Drops a page still in flight for the user who just left.
+        this._revision.update(r => r + 1);
         this._filters.set({});
         this._selectedTransaction.set(null);
         this._transactions.set([]);

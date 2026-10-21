@@ -36,6 +36,14 @@ describe('AccountForm payload', () => {
     });
   });
 
+  it('sends a typed currency trimmed and upper-cased', () => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ name: 'Wallet', currency: ' usdt ', startBalance: 0 });
+
+    expect(form.buildPayload().currency).toBe('USDT');
+    expect(form.balancePrecision()).toBe(6);
+  });
+
   it('sends only crypto keys for a crypto account', () => {
     const form = createForm({ currency: 'BTC' });
     form.form.patchValue({

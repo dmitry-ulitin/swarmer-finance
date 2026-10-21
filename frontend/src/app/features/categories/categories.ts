@@ -57,8 +57,8 @@ export class Categories {
   });
   readonly isDeletable = computed(() => {
     const category = this.selectedCategory();
-    return category != null && category.parent_id !== null && this.isOwn(category)
-      && (category.children?.length ?? 0) === 0;
+    // Subcategories move up to the parent; the delete preview reports a clash.
+    return category != null && category.parent_id !== null && this.isOwn(category);
   });
 
   setAsSelected(node: Category) {

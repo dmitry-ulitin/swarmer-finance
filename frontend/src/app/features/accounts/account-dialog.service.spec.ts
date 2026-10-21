@@ -19,18 +19,20 @@ describe('AccountDialogService.openDelete', () => {
   let service: AccountDialogService;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let deleteAccount: ReturnType<typeof vi.fn>;
+  let reloadWithout: ReturnType<typeof vi.fn>;
   let showError: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     dialogOpen = vi.fn(() => of(true));
     deleteAccount = vi.fn(() => of({ data: null, error: null }));
+    reloadWithout = vi.fn();
     showError = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: TuiDialogService, useValue: { open: dialogOpen } },
         { provide: AccountsState, useValue: { delete: deleteAccount } },
         { provide: AuthService, useValue: { user: () => null } },
-        { provide: TransactionsState, useValue: { reload: vi.fn() } },
+        { provide: TransactionsState, useValue: { reloadWithout } },
         { provide: NotificationService, useValue: { showError } },
         { provide: AccountSyncService, useValue: { sync: vi.fn() } },
       ],
@@ -41,6 +43,7 @@ describe('AccountDialogService.openDelete', () => {
   it('deletes the account once confirmed', async () => {
     expect(await service.openDelete(account)).toBe(true);
     expect(deleteAccount).toHaveBeenCalledWith(7);
+    expect(reloadWithout).toHaveBeenCalledWith(7);
     expect(showError).not.toHaveBeenCalled();
   });
 
@@ -64,6 +67,7 @@ describe('AccountDialogService purge actions', () => {
   let purgeTransactions: ReturnType<typeof vi.fn>;
   let deleteWithTransactions: ReturnType<typeof vi.fn>;
   let reloadTransactions: ReturnType<typeof vi.fn>;
+  let reloadWithout: ReturnType<typeof vi.fn>;
   let showError: ReturnType<typeof vi.fn>;
   let showSuccess: ReturnType<typeof vi.fn>;
 
@@ -72,13 +76,14 @@ describe('AccountDialogService purge actions', () => {
     purgeTransactions = vi.fn(() => of({ data: { deleted: 3, detached: 1 }, error: null }));
     deleteWithTransactions = vi.fn(() => of({ data: { deleted: 1, detached: 0 }, error: null }));
     reloadTransactions = vi.fn();
+    reloadWithout = vi.fn();
     showError = vi.fn();
     showSuccess = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: TuiDialogService, useValue: { open: dialogOpen } },
         { provide: AccountsState, useValue: { purgeTransactions, deleteWithTransactions } },
-        { provide: TransactionsState, useValue: { reload: reloadTransactions } },
+        { provide: TransactionsState, useValue: { reload: reloadTransactions, reloadWithout } },
         { provide: AuthService, useValue: { user: () => null } },
         { provide: NotificationService, useValue: { showError, showSuccess } },
         { provide: AccountSyncService, useValue: { sync: vi.fn() } },
@@ -97,7 +102,7 @@ describe('AccountDialogService purge actions', () => {
   it('deletes the account with its transactions once confirmed', async () => {
     expect(await service.openDeleteWithTransactions(account)).toBe(true);
     expect(deleteWithTransactions).toHaveBeenCalledWith(7);
-    expect(reloadTransactions).toHaveBeenCalled();
+    expect(reloadWithout).toHaveBeenCalledWith(7);
     expect(showSuccess).toHaveBeenCalledWith('Account deleted, 1 transaction deleted');
   });
 

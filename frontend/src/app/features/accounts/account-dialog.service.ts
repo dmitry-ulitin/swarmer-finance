@@ -94,6 +94,8 @@ export class AccountDialogService {
       );
       if (!confirmed) return false;
       await firstValueFrom(this.accountsState.delete(account.id));
+      // A filter still naming the account would hide it and show nothing.
+      this.transactionsState.reloadWithout(account.id);
       return true;
     } catch (e) {
       this.notifications.showError(e, 'Failed to delete account');
@@ -132,7 +134,7 @@ export class AccountDialogService {
     try {
       if (!await this.confirm('Delete Account with Transactions', data)) return false;
       const response = await firstValueFrom(this.accountsState.deleteWithTransactions(account.id));
-      this.transactionsState.reload();
+      this.transactionsState.reloadWithout(account.id);
       this.notifications.showSuccess(`Account deleted, ${describePurge(response.data!)}`);
       return true;
     } catch (e) {

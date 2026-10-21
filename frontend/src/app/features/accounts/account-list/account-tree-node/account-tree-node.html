@@ -8,7 +8,7 @@
         [class.active]="transactions.selectedAccountIds().includes(account.id)"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
       >{{ account.displayName }}</button>
-      @if (account.type === 'bank') {
+      @if (account.type === 'bank' && canWrite(account)) {
       <button
         appearance="gray"
         class="small"
@@ -21,7 +21,7 @@
         Import
       </button>
       }
-      @if (account.tracked) {
+      @if (account.tracked && canWrite(account)) {
       <button
         appearance="gray"
         class="small"

@@ -304,6 +304,32 @@ describe('TransactionsState on logout', () => {
   });
 });
 
+describe('TransactionsState on logout, with a page in flight', () => {
+  it('drops the page when it arrives after logout', async () => {
+    const isAuthenticated = signal(true);
+    const pending = new Subject<unknown>();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getTransactions: vi.fn(() => pending) } },
+        { provide: AuthService, useValue: { isAuthenticated } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+        { provide: AccountsState, useValue: { accounts: signal([]), visibleAccounts: signal([]) } },
+      ],
+    });
+    const state = TestBed.inject(TransactionsState);
+    state.reload();
+    TestBed.tick();
+
+    isAuthenticated.set(false);
+    TestBed.tick();
+    pending.next({ data: [{ id: 7 }], error: null });
+    pending.complete();
+    await Promise.resolve();
+
+    expect(state.transactions()).toEqual([]);
+  });
+});
+
 describe('TransactionsState fetch', () => {
   let getTransactions: ReturnType<typeof vi.fn>;
   let showError: ReturnType<typeof vi.fn>;

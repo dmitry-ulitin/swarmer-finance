@@ -81,12 +81,12 @@ describe('Categories management screen', () => {
     expect(screen.isDeletable()).toBe(true);
   });
 
-  it('still refuses to delete my own category that has children', () => {
+  it('deletes my own category that has children: they move up to its parent', () => {
     const screen = configure();
     screen.setAsSelected(withChild);
 
     expect(screen.isEditable()).toBe(true);
-    expect(screen.isDeletable()).toBe(false);
+    expect(screen.isDeletable()).toBe(true);
   });
 
   it('refuses to edit or delete a system root', () => {

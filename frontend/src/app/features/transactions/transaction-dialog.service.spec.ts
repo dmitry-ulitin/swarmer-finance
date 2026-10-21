@@ -93,6 +93,16 @@ describe('buildCreateDefaults', () => {
     expect(result?.date).toBe('2026-09-14');
   });
 
+  it('does not carry over the txid of a synced transfer', () => {
+    const lastTransfer = makeTransaction({
+      debit_account: makeTxAccount(1, 'Cash'),
+      credit_account: makeTxAccount(2, 'Wallet'),
+      txid: 'abc123',
+    });
+
+    expect(buildCreateDefaults(lastTransfer, undefined, '2026-09-14')?.txid).toBeNull();
+  });
+
   it('returns null when there is no last transaction and no preferred account', () => {
     expect(buildCreateDefaults(undefined, undefined, '2026-09-14')).toBeNull();
   });

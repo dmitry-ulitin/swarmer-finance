@@ -7,7 +7,7 @@ import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';
 import { TuiExpand, TuiButton, TuiHint } from '@taiga-ui/core';
 import { TuiHovered } from '@taiga-ui/cdk';
-import { Account } from '../../../../models/account';
+import { Account, accessLevelOf } from '../../../../models/account';
 import { ImportDialogService } from '../../../import/import-dialog.service';
 import { AccountSyncService } from '../../account-sync.service';
 
@@ -68,6 +68,11 @@ export class AccountTreeNode {
   }
 
   protected readonly indent = computed(() => `calc(0.25rem + ${this.depth()}rem)`);
+
+  /** Importing and syncing take write access. */
+  protected canWrite(account: Account): boolean {
+    return accessLevelOf(account) >= 2;
+  }
 
   protected onImport(account: Account): void {
     void this.importDialog.open(account);
