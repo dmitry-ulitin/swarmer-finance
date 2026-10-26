@@ -111,7 +111,10 @@ locally today; a push to `main` redeploys both services.
 
 ### Login rate limiting
 
-- Applies to `POST /api/auth/login` (and `register` while it is open).
+- Applies to `POST /api/auth/login`. Register is not throttled: it is open
+  only briefly and then switched off. (My call, made while planning,
+  because throttling register per IP would break the test suite, which
+  registers many users from one address.)
   Failed logins are counted per **client IP + email** (my call). Express
   trusts Render's proxy (`app.set('trust proxy', ...)`) so the IP comes from
   `X-Forwarded-For`. Requests pass through the static-site rewrite *and*
