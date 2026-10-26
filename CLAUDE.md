@@ -19,7 +19,9 @@ Production runs on Render (`render.yaml` Blueprint, auto-deploy from
 unpooled URL on every start; `swarmer-finance` is a static site that rewrites
 `/api/*` to the API, so the browser sees one origin. Secrets are set in the
 Render dashboard. Prod data diverges from local dev from the one-off copy
-(`backend/scripts/copy-to-neon.ts`) on.
+(`backend/scripts/copy-to-neon.ts`) on. `.github/workflows/backup.yml` takes a
+daily age-encrypted dump to Google Drive (keeps 30); restore steps in
+`backend/scripts/README.md`.
 
 Design specs and implementation plans for past features live in
 `docs/superpowers/specs/` and `docs/superpowers/plans/`.

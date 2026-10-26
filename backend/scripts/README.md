@@ -157,7 +157,10 @@ owner's Google Drive, keeping the newest 30. Repository secrets:
 - `BACKUP_AGE_RECIPIENT` — the `age` public key (`age1…`); the private key is
   kept by the owner only, outside the repo and Drive
 - `RCLONE_CONFIG` — an `rclone.conf` with a `[gdrive]` Drive remote
-  (`scope = drive.file`)
+  (`scope = drive.file`) using the owner's own OAuth client (Google Cloud
+  project "swarmer-backup"; privacy page `frontend/public/privacy.html`).
+  With `drive.file` a client sees only files it created, so switching to
+  another client starts a new backup folder.
 
 ## Restoring
 
