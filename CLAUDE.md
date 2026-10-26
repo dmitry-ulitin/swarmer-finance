@@ -13,7 +13,13 @@ Direct bank sync via Enable Banking is designed but not built
 Investments/assets and analytics/reports beyond the category summary are
 deferred to later phases.
 
-Local-only deployment for now; no hosted/prod environment exists.
+Production runs on Render (`render.yaml` Blueprint, auto-deploy from
+`main`) against Neon Postgres (project `red-lab-45916696`, eu-central-1):
+`swarmer-finance-api` is a free web service that migrates through Neon's
+unpooled URL on every start; `swarmer-finance` is a static site that rewrites
+`/api/*` to the API, so the browser sees one origin. Secrets are set in the
+Render dashboard. Prod data diverges from local dev from the one-off copy
+(`backend/scripts/copy-to-neon.ts`) on.
 
 Design specs and implementation plans for past features live in
 `docs/superpowers/specs/` and `docs/superpowers/plans/`.
@@ -67,6 +73,11 @@ All API responses use this envelope format consistently.
 - Frontend: `AuthService` uses Angular Signals; `AuthInterceptor` injects Bearer token; `authGuard`/`publicGuard` protect routes
 - `RefreshCoordinator` (`core/refresh-coordinator.ts`) makes the token refresh
   single-flight, so parallel 401s share one `/api/auth/refresh` call
+- Failed logins are throttled in memory per client IP + email
+  (`services/loginLimiter.ts`: 10 per 15 min, then 429; a success clears
+  it); `index.ts` trusts one proxy hop for `req.ip`
+- `REGISTRATION_ENABLED=false` closes `POST /api/auth/register` (403);
+  any other value or unset leaves it open
 
 ### Frontend State Management
 - **AuthService** (`core/auth.service.ts`): Signal-based `accessToken`, `userSignal`, computed `isAuthenticated`
@@ -214,6 +225,9 @@ only.
 Copy `.env.example` → `backend/.env` (dotenv reads it from the backend's
 working directory):
 - `DATABASE_URL` — PostgreSQL connection string
+- `DATABASE_URL_UNPOOLED` — Render only: Neon's direct endpoint, used by the
+  start command for migrations
+- `REGISTRATION_ENABLED` — `false` closes registration (default open)
 - `TEST_DATABASE_URL` — used instead of `DATABASE_URL` by Jest when set
 - `JWT_SECRET`, `JWT_REFRESH_SECRET` — token signing secrets
 - `PORT` — default 3000

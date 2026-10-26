@@ -1,0 +1,53 @@
+# Render Blueprint: the API as a free web service, the Angular app as a
+# static site that proxies /api/* to it. The database is on Neon; its URLs
+# and the API keys are entered in the Render dashboard (sync: false).
+services:
+  - type: web
+    name: swarmer-finance-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    branch: main
+    autoDeploy: true
+    # devDependencies are needed: tsc builds, tsx runs the .sql migrations.
+    buildCommand: npm ci --include=dev && npm run build
+    # Free plan has no pre-deploy command; migrate through Neon's direct
+    # (unpooled) endpoint on every start — a no-op when nothing is pending.
+    startCommand: DATABASE_URL=$DATABASE_URL_UNPOOLED npm run migrate && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: REGISTRATION_ENABLED
+        value: "true"
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: ETHERSCAN_API_KEY
+        sync: false
+      - key: TRONGRID_API_KEY
+        sync: false
+
+  - type: web
+    name: swarmer-finance
+    runtime: static
+    rootDir: frontend
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist/swarmer-finance/browser
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://swarmer-finance-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
