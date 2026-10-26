@@ -163,10 +163,14 @@ owner's Google Drive, keeping the newest 30. Repository secrets:
 
 ```bash
 age -d -i ~/path/to/swarmer-backup-key.txt swarmer-finance-YYYYMMDD-HHMM.dump.age > restore.dump
-# inspect locally in a scratch database (container pg_restore is v15 and
-# refuses a v18 dump, so use a v18 client, e.g. a postgres:18 container):
-docker run --rm -i --network host -v "$PWD:/w" postgres:18 \
-  pg_restore --no-owner --no-privileges -d "postgresql://finance_user:…@localhost:5432/<scratch_db>" /w/restore.dump
+# inspect it in a throwaway Postgres 18 (the dev container is v15 and its
+# tools refuse a v18 dump)
+docker run -d --rm --name restore-check -e POSTGRES_PASSWORD=check postgres:18
+docker cp restore.dump restore-check:/restore.dump
+docker exec restore-check createdb -U postgres check
+docker exec restore-check pg_restore --no-owner --no-privileges -U postgres -d check /restore.dump
+docker exec -it restore-check psql -U postgres -d check   # look around
+docker stop restore-check                                  # removes it
 ```
 
 Restoring into Neon itself: create a new Neon branch or an empty database,
