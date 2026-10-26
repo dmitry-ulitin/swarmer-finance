@@ -7,14 +7,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A personal finance management web app: multi-user, with per-account sharing
 (read / write / admin) between users. Core scope for now: income/expense
 transactions with hierarchical categories, multi-currency accounts, manual
-entry (CSV bank-statement import planned, not built). Investments/assets and
-analytics/reports are deferred to later phases.
+entry, bank-statement import (CSV/XLS/XLSX) and blockchain wallet sync.
+Direct bank sync via Enable Banking is designed but not built
+(`docs/superpowers/specs/2026-10-23-bank-sync-enable-banking-design.md`).
+Investments/assets and analytics/reports beyond the category summary are
+deferred to later phases.
 
-Local-only deployment for now; no hosted/prod environment exists.## Commands
+Local-only deployment for now; no hosted/prod environment exists.
+
+Design specs and implementation plans for past features live in
+`docs/superpowers/specs/` and `docs/superpowers/plans/`.
+
+## Commands
 
 ### Backend (`/backend`)
 ```bash
-npm run dev          # Dev server with hot-reload (tsx)
+npm run dev          # Dev server (tsx, no watch — restart after changes)
 npm run build        # TypeScript compile to dist/
 npm start            # Run production build
 npm run migrate      # Run pending database migrations
@@ -32,7 +40,7 @@ npm test             # Vitest unit tests
 
 ### Local Dev (Docker)
 ```bash
-docker-compose up --build   # Start local PostgreSQL
+docker-compose up -d        # Start local PostgreSQL
 ```
 
 ## Architecture
@@ -40,7 +48,8 @@ docker-compose up --build   # Start local PostgreSQL
 ### Monorepo Structure
 - `backend/` — Node.js + Express + PostgreSQL (raw SQL, no ORM)
 - `frontend/` — Angular 22 standalone components + Taiga UI v5
-- `docker-compose.yml` — local Postgres 17 (db: finance_db, localhost:5432)
+- `docker-compose.yml` — local Postgres 15 (db: finance_db, localhost:5432)
+- `backend/scripts/` — one-off SQL for migrating the legacy swarmerdb data
 
 ### Backend Request Flow
 ```
@@ -56,11 +65,14 @@ All API responses use this envelope format consistently.
 - JWT access token (15min) + refresh token (7d), stored in `localStorage`
 - Backend: `src/middleware/auth.ts` verifies JWT; `src/services/auth.ts` handles tokens/bcrypt
 - Frontend: `AuthService` uses Angular Signals; `AuthInterceptor` injects Bearer token; `authGuard`/`publicGuard` protect routes
+- `RefreshCoordinator` (`core/refresh-coordinator.ts`) makes the token refresh
+  single-flight, so parallel 401s share one `/api/auth/refresh` call
 
 ### Frontend State Management
 - **AuthService** (`core/auth.service.ts`): Signal-based `accessToken`, `userSignal`, computed `isAuthenticated`
 - **CategoriesState** (`core/categories.state.ts`): Angular `resource()` API for async loading + computed hierarchical structure
 - **AccountsState** (`core/accounts.state.ts`): Same pattern as CategoriesState — flat list of user accounts
+- **TransactionsState** (`core/transactions.state.ts`): filters and the paged transaction list (20 per page)
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
@@ -72,7 +84,11 @@ All API responses use this envelope format consistently.
   Uncategorized when the parent is a system category) and its children under
   the parent; it is refused (409) when a child's name is already taken
   there. `GET /api/categories/:id/delete-preview` reports this up front.
-- Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as **INTEGER cents** (e.g. 1000 = $10.00)
+- Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as an **INTEGER** at the account's `scale` (see
+  below; e.g. 1000 = $10.00). The API takes and returns decimals; services
+  convert with `toCents` / `toDecimal` (`services/currency.ts`)
+- Migration 008 adds `type` (`cash` / `bank` / `crypto`) and per-type
+  `settings` JSONB to accounts
 - Once an account has transactions its `start_balance` cannot change (400;
   a correcting transaction fixes a mismatch instead). Account responses
   carry `last_transaction_date` (null when none), which the form uses to
@@ -81,7 +97,7 @@ All API responses use this envelope format consistently.
   backend from the currency (`services/currencyScale.ts`: ISO minor units,
   BTC/ETH 8, USDT/USDC/TRX 6, SOL/TON 9); the API does not accept it, and a
   currency change that would rescale existing transactions is refused.
-- Transactions created in migration 004: `debit`/`credit` stored as **INTEGER cents**; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
+- Transactions created in migration 004: `debit`/`credit` stored as **INTEGERs** at the account's scale; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
 - `account_shares` added in migration 009: `(account_id, user_id, level)`,
   level 1 = read, 2 = transactions, 3 = admin. The owner is **not** stored
   there — `accounts.user_id` is the only source of ownership, and
@@ -137,6 +153,35 @@ by a txid in `description`, else by exact amount and date ±3 days — keeping
 their category and description, and removes the rest (transfers are left to
 the other account).
 
+#### Bank-statement import
+
+`POST /api/import/parse` (WRITE on the account, not for tracked accounts)
+reads a base64 CSV or XLS/XLSX statement (`services/import/csv.ts`,
+`workbook.ts`), detects the bank from its header row
+(`services/import/profiles.ts`: LHV, Bank of Cyprus, Alfa-Bank, CaixaBank,
+UniCredit — a new bank is a new profile, i.e. data, not code) and returns
+rows marked `new` / `duplicate` / `possible_duplicate`. A row's
+`import_hash` (`services/import/hash.ts`, migration 011) is the bank's
+reference when it has one, else row content plus an occurrence index;
+`possible_duplicate` is an advisory date-and-amount match. Rows come with
+category suggestions learned from the user's history
+(`services/import/categorize.ts`). `POST /api/import/reconcile` inserts the
+rows the user kept — as expense/income, or as transfers when a
+`transferAccountId` is given (the peer amount converted at the current
+rate) — re-checking access and hashes but not the
+advisory match. Real statements go in `backend/banks/` (gitignored);
+redacted test copies in `backend/src/test/fixtures/banks/`.
+
+#### Exchange rates
+
+`services/currency.ts` fetches rates from Frankfurter (ECB) and falls back to
+CoinGecko for pairs it does not cover (crypto, RUB, …), caching them in
+`exchange_rates` (migrations 005, 010, 016). Account balances and the
+category summary (`GET /api/transactions/summary`) are shown converted into
+the user's `users.currency` (default EUR) at `users.currency_scale`, null
+when a rate is missing; the only place a rate becomes stored data is the
+second amount of a cross-currency transfer created by statement import.
+
 #### Transactions — single table, double-entry style
 
 One `transactions` table covers expense, income, and transfer; the type is implied by which columns are populated — no stored `type` column:
@@ -166,11 +211,17 @@ filter. Permission checks live in the service layer via
 only.
 
 ### Environment Variables
-Copy `.env.example` → `.env`:
+Copy `.env.example` → `backend/.env` (dotenv reads it from the backend's
+working directory):
 - `DATABASE_URL` — PostgreSQL connection string
+- `TEST_DATABASE_URL` — used instead of `DATABASE_URL` by Jest when set
 - `JWT_SECRET`, `JWT_REFRESH_SECRET` — token signing secrets
 - `PORT` — default 3000
 - `CORS_ORIGIN` — default `*`
+- Optional, with working defaults: `FRANKFURTER_BASE_URL`,
+  `COINGECKO_BASE_URL`, `COINGECKO_API_KEY` (rates);
+  `BITCOIN_ESPLORA_URL`, `TRON_API_URL`, `TRONGRID_API_KEY`,
+  `ETHEREUM_API_URL`, `ETHERSCAN_API_KEY` (wallet sync)
 
 Dev proxy: `/api/*` → `http://localhost:3000` configured in `frontend/proxy.conf.json`
 
