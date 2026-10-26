@@ -25,6 +25,11 @@ const generateTokens = (userId: number): AuthTokens => {
 };
 
 export const register = async (email: string, password: string, name: string, currency: string): Promise<{ user: User; tokens: AuthTokens }> => {
+  // Production switches registration off once the family has signed up.
+  if (process.env.REGISTRATION_ENABLED === 'false') {
+    throw { statusCode: 403, message: 'Registration is closed' };
+  }
+
   const existingUser = await userQueries.getUserByEmail(email);
   if (existingUser) {
     throw { statusCode: 400, message: 'Email already registered' };

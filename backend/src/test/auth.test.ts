@@ -174,4 +174,53 @@ describe('Auth API', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe('registration switch', () => {
+    let saved: string | undefined;
+
+    beforeEach(() => {
+      saved = process.env.REGISTRATION_ENABLED;
+    });
+
+    afterEach(() => {
+      if (saved === undefined) delete process.env.REGISTRATION_ENABLED;
+      else process.env.REGISTRATION_ENABLED = saved;
+    });
+
+    it('refuses registration when REGISTRATION_ENABLED=false', async () => {
+      process.env.REGISTRATION_ENABLED = 'false';
+      const email = `closed${Date.now()}@example.com`;
+
+      const res = await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+      expect(res.status).toBe(403);
+      expect(res.body.data).toBeNull();
+      expect(res.body.error).toBe('Registration is closed');
+
+      const login = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
+      expect(login.status).toBe(401);
+    });
+
+    it('keeps registration open when REGISTRATION_ENABLED is unset or "true"', async () => {
+      delete process.env.REGISTRATION_ENABLED;
+      const unset = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `open${Date.now()}@example.com`, password: 'password123' });
+      expect(unset.status).toBe(200);
+
+      process.env.REGISTRATION_ENABLED = 'true';
+      const on = await request(app)
+        .post('/api/auth/register')
+        .send({ email: `open2${Date.now()}@example.com`, password: 'password123' });
+      expect(on.status).toBe(200);
+    });
+
+    it('still allows login when registration is closed', async () => {
+      const email = `existing${Date.now()}@example.com`;
+      await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+
+      process.env.REGISTRATION_ENABLED = 'false';
+      const res = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
+      expect(res.status).toBe(200);
+    });
+  });
 });
