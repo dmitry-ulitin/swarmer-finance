@@ -1,0 +1,55 @@
+# Daily encrypted backup of the production database (Neon) to Google Drive.
+# The dump is encrypted with age before it leaves the runner; only the
+# owner's private key can read it. Restore steps: backend/scripts/README.md.
+name: DB backup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REMOTE: gdrive:swarmer-finance-backups
+      KEEP: 30
+    steps:
+      - name: Install pg_dump 18, age and rclone
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-18 age rclone
+
+      - name: Dump, encrypt and upload
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          file="swarmer-finance-$(date -u +%Y%m%d-%H%M).dump.age"
+          /usr/lib/postgresql/18/bin/pg_dump -Fc "$DATABASE_URL" \
+            | age -r "$AGE_RECIPIENT" > "$file"
+          test -s "$file"
+          rclone copy "$file" "$REMOTE"
+          echo "Uploaded $file ($(stat -c %s "$file") bytes)"
+
+      - name: Keep the newest ${{ env.KEEP }}
+        run: |
+          set -euo pipefail
+          # Names carry a sortable UTC timestamp, so oldest sort first.
+          rclone lsf --files-only --include 'swarmer-finance-*.dump.age' "$REMOTE" \
+            | sort | head -n -"$KEEP" \
+            | while read -r old; do
+                echo "Deleting $old"
+                rclone deletefile "$REMOTE/$old"
+              done

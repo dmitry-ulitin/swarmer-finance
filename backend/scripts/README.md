@@ -145,3 +145,31 @@ npx tsx scripts/copy-to-neon.ts NEON_DATABASE_URL_UNPOOLED
 It refuses to run unless the target has the same migrations and no user data,
 so it cannot run twice. It prints source/target row counts and per-account
 balances and exits 1 on any mismatch.
+
+# Production backups
+
+`.github/workflows/backup.yml` dumps the Neon database daily at 03:00 UTC (and
+on **Run workflow**), encrypts it with `age` and uploads
+`swarmer-finance-YYYYMMDD-HHMM.dump.age` to `swarmer-finance-backups` on the
+owner's Google Drive, keeping the newest 30. Repository secrets:
+
+- `BACKUP_DATABASE_URL` — Neon's direct (unpooled) URL
+- `BACKUP_AGE_RECIPIENT` — the `age` public key (`age1…`); the private key is
+  kept by the owner only, outside the repo and Drive
+- `RCLONE_CONFIG` — an `rclone.conf` with a `[gdrive]` Drive remote
+  (`scope = drive.file`)
+
+## Restoring
+
+```bash
+age -d -i ~/path/to/swarmer-backup-key.txt swarmer-finance-YYYYMMDD-HHMM.dump.age > restore.dump
+# inspect locally in a scratch database (container pg_restore is v15 and
+# refuses a v18 dump, so use a v18 client, e.g. a postgres:18 container):
+docker run --rm -i --network host -v "$PWD:/w" postgres:18 \
+  pg_restore --no-owner --no-privileges -d "postgresql://finance_user:…@localhost:5432/<scratch_db>" /w/restore.dump
+```
+
+Restoring into Neon itself: create a new Neon branch or an empty database,
+`pg_restore --no-owner --no-privileges -d <its direct URL> restore.dump`, check
+it, then point Render's `DATABASE_URL`/`DATABASE_URL_UNPOOLED` at it. For a
+mistake noticed within 6 hours, Neon's point-in-time restore is simpler.
