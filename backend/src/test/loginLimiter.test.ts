@@ -69,6 +69,17 @@ describe('login throttling', () => {
     expect((await login(email, password)).status).toBe(200);
   });
 
+  it('parallel wrong-password logins get at most 10 guesses', async () => {
+    const email = await registerUser('parallel');
+    const results = await Promise.all(
+      Array.from({ length: 2 * MAX_FAILURES }, () => login(email, 'wrong-password')),
+    );
+    const statuses = results.map((r) => r.status);
+
+    expect(statuses.filter((s) => s === 401).length).toBeLessThanOrEqual(MAX_FAILURES);
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(MAX_FAILURES);
+  });
+
   it('the window expires', () => {
     for (let i = 0; i < MAX_FAILURES; i++) recordFailure('k', 0);
 

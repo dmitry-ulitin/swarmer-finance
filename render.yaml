@@ -27,8 +27,10 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # Set only in the dashboard (unset = open), so a Blueprint sync can't
+      # reopen registration after it has been switched to false.
       - key: REGISTRATION_ENABLED
-        value: "true"
+        sync: false
       - key: COINGECKO_API_KEY
         sync: false
       - key: ETHERSCAN_API_KEY
