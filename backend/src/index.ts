@@ -12,6 +12,10 @@ dotenv.config();
 
 const app = express();
 
+// Render terminates TLS in front of the app; take the client IP (used by the
+// login throttle) from the X-Forwarded-For entry its proxy appends.
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true
