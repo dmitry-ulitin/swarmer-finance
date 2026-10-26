@@ -126,3 +126,22 @@ safe against a live database. It checks three things:
 The 2026-09-18 run: 2 users, 62 accounts, 80 categories (76 user + 4 system),
 29 shares, 15 182 transactions (12 127 expense / 1 876 income / 1 179 transfer),
 all balances identical, all invariants zero.
+
+# Copy to Neon (`copy-to-neon.ts`)
+
+One-off copy of users 1 and 2 — their accounts, shares, categories,
+transactions, `chain_seen_txids` — plus all cached `exchange_rates` from the
+local dev DB (`DATABASE_URL`) into the production database, keeping ids and
+moving the sequences past them. The source is only read.
+
+```bash
+cd backend
+# 1. migrate the target through Neon's direct endpoint
+DATABASE_URL="$(grep '^NEON_DATABASE_URL_UNPOOLED=' .env | cut -d= -f2- | tr -d '"')" npm run migrate
+# 2. copy; TARGET is a URL or the name of a variable in backend/.env
+npx tsx scripts/copy-to-neon.ts NEON_DATABASE_URL_UNPOOLED
+```
+
+It refuses to run unless the target has the same migrations and no user data,
+so it cannot run twice. It prints source/target row counts and per-account
+balances and exits 1 on any mismatch.
