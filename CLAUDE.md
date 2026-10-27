@@ -202,8 +202,8 @@ replaces them and may change their `uid`s) and `bank_account_links`
 (`account_id` -> connection + `uid`, `loaded_to` marker; no FK on `uid`).
 `routes/bank.ts` (`services/bank/`): `/api/bank/credentials` (GET works
 without the key and reports `enabled`), `/aspsps?country=`, `/connections`
-(start, `/complete` with `state` + `code`, `/:id/reconnect`, DELETE) and
-`/links/:accountId` (PUT/DELETE). `services/bank/client.ts` signs an RS256
+(start, `/complete` with `state` + `code`, `/:id/reconnect`, DELETE).
+`services/bank/client.ts` signs an RS256
 JWT per request (`kid` = application id) and pages `continuation_key`;
 tests mock `global.fetch`. Without a valid `BANK_CREDENTIALS_KEY` (32 bytes,
 base64) every call but `GET /credentials`, and `POST /api/import/bank`,
@@ -213,8 +213,13 @@ in the user's Enable Banking app, so a consent cannot complete against a
 local non-https frontend (local work relies on the mocked tests). A stale or
 foreign `state` is 400 `Unknown or expired connection request`.
 
-Linking needs ADMIN on the app account, a connection of the caller's own and
-an account of type `bank` (a linked account cannot change its type); a
+An account is linked through `bankLink: { connectionId, uid } | null` on
+`POST /api/accounts` and `PUT /api/accounts/:id` (omitted on PUT keeps the
+link, resending the current one is no change), checked by
+`services/bank/links.ts` `checkLink`. Linking needs ADMIN on the app account,
+a connection of the caller's own and an account of type `bank` (a linked
+account cannot change its type or currency unless the same request relinks
+or unlinks it); a
 single-currency bank account must match the app account's currency, while
 a multi-currency (`XXX`) one loads only rows in the app account's currency.
 `POST /api/import/bank` (WRITE) returns the same preview as statement import
@@ -231,7 +236,7 @@ reconnect` (expiry is flagged 7 days ahead, and when the bank refuses the
 session). A member's links through their own connection are deleted in the
 same transaction that removes them from the account
 (`accountShares.removeMember`). Frontend: header user menu "Bank connections"
-dialog, account settings "Bank link" / "Load from bank", route
+dialog, the account form's "Load from bank account" field, account settings "Load from bank", route
 `/bank-callback`.
 
 #### Exchange rates

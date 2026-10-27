@@ -33,6 +33,21 @@
             <label tuiLabel>Account Number</label>
             <input tuiInput formControlName="accountNumber" placeholder="IBAN or account number" />
         </tui-textfield>
+
+        @if (bankOptions().length > 1) {
+            <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="bankLabelOf">
+                <label tuiLabel>Load from bank account</label>
+                <input tuiSelect formControlName="bankAccount" />
+                <tui-data-list *tuiDropdown>
+                    @for (o of bankOptions(); track o.key) {
+                        <button tuiOption new type="button" [value]="o.key" [disabled]="!fitsBank(o.key)">{{ o.label }}</button>
+                    }
+                </tui-data-list>
+            </tui-textfield>
+            @if (bankMismatch()) {
+                <p class="hint">This bank account is in another currency than the account.</p>
+            }
+        }
     }
 
     @if (type() === 'crypto') {
@@ -50,7 +65,7 @@
 
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
-        <button tuiButton size="s" type="submit" [disabled]="loading()">
+        <button tuiButton size="s" type="submit" [disabled]="loading() || (type() === 'bank' && bankMismatch())">
             {{ loading() ? 'Saving...' : (!!accountId() ? 'Save Changes' : 'Create Account') }}
         </button>
     </div>

@@ -23,9 +23,6 @@
     @if (account.bank_link && canWriteFiltered()) {
     <button tuiOption (click)="loadFromBankFiltered();settingsButton.click()" [iconEnd]="'@tui.cloud-download'">{{ bankLoadLabel(account) }}</button>
     }
-    @if (account.type === 'bank' && canEditFiltered()) {
-    <button tuiOption (click)="linkFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.link'">Bank link</button>
-    }
     @if (account.tracked && canWriteFiltered()) {
     <button tuiOption (click)="syncFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.refresh-cw'" [disabled]="sync.syncing().has(account.id)">Sync</button>
     }

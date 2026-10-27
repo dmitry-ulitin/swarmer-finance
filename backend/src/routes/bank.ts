@@ -4,7 +4,6 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validate, validateIdParam } from '../middleware/validation';
 import { requireBankSync } from '../services/bank/crypto';
 import * as connections from '../services/bank/connections';
-import * as links from '../services/bank/links';
 
 const router = Router();
 
@@ -43,8 +42,6 @@ const completeSchema = z.object({
   state: z.string().min(1).max(200),
   code: z.string().min(1).max(2000),
 });
-
-const linkSchema = z.object({ connectionId: z.number().int().positive(), uid: z.string().min(1).max(200) });
 
 router.get('/credentials', async (req: AuthRequest, res, next) => {
   try {
@@ -132,25 +129,6 @@ router.post('/connections/:id/reconnect', validate(reconnectSchema), async (req:
 router.delete('/connections/:id', async (req: AuthRequest, res, next) => {
   try {
     await connections.deleteConnection(req.userId!, Number(req.params.id));
-    res.json({ data: { success: true }, error: null });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.put('/links/:accountId', validate(linkSchema), async (req: AuthRequest, res, next) => {
-  try {
-    const { connectionId, uid } = req.body;
-    const data = await links.setLink(Number(req.params.accountId), req.userId!, connectionId, uid);
-    res.json({ data, error: null });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.delete('/links/:accountId', async (req: AuthRequest, res, next) => {
-  try {
-    await links.removeLink(Number(req.params.accountId), req.userId!);
     res.json({ data: { success: true }, error: null });
   } catch (error) {
     next(error);

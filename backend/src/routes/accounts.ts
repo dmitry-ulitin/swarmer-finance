@@ -40,10 +40,18 @@ const settingsByType = {
 // `.and()`: a ZodIntersection parses both sides independently and merges
 // them, so the strict settings object never sees a cross-type key and
 // `{ type: 'cash', settings: { accountNumber } }` would be accepted.
+// The account's bank link (services/bank/links.ts); null removes it, and on
+// PUT an omitted field keeps the current one.
+const bankLinkSchema = z
+  .strictObject({ connectionId: z.number().int().positive(), uid: z.string().min(1).max(255) })
+  .nullable()
+  .optional();
+
 const createBase = {
   name: z.string().min(1).max(255),
   currency: currencySchema,
   startBalance: z.number().default(0),
+  bankLink: bankLinkSchema,
 };
 
 // A discriminated union can't default a missing discriminant itself, so a
@@ -66,6 +74,7 @@ const updateBase = {
   name: z.string().min(1).max(255).optional(),
   currency: currencySchema.optional(),
   startBalance: z.number().optional(),
+  bankLink: bankLinkSchema,
 };
 
 // Unlike create, `settings` has NO default here — it is required on every
@@ -100,8 +109,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { name, currency, startBalance, type, settings } = req.body;
-    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, type, settings);
+    const { name, currency, startBalance, type, settings, bankLink } = req.body;
+    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, type, settings, bankLink);
     res.json({ data: account, error: null });
   } catch (error) {
     next(error);

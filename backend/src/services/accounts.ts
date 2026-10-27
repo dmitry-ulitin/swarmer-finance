@@ -7,8 +7,8 @@ import { Account, AccountType, User } from '../types';
 import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel, requireLevelOnAll } from './access';
 import { ChainProvider, getProvider, isTracked } from './chain';
 import { getCurrencyScale } from './currencyScale';
-import { hasLink as hasBankLink } from '../db/queries/bank';
-import { getLinkDtos } from './bank/links';
+import { listLinks } from '../db/queries/bank';
+import { BankLinkInput, applyLink, checkLink, getLinkDtos } from './bank/links';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -33,6 +33,10 @@ async function withBalances(accounts: Account[]): Promise<Account[]> {
     }
     return { ...account, balance, last_transaction_date: lastDate };
   });
+}
+
+async function withBankLink(account: Account, userId: number): Promise<Account> {
+  return { ...account, bank_link: (await getLinkDtos([account.id], userId)).get(account.id) ?? null };
 }
 
 async function getUserOrThrow(userId: number): Promise<User> {
@@ -90,9 +94,11 @@ export const createAccount = async (
   currency: string,
   startBalance: number,
   type: AccountType = 'cash',
-  settings: Record<string, unknown> = {}
+  settings: Record<string, unknown> = {},
+  bankLink: BankLinkInput | null = null
 ) => {
   const user = await getUserOrThrow(userId);
+  if (bankLink) await checkLink(userId, { type, currency }, bankLink);
   const provider = isTracked({ type, settings }) ? getProvider(settings.blockchain) : null;
   if (provider) {
     assertTrackedShape(provider, currency, startBalance);
@@ -100,8 +106,9 @@ export const createAccount = async (
   settings = normalizeSettings(provider, settings);
   const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
+  if (bankLink) await applyLink(account.id, bankLink);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), last_transaction_date: null }]);
-  return toDecimalDTO(converted, user.currency_scale);
+  return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
 };
 
 export const updateAccount = async (
@@ -113,6 +120,8 @@ export const updateAccount = async (
     startBalance?: number;
     type: AccountType;
     settings: Record<string, unknown>;
+    /** Omitted keeps the current link, null removes it. */
+    bankLink?: BankLinkInput | null;
   }
 ) => {
   const existing = await accountQueries.getAccountById(id);
@@ -124,7 +133,18 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   const user = await getUserOrThrow(userId);
-  if ((data.type !== existing.type || (data.currency ?? existing.currency) !== existing.currency) && await hasBankLink(id)) {
+  const [currentLink] = await listLinks([id]);
+  // Resending the current link is no change, so a co-owner can edit an
+  // account linked through someone else's connection.
+  const linkChanges = data.bankLink !== undefined && !(
+    data.bankLink && currentLink
+    && data.bankLink.connectionId === currentLink.connection_id && data.bankLink.uid === currentLink.uid
+  ) && !(data.bankLink === null && !currentLink);
+  const nextCurrency = data.currency ?? existing.currency;
+  if (linkChanges && data.bankLink) {
+    await checkLink(userId, { type: data.type, currency: nextCurrency }, data.bankLink);
+  } else if (currentLink && !linkChanges && (data.type !== existing.type || nextCurrency !== existing.currency)) {
+    // The link was checked against the old type and currency.
     throw { statusCode: 400, message: 'Unlink the bank first' };
   }
 
@@ -209,9 +229,10 @@ export const updateAccount = async (
   if (!account) {
     throw { statusCode: 404, message: 'Account is deleted' };
   }
+  if (linkChanges) await applyLink(id, data.bankLink!);
   const [withBal] = await withBalances([account]);
   const [converted] = await withConvertedBalances(user, [withBal]);
-  return toDecimalDTO(converted, user.currency_scale);
+  return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
 };
 
 /**

@@ -47,20 +47,27 @@ export async function getLinkDtos(accountIds: number[], userId: number): Promise
   return new Map(rows.map((r) => [r.account_id, toDto(r, userId)]));
 }
 
-export async function setLink(
-  accountId: number,
+export interface BankLinkInput {
+  connectionId: number;
+  uid: string;
+}
+
+/**
+ * Throws unless the account may be linked to this bank account: it is a
+ * `bank` account, the connection is the caller's own and has the account,
+ * and the currencies match (a multi-currency `XXX` bank account fits any).
+ * The caller has already checked ADMIN on the app account.
+ */
+export async function checkLink(
   userId: number,
-  connectionId: number,
-  uid: string
-): Promise<BankLinkDto> {
-  await requireLevel(accountId, userId, LEVEL.ADMIN);
-  const account = await getAccountById(accountId);
-  if (!account || account.deleted) throw { statusCode: 404, message: 'Account not found' };
+  account: { type: string; currency: string },
+  link: BankLinkInput
+): Promise<void> {
   if (account.type !== 'bank') {
     throw { statusCode: 400, message: 'Only a bank account can be linked to a bank' };
   }
-  await getConnection(userId, connectionId);
-  const bankAccount = (await bankQueries.listConnectionAccounts([connectionId])).find((a) => a.uid === uid);
+  await getConnection(userId, link.connectionId);
+  const bankAccount = (await bankQueries.listConnectionAccounts([link.connectionId])).find((a) => a.uid === link.uid);
   if (!bankAccount) throw { statusCode: 400, message: 'No such bank account in this connection' };
   if (bankAccount.currency !== 'XXX' && bankAccount.currency !== account.currency) {
     throw {
@@ -68,13 +75,12 @@ export async function setLink(
       message: `The bank account is in ${bankAccount.currency} but the account is in ${account.currency}`,
     };
   }
-  await bankQueries.upsertLink(accountId, connectionId, uid);
-  return (await getLinkDtos([accountId], userId)).get(accountId)!;
 }
 
-export async function removeLink(accountId: number, userId: number): Promise<void> {
-  await requireLevel(accountId, userId, LEVEL.ADMIN);
-  await bankQueries.deleteLink(accountId);
+/** Stores a link already passed through checkLink, or removes it (null). */
+export async function applyLink(accountId: number, link: BankLinkInput | null): Promise<void> {
+  if (link) await bankQueries.upsertLink(accountId, link.connectionId, link.uid);
+  else await bankQueries.deleteLink(accountId);
 }
 
 /** Drops the links on the account whose connection belongs to the user, so nobody loads through their keys. */

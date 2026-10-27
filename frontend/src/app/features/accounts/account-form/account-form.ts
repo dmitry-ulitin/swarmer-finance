@@ -1,7 +1,7 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
 import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -11,8 +11,22 @@ import { firstValueFrom, merge, startWith } from 'rxjs';
 import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 import { NotificationService } from '../../../core/notification.service';
 import { currencyScale } from '../../../core/currency-scale';
+import { ApiService } from '../../../core/api.service';
+import type { BankConnection } from '../../../models/bank';
 
 const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto'];
+
+/** A bank account the app account can load from; key '' is "not linked". */
+interface BankOption {
+  key: string;
+  label: string;
+  link: { connectionId: number; uid: string } | null;
+  /** The bank account's currency; 'XXX' is multi-currency. */
+  currency: string | null;
+}
+
+const bankLabel = (bank: string, account: string, currency: string): string =>
+  `${bank} · ${account} · ${currency === 'XXX' ? 'multi-currency' : currency}`;
 
 const TYPE_LABELS: Record<AccountType, string> = {
   cash: 'Cash',
@@ -25,7 +39,7 @@ const normalizeCurrency = (currency: string): string => currency.trim().toUpperC
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat, TuiDataList],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,6 +50,7 @@ export class AccountForm {
   private readonly accountsState = inject(AccountsState);
   private readonly notifications = inject(NotificationService);
   private readonly dialogs = inject(TuiDialogService);
+  private readonly api = inject(ApiService);
 
   readonly currencies = this.accountsState.currencies;
   readonly accountTypes = ACCOUNT_TYPES;
@@ -55,6 +70,7 @@ export class AccountForm {
     accountNumber: new FormControl<string>('', { nonNullable: true }),
     address: new FormControl<string>('', { nonNullable: true }),
     blockchain: new FormControl<string>('', { nonNullable: true }),
+    bankAccount: new FormControl<string>(this.linkKey(this.context.data?.bank_link), { nonNullable: true }),
   });
 
   readonly type = toSignal(this.form.controls.type.valueChanges, {
@@ -78,6 +94,47 @@ export class AccountForm {
   /** Currencies the chosen chain syncs; null while the account is not tracked. */
   private readonly trackedCurrencies = signal<readonly string[] | null>(null);
   readonly currencyOptions = computed(() => this.trackedCurrencies() ?? this.currencies());
+
+  private readonly bankConnections = signal<BankConnection[]>([]);
+  /**
+   * "Not linked", every bank account of the user's own connections, and the
+   * current link when it is not among them (another member's connection, or
+   * a uid the bank dropped on a reconnect), so saving keeps it.
+   */
+  readonly bankOptions = computed<BankOption[]>(() => {
+    const own = this.bankConnections().flatMap(c => c.accounts.map(a => ({
+      key: this.linkKey({ connectionId: c.id, uid: a.uid }),
+      label: bankLabel(c.aspspName, a.name || a.iban || a.uid, a.currency),
+      link: { connectionId: c.id, uid: a.uid },
+      currency: a.currency,
+    })));
+    const current = this.context.data?.bank_link;
+    const extra = current && !own.some(o => o.key === this.linkKey(current))
+      ? [{
+          key: this.linkKey(current),
+          label: bankLabel(current.aspspName, current.accountName || current.iban || current.uid, current.currency)
+            + (current.status === 'unmapped' ? ' (relink)' : ''),
+          link: { connectionId: current.connectionId, uid: current.uid },
+          currency: current.currency,
+        }]
+      : [];
+    return [{ key: '', label: 'Not linked', link: null, currency: null }, ...extra, ...own];
+  });
+  readonly bankLabelOf = (key: string): string => this.bankOptions().find(o => o.key === key)?.label ?? '';
+  private readonly bankAccount = toSignal(this.form.controls.bankAccount.valueChanges, {
+    initialValue: this.form.controls.bankAccount.value,
+  });
+  /** Mirrors the backend check: a single-currency bank account must match the account. */
+  readonly bankMismatch = computed(() => {
+    const option = this.bankOptions().find(o => o.key === this.bankAccount());
+    const currency = normalizeCurrency(this.currency() ?? '');
+    return !!option?.currency && option.currency !== 'XXX' && option.currency !== currency;
+  });
+  readonly fitsBank = (key: string): boolean => {
+    const option = this.bankOptions().find(o => o.key === key);
+    const currency = normalizeCurrency(this.currency() ?? '');
+    return !option?.currency || option.currency === 'XXX' || option.currency === currency;
+  };
 
   constructor() {
     const data = this.context.data;
@@ -107,6 +164,21 @@ export class AccountForm {
     merge(c.type.valueChanges, c.address.valueChanges, c.blockchain.valueChanges)
       .pipe(startWith(null), takeUntilDestroyed())
       .subscribe(() => this.applyTrackedLock());
+
+    void this.loadBankConnections();
+  }
+
+  private linkKey(link: { connectionId: number; uid: string } | null | undefined): string {
+    return link ? `${link.connectionId}:${link.uid}` : '';
+  }
+
+  /** Without bank sync on the server (503) or any connection, the field just stays hidden. */
+  private async loadBankConnections(): Promise<void> {
+    try {
+      this.bankConnections.set((await firstValueFrom(this.api.getBankConnections())).data ?? []);
+    } catch {
+      this.bankConnections.set([]);
+    }
   }
 
   private applyTrackedLock(): void {
@@ -154,13 +226,15 @@ export class AccountForm {
     switch (raw.type) {
       case 'bank': {
         const accountNumber = clean(raw.accountNumber);
-        return { ...base, type: 'bank', settings: accountNumber === undefined ? {} : { accountNumber } };
+        const bankLink = this.bankOptions().find(o => o.key === raw.bankAccount)?.link ?? null;
+        return { ...base, type: 'bank', settings: accountNumber === undefined ? {} : { accountNumber }, bankLink };
       }
       case 'crypto': {
         const address = clean(raw.address);
         const blockchain = clean(raw.blockchain);
         return {
           ...base,
+          ...this.unlinkIfLinked(),
           type: 'crypto',
           settings: {
             ...(address === undefined ? {} : { address }),
@@ -169,8 +243,13 @@ export class AccountForm {
         };
       }
       default:
-        return { ...base, type: 'cash', settings: {} };
+        return { ...base, ...this.unlinkIfLinked(), type: 'cash', settings: {} };
     }
+  }
+
+  /** Leaving the bank type drops the link; the backend refuses a type change otherwise. */
+  private unlinkIfLinked(): { bankLink?: null } {
+    return this.context.data?.bank_link ? { bankLink: null } : {};
   }
 
   cancel(): void {
@@ -198,7 +277,7 @@ export class AccountForm {
   }
 
   async onSubmit() {
-    if (this.form.invalid) return;
+    if (this.form.invalid || (this.type() === 'bank' && this.bankMismatch())) return;
     if (this.switchesSyncOn() && !await this.confirmSync()) return;
 
     try {

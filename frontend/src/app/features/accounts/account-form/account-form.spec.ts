@@ -8,7 +8,9 @@ import { TuiDialogService } from '@taiga-ui/core';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { AccountForm } from './account-form';
 import { AccountsState } from '../../../core/accounts.state';
+import { ApiService } from '../../../core/api.service';
 import type { Account } from '../../../models/account';
+import type { BankConnection, BankLink } from '../../../models/bank';
 
 function createForm(data: Partial<Account> | null, dialogOpen = vi.fn(() => of(true))) {
   TestBed.configureTestingModule({
@@ -66,7 +68,7 @@ describe('AccountForm payload', () => {
 
     expect(form.buildPayload()).toEqual({
       name: 'Checking', currency: 'USD', startBalance: 0,
-      type: 'bank', settings: {},
+      type: 'bank', settings: {}, bankLink: null,
     });
   });
 
@@ -260,5 +262,73 @@ describe('AccountForm switching sync on', () => {
     track(form);
     await form.onSubmit();
     expect(dialogOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountForm bank link', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const connections: BankConnection[] = [{
+    id: 4, aspspName: 'LHV', country: 'EE', status: 'active', validUntil: null,
+    accounts: [
+      { uid: 'multi', iban: 'EE01', name: 'Main', currency: 'XXX' },
+      { uid: 'usd', iban: 'EE02', name: null, currency: 'USD' },
+    ],
+  }];
+  const link = (over: Partial<BankLink> = {}): BankLink => ({
+    connectionId: 9, uid: 'other', aspspName: 'Swedbank', accountName: 'Joint', iban: null, currency: 'EUR',
+    status: 'active', validUntil: null, loadedTo: null, ownConnection: false, ...over,
+  });
+
+  async function bankForm(data: Partial<Account>) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        { provide: ApiService, useValue: { getBankConnections: vi.fn(() => of({ data: connections, error: null })) } },
+        { provide: AccountsState, useValue: { currencies: () => ['EUR', 'USD'] } },
+        { provide: POLYMORPHEUS_CONTEXT, useValue: { data, completeWith: () => {} } },
+        { provide: TuiDialogService, useValue: { open: vi.fn() } },
+      ],
+    });
+    const form = TestBed.createComponent(AccountForm).componentInstance;
+    // The connections load in the constructor; let that promise settle.
+    await Promise.resolve();
+    return form;
+  }
+
+  it('offers the connections\' bank accounts and disables other currencies', async () => {
+    const form = await bankForm({ currency: 'EUR', type: 'bank' });
+    form.form.patchValue({ name: 'LHV EUR', currency: 'EUR', type: 'bank' });
+    expect(form.bankOptions().map(o => o.label)).toEqual([
+      'Not linked', 'LHV · Main · multi-currency', 'LHV · EE02 · USD',
+    ]);
+    expect(form.fitsBank('4:multi')).toBe(true);
+    expect(form.fitsBank('4:usd')).toBe(false);
+  });
+
+  it('sends the chosen bank account on create', async () => {
+    const form = await bankForm({ currency: 'EUR' });
+    form.form.patchValue({ name: 'LHV EUR', currency: 'EUR', type: 'bank', bankAccount: '4:multi' });
+    expect(form.buildPayload().bankLink).toEqual({ connectionId: 4, uid: 'multi' });
+  });
+
+  it('flags a bank account in another currency', async () => {
+    const form = await bankForm({ currency: 'EUR' });
+    form.form.patchValue({ name: 'LHV', currency: 'EUR', type: 'bank', bankAccount: '4:usd' });
+    expect(form.bankMismatch()).toBe(true);
+    form.form.patchValue({ currency: 'USD' });
+    expect(form.bankMismatch()).toBe(false);
+  });
+
+  it("keeps a link through another member's connection", async () => {
+    const form = await bankForm({ id: 3, name: 'Joint', currency: 'EUR', type: 'bank', settings: {}, bank_link: link() });
+    expect(form.bankLabelOf(form.form.controls.bankAccount.value)).toBe('Swedbank · Joint · EUR');
+    expect(form.buildPayload().bankLink).toEqual({ connectionId: 9, uid: 'other' });
+  });
+
+  it('unlinks when the account stops being a bank account', async () => {
+    const form = await bankForm({ id: 3, name: 'Joint', currency: 'EUR', type: 'bank', settings: {}, bank_link: link() });
+    form.form.patchValue({ type: 'cash' });
+    expect(form.buildPayload().bankLink).toBeNull();
   });
 });

@@ -108,11 +108,6 @@ export class Header {
     if (account && this.canWriteFiltered()) void this.importDialog.open(account);
   }
 
-  linkFilteredAccount(): void {
-    const account = this.filteredAccount();
-    if (account && this.canEditFiltered()) void this.bankDialog.openLink(account);
-  }
-
   loadFromBankFiltered(): void {
     const account = this.filteredAccount();
     if (account?.bank_link && this.canWriteFiltered()) void this.importDialog.openFromBank(account);

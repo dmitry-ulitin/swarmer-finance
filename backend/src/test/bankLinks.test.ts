@@ -5,7 +5,7 @@ import { pool } from '../db';
 
 const app = createTestApp();
 
-describe('/api/bank/links', () => {
+describe('bank links on accounts', () => {
   const savedKey = process.env.BANK_CREDENTIALS_KEY;
   const originalFetch = global.fetch;
   type U = { token: string; id: number };
@@ -63,8 +63,13 @@ describe('/api/bank/links', () => {
     return id;
   };
 
+  /** PUT the account as it is stored, with only the bank link changed. */
+  const putLink = async (u: U, accountId: number, bankLink: { connectionId: number; uid: string } | null) => {
+    const { type, settings } = (await pool.query('SELECT type, settings FROM accounts WHERE id = $1', [accountId])).rows[0];
+    return request(app).put(`/api/accounts/${accountId}`).set(auth(u)).send({ type, settings, bankLink });
+  };
   const link = (u: U, accountId: number, connectionId: number, uid = 'uid-1') =>
-    request(app).put(`/api/bank/links/${accountId}`).set(auth(u)).send({ connectionId, uid });
+    putLink(u, accountId, { connectionId, uid });
   const bankLink = async (u: U, accountId: number) => {
     const res = await request(app).get('/api/accounts').set(auth(u));
     return res.body.data.find((a: any) => a.id === accountId).bank_link;
@@ -82,11 +87,12 @@ describe('/api/bank/links', () => {
 
     const ok = await link(admin, acc, adminConn);
     expect(ok.status).toBe(200);
-    expect(ok.body.data).toMatchObject({ connectionId: adminConn, uid: 'uid-1', accountName: 'Main', iban: 'EE01' });
+    expect(ok.body.data.bank_link).toMatchObject({ connectionId: adminConn, uid: 'uid-1', accountName: 'Main', iban: 'EE01' });
     expect((await link(writer, acc, writerConn)).status).toBe(403);
-    expect((await request(app).delete(`/api/bank/links/${acc}`).set(auth(writer))).status).toBe(403);
-    const del = await request(app).delete(`/api/bank/links/${acc}`).set(auth(admin));
-    expect(del.body.data).toEqual({ success: true });
+    expect((await putLink(writer, acc, null)).status).toBe(403);
+    const del = await putLink(admin, acc, null);
+    expect(del.status).toBe(200);
+    expect(del.body.data.bank_link).toBeNull();
     expect(await bankLink(owner, acc)).toBeNull();
   });
 
@@ -226,6 +232,60 @@ describe('/api/bank/links', () => {
       .send({ name: 'Acc', currency: 'EUR', type: 'bank', settings: {} });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Unlink the bank first');
+  });
+
+  it('changes the currency together with a matching new link', async () => {
+    const u = await register('cl');
+    const acc = await makeAccount(u.id);
+    await link(u, acc, await makeConnection(u.id));
+    const eurConn = await makeConnection(u.id, 'EUR');
+    const res = await request(app)
+      .put(`/api/accounts/${acc}`)
+      .set(auth(u))
+      .send({ name: 'Acc', currency: 'EUR', type: 'bank', settings: {}, bankLink: { connectionId: eurConn, uid: 'uid-1' } });
+    expect(res.status).toBe(200);
+    expect(res.body.data.bank_link).toMatchObject({ connectionId: eurConn, currency: 'EUR' });
+  });
+
+  it("lets a co-owner edit an account linked through someone else's connection", async () => {
+    const owner = await register('eo');
+    const coOwner = await register('ec');
+    const acc = await makeAccount(owner.id);
+    await grant(acc, coOwner.id, 3);
+    const conn = await makeConnection(owner.id);
+    await link(owner, acc, conn);
+    const res = await request(app)
+      .put(`/api/accounts/${acc}`)
+      .set(auth(coOwner))
+      .send({ name: 'Renamed', type: 'bank', settings: {}, bankLink: { connectionId: conn, uid: 'uid-1' } });
+    expect(res.status).toBe(200);
+    expect(res.body.data.bank_link).toMatchObject({ connectionId: conn, ownConnection: false });
+    const kept = await request(app)
+      .put(`/api/accounts/${acc}`)
+      .set(auth(coOwner))
+      .send({ name: 'Renamed again', type: 'bank', settings: {} });
+    expect(kept.status).toBe(200);
+    expect(kept.body.data.bank_link).not.toBeNull();
+  });
+
+  it('links a new account on creation', async () => {
+    const u = await register('nc');
+    const conn = await makeConnection(u.id);
+    const res = await request(app)
+      .post('/api/accounts')
+      .set(auth(u))
+      .send({ name: 'New', currency: 'USD', type: 'bank', bankLink: { connectionId: conn, uid: 'uid-1' } });
+    expect(res.status).toBe(200);
+    expect(res.body.data.bank_link).toMatchObject({ connectionId: conn, uid: 'uid-1', loadedTo: null });
+
+    const bad = await request(app)
+      .post('/api/accounts')
+      .set(auth(u))
+      .send({ name: 'Cash', currency: 'USD', type: 'cash', bankLink: { connectionId: conn, uid: 'uid-1' } });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toBe('Only a bank account can be linked to a bank');
+    const count = await pool.query("SELECT count(*)::int AS n FROM accounts WHERE user_id = $1 AND name = 'Cash'", [u.id]);
+    expect(count.rows[0].n).toBe(0);
   });
 
   it("refuses changing a linked account's type", async () => {

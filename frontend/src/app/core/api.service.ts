@@ -4,7 +4,7 @@ import { Category, CategoryCreatePayload, CategoryDeletePreview, CategoryUpdateP
 import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareLevel } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
-import { BankAspsp, BankConnection, BankCredentials, BankLink, bankRedirectUrl } from '../models/bank';
+import { BankAspsp, BankConnection, BankCredentials, bankRedirectUrl } from '../models/bank';
 import { Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -189,14 +189,6 @@ export class ApiService {
 
   deleteBankConnection(id: number): Observable<ApiResponse<{ success: boolean }>> {
     return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/bank/connections/${id}`);
-  }
-
-  linkBankAccount(accountId: number, connectionId: number, uid: string): Observable<ApiResponse<BankLink>> {
-    return this.http.put<ApiResponse<BankLink>>(`/api/bank/links/${accountId}`, { connectionId, uid });
-  }
-
-  unlinkBankAccount(accountId: number): Observable<ApiResponse<{ success: boolean }>> {
-    return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/bank/links/${accountId}`);
   }
 
   /** Loads bank transactions into an import preview; `dateFrom` only matters before the first load. */
