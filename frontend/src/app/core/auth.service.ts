@@ -45,6 +45,10 @@ export class AuthService {
       .pipe(tap(response => this.handleAuth(response.data)));
   }
 
+  changePassword(currentPassword: string, newPassword: string) {
+    return this.http.post<ApiResponse<{ success: boolean }>>('/api/auth/password', { currentPassword, newPassword });
+  }
+
   logout() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

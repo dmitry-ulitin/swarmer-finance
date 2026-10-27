@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as authService from '../services/auth';
 import * as loginLimiter from '../services/loginLimiter';
 import { validate } from '../middleware/validation';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -31,6 +32,11 @@ const loginSchema = z.object({
 
 const refreshSchema = z.object({
   refreshToken: z.string(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
 });
 
 router.post('/register', validate(registerSchema), async (req, res, next) => {
@@ -98,6 +104,24 @@ router.post('/refresh', validate(refreshSchema), async (req, res, next) => {
     const { refreshToken } = req.body;
     const tokens = await authService.refreshTokens(refreshToken);
     res.json({ data: tokens, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/password', authMiddleware, validate(changePasswordSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    // Same throttle as /login, so a stolen access token can't be used to
+    // guess the password.
+    const key = `${req.ip}|user:${req.userId}`;
+    if (loginLimiter.isBlocked(key)) {
+      return next({ statusCode: 429, message: 'Too many failed attempts, try again later' });
+    }
+    loginLimiter.recordFailure(key);
+    await authService.changePassword(req.userId!, currentPassword, newPassword);
+    loginLimiter.clearFailures(key);
+    res.json({ data: { success: true }, error: null });
   } catch (error) {
     next(error);
   }

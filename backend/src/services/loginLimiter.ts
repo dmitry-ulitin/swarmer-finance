@@ -1,5 +1,6 @@
 /**
- * In-memory throttle for failed logins, keyed by client IP + email.
+ * In-memory throttle for failed logins, keyed by client IP + email, and for
+ * failed password changes, keyed by client IP + user id.
  *
  * One backend instance runs in production, so process memory is enough; a
  * restart (or the free tier going to sleep) simply resets the counters.

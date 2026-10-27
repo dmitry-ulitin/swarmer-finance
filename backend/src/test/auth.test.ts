@@ -175,6 +175,59 @@ describe('Auth API', () => {
     });
   });
 
+  describe('POST /api/auth/password', () => {
+    let email: string;
+    let token: string;
+
+    beforeEach(async () => {
+      email = `pwd${Date.now()}@example.com`;
+      const res = await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+      token = res.body.data.accessToken;
+    });
+
+    const change = (body: object) =>
+      request(app).post('/api/auth/password').set('Authorization', `Bearer ${token}`).send(body);
+
+    it('changes the password: the new one logs in, the old one no longer does', async () => {
+      const res = await change({ currentPassword: 'password123', newPassword: 'n3w-strong-pass' });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ success: true });
+
+      const oldLogin = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
+      expect(oldLogin.status).toBe(401);
+      const newLogin = await request(app).post('/api/auth/login').send({ email, password: 'n3w-strong-pass' });
+      expect(newLogin.status).toBe(200);
+    });
+
+    it('refuses a wrong current password with 400 and keeps the old one', async () => {
+      const res = await change({ currentPassword: 'wrongpassword', newPassword: 'n3w-strong-pass' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Current password is incorrect');
+
+      const login = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
+      expect(login.status).toBe(200);
+    });
+
+    it('refuses a new password shorter than 8 characters', async () => {
+      const res = await change({ currentPassword: 'password123', newPassword: 'short1' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('newPassword');
+    });
+
+    it('refuses a new password equal to the current one', async () => {
+      const res = await change({ currentPassword: 'password123', newPassword: 'password123' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('New password must differ from the current one');
+    });
+
+    it('requires a token', async () => {
+      const res = await request(app)
+        .post('/api/auth/password')
+        .send({ currentPassword: 'password123', newPassword: 'n3w-strong-pass' });
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe('registration switch', () => {
     let saved: string | undefined;
 

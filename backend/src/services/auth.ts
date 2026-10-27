@@ -65,6 +65,25 @@ export const login = async (email: string, password: string): Promise<{ user: Us
   return { user, tokens };
 };
 
+// A wrong current password is a 400, not a 401: the frontend answers a 401
+// by refreshing the token and, failing that, logging the user out.
+export const changePassword = async (userId: number, currentPassword: string, newPassword: string): Promise<void> => {
+  const passwordHash = await userQueries.getPasswordHashById(userId);
+  if (!passwordHash) {
+    throw { statusCode: 401, message: 'User not found' };
+  }
+
+  const isValidPassword = await bcrypt.compare(currentPassword, passwordHash);
+  if (!isValidPassword) {
+    throw { statusCode: 400, message: 'Current password is incorrect' };
+  }
+  if (newPassword === currentPassword) {
+    throw { statusCode: 400, message: 'New password must differ from the current one' };
+  }
+
+  await userQueries.updatePasswordHash(userId, await bcrypt.hash(newPassword, 10));
+};
+
 export const refreshTokens = async (refreshToken: string): Promise<AuthTokens> => {
   try {
     // Pin the verification algorithm explicitly. See middleware/auth.ts for

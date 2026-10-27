@@ -29,9 +29,10 @@
     <button tuiOption (click)="categories();settingsButton.click()" [iconEnd]="'@tui.folder'">Categories</button>
   </tui-data-list>
 </ng-template>
-<button tuiButton tuiChevron appearance="flat-grayscale"  class="light" size="xs" [iconStart]="'@tui.user'"[tuiDropdown]="userDropdown" tuiDropdownAuto>{{ authService.user()?.name }}</button>
+<button #userButton tuiButton tuiChevron appearance="flat-grayscale" class="light" size="xs" [iconStart]="'@tui.user'"[tuiDropdown]="userDropdown" tuiDropdownAuto>{{ authService.user()?.name }}</button>
 <ng-template #userDropdown>
-  <tui-data-list [size]="'s'">
+  <tui-data-list [size]="'s'" class="nowrap">
+    <button tuiOption (click)="changePassword();userButton.click()" [iconEnd]="'@tui.key-round'">Change password</button>
     <button tuiOption (click)="authService.logout()" [iconEnd]="'@tui.log-out'">Logout</button>
   </tui-data-list>
 </ng-template>

@@ -11,6 +11,7 @@ import { syncedLock } from '../transactions/synced-lock';
 import { ImportDialogService } from '../import/import-dialog.service';
 import { AccountSyncService } from '../accounts/account-sync.service';
 import { accessLevelOf } from '../../models/account';
+import { ChangePasswordDialogService } from '../auth/change-password-dialog.service';
 
 @Component({
   selector: 'app-header',
@@ -27,6 +28,7 @@ export class Header {
   private readonly accountDialogs = inject(AccountDialogService);
   private readonly transactionDialogs = inject(TransactionDialogService);
   private readonly importDialog = inject(ImportDialogService);
+  private readonly passwordDialog = inject(ChangePasswordDialogService);
   readonly sync = inject(AccountSyncService);
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
@@ -64,6 +66,10 @@ export class Header {
 
   categories(): void {
     this.categoryDialogs.openManager();
+  }
+
+  changePassword(): void {
+    void this.passwordDialog.open();
   }
 
   reload(): void {

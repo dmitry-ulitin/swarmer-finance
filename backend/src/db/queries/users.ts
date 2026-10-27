@@ -26,6 +26,18 @@ export const createUser = async (
   return result[0];
 };
 
+export const getPasswordHashById = async (id: number): Promise<string | null> => {
+  const row = await queryOne<{ password_hash: string }>(
+    'SELECT password_hash FROM users WHERE id = $1',
+    [id]
+  );
+  return row ? row.password_hash : null;
+};
+
+export const updatePasswordHash = async (id: number, passwordHash: string): Promise<void> => {
+  await execute('UPDATE users SET password_hash = $2 WHERE id = $1', [id, passwordHash]);
+};
+
 export const getUserIdByEmail = async (email: string): Promise<number | null> => {
   const row = await queryOne<{ id: number }>(
     'SELECT id FROM users WHERE lower(email) = lower($1)',
