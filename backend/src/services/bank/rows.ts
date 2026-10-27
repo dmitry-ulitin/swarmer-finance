@@ -7,9 +7,12 @@ import { ParsedRow, round2 } from '../import/rows';
 export function toParsedRows(txs: EbTransaction[], currency: string): ParsedRow[] {
   const rows: ParsedRow[] = [];
   for (const tx of txs) {
-    if (tx.status !== 'BOOK' || tx.transaction_amount.currency !== currency) continue;
+    if (tx.status !== 'BOOK') continue;
+    const amount = tx.transaction_amount as EbTransaction['transaction_amount'] | undefined;
+    if (!amount) throw { statusCode: 502, message: 'Bank returned an unreadable transaction' };
+    if (amount.currency !== currency) continue;
     const date = tx.booking_date || tx.value_date || tx.transaction_date;
-    const raw = tx.transaction_amount.amount;
+    const raw = amount.amount;
     const abs = typeof raw === 'string' && raw.trim() !== '' ? round2(Number(raw)) : NaN;
     const indicator = tx.credit_debit_indicator;
     if (!date || !isIsoDate(date) || !Number.isFinite(abs) || (indicator !== 'DBIT' && indicator !== 'CRDT')) {

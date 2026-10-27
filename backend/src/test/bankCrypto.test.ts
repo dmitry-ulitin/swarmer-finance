@@ -47,6 +47,14 @@ describe('bank key encryption', () => {
     );
   });
 
+  it('refuses a truncated auth tag', () => {
+    const parts = encryptSecret(PEM, 7).split('.');
+    parts[2] = Buffer.from(parts[2], 'base64').subarray(0, 4).toString('base64');
+    expect(() => decryptSecret(parts.join('.'), 7)).toThrow(
+      expect.objectContaining({ statusCode: 500, message: 'Stored bank key cannot be decrypted' })
+    );
+  });
+
   it('is disabled without a key or with a short one', () => {
     delete process.env.BANK_CREDENTIALS_KEY;
     expect(isBankSyncEnabled()).toBe(false);

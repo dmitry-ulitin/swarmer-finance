@@ -71,6 +71,7 @@ describe('toParsedRows', () => {
       ['datetime date', { booking_date: '2026-10-12T10:00:00Z' }],
       ['empty amount', { transaction_amount: { amount: '', currency: 'EUR' } }],
       ['non-numeric amount', { transaction_amount: { amount: 'abc', currency: 'EUR' } }],
+      ['missing amount object', { transaction_amount: undefined as never }],
       ['unknown indicator', { credit_debit_indicator: 'XXXX' as never }],
     ];
     it.each(cases)('rejects %s', (_n, o) => {
@@ -108,5 +109,11 @@ describe('computeBankHashes', () => {
     expect(a).not.toBe(b);
     expect(a).toBe(hashRows([rows[0]], 'eb|EE|LHV Pank', true)[0]);
     expect(b).toBe(sha(`${hashBase(rows[0])}|1`));
+  });
+});
+
+describe('toParsedRows without an amount object', () => {
+  it('skips a non-BOOK row', () => {
+    expect(toParsedRows([tx({ status: 'PDNG', transaction_amount: undefined as never })], 'EUR')).toEqual([]);
   });
 });

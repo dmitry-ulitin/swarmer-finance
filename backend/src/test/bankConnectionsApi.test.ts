@@ -166,6 +166,35 @@ describe('/api/bank keys and connections', () => {
     expect(res.text).not.toContain('SECRET123');
   });
 
+  it('rejects a non-RSA key', async () => {
+    const user = await register('bankec');
+    const ec = crypto
+      .generateKeyPairSync('ec', { namedCurve: 'P-256' })
+      .privateKey.export({ type: 'pkcs8', format: 'pem' })
+      .toString();
+    const res = await request(app)
+      .put('/api/bank/credentials')
+      .set(auth(user.token))
+      .send({ applicationId: APP_ID, privateKey: ec });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Private key must be an RSA key');
+  });
+
+  it('does not log a fragment of a malformed JSON body', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const res = await request(app)
+        .put('/api/bank/credentials')
+        .set('Content-Type', 'application/json')
+        .send('{"privateKey": "MARKER_SECRET_123" oops}');
+      expect(res.status).toBe(400);
+      expect(spy).toHaveBeenCalled();
+      expect(JSON.stringify(spy.mock.calls)).not.toContain('MARKER_SECRET_123');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('needs keys before talking to the bank', async () => {
     const user = await register('banknokeys');
     const res = await request(app).get('/api/bank/aspsps?country=EE').set(auth(user.token));

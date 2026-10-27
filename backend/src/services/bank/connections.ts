@@ -45,11 +45,15 @@ export async function saveCredentials(
   applicationId: string,
   privateKey: string
 ): Promise<BankCredentialsInfo> {
+  let keyType: string | undefined;
   try {
-    crypto.createPrivateKey(privateKey);
+    keyType = crypto.createPrivateKey(privateKey).asymmetricKeyType;
   } catch {
     // The parser's message is not passed on: it may quote the input.
     throw { statusCode: 400, message: 'Private key is not a valid PEM' };
+  }
+  if (keyType !== 'rsa') {
+    throw { statusCode: 400, message: 'Private key must be an RSA key' };
   }
   await bankQueries.saveCredentials(userId, applicationId, encryptSecret(privateKey, userId));
   return getCredentialsInfo(userId);

@@ -38,9 +38,11 @@ export function decryptSecret(stored: string, userId: number): string {
     const [version, iv, tag, ciphertext] = stored.split('.');
     const key = getKey();
     if (version !== 'v1' || !key || !iv || !tag || !ciphertext) throw new Error('bad format');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'base64'));
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'base64'), { authTagLength: 16 });
     decipher.setAAD(Buffer.from(`user:${userId}`));
-    decipher.setAuthTag(Buffer.from(tag, 'base64'));
+    const tagBytes = Buffer.from(tag, 'base64');
+    if (tagBytes.length !== 16) throw new Error('bad tag');
+    decipher.setAuthTag(tagBytes);
     return Buffer.concat([
       decipher.update(Buffer.from(ciphertext, 'base64')),
       decipher.final(),

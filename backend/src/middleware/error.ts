@@ -10,7 +10,12 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  console.error('Error:', err.message);
+  // body-parser's JSON errors may quote part of the input (e.g. a private key).
+  if ((err as { type?: string }).type === 'entity.parse.failed') {
+    console.error('Error: invalid JSON body');
+  } else {
+    console.error('Error:', err.message);
+  }
   
   const statusCode = err.statusCode || 500;
   // Only errors thrown on purpose carry a statusCode; anything else (a
