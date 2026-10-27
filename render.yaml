@@ -37,6 +37,10 @@ services:
         sync: false
       - key: TRONGRID_API_KEY
         sync: false
+      # Not generateValue: a Blueprint re-create would roll it and leave the
+      # stored bank keys undecryptable.
+      - key: BANK_CREDENTIALS_KEY
+        sync: false
 
   - type: web
     name: swarmer-finance
