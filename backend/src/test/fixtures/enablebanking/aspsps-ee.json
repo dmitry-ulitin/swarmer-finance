@@ -1,0 +1,6 @@
+{
+  "aspsps": [
+    { "name": "LHV Pank", "country": "EE", "maximum_consent_validity": 15552000, "beta": true, "psu_types": ["personal"] },
+    { "name": "Test Bank", "country": "EE", "maximum_consent_validity": 7776000, "psu_types": ["personal", "business"] }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "continuation_key": "k2",
+  "transactions": [
+    { "entry_reference": "1000001", "transaction_id": null, "transaction_amount": { "amount": "12.34", "currency": "EUR" }, "credit_debit_indicator": "DBIT", "status": "BOOK", "booking_date": "2027-01-10", "value_date": null, "remittance_information": ["CARD PURCHASE", "Example Shop Tallinn"], "creditor": null, "debtor": null },
+    { "entry_reference": "1000002", "transaction_id": null, "transaction_amount": { "amount": "250.00", "currency": "EUR" }, "credit_debit_indicator": "DBIT", "status": "BOOK", "booking_date": "2027-01-09", "value_date": null, "remittance_information": ["Rent January"], "creditor": { "name": "John Roe" }, "debtor": null },
+    { "entry_reference": "1000003", "transaction_id": null, "transaction_amount": { "amount": "1500.00", "currency": "EUR" }, "credit_debit_indicator": "CRDT", "status": "BOOK", "booking_date": "2027-01-08", "value_date": null, "remittance_information": ["Salary"], "creditor": null, "debtor": { "name": "Example Employer OU" } }
+  ]
+}
