@@ -98,6 +98,12 @@ export async function loadFromBank(
   if (link.acc_uid === null) {
     throw { statusCode: 409, message: 'This bank account is no longer in the connection — link it again' };
   }
+  if (link.acc_currency && link.acc_currency !== 'XXX' && link.acc_currency !== account.currency) {
+    throw {
+      statusCode: 409,
+      message: `The bank account is in ${link.acc_currency} but the account is in ${account.currency} — link it again`,
+    };
+  }
   const status = connectionStatus(link);
   if (status === 'expired' || status === 'pending') throw accessExpired();
   const cred = await loadCredentials(link.user_id);

@@ -199,6 +199,18 @@ describe('/api/bank/links', () => {
     expect(await bankLink(owner, acc)).not.toBeNull();
   });
 
+  it("refuses changing a linked account's currency", async () => {
+    const u = await register('cu');
+    const acc = await makeAccount(u.id);
+    await link(u, acc, await makeConnection(u.id));
+    const res = await request(app)
+      .put(`/api/accounts/${acc}`)
+      .set(auth(u))
+      .send({ name: 'Acc', currency: 'EUR', type: 'bank', settings: {} });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Unlink the bank first');
+  });
+
   it("refuses changing a linked account's type", async () => {
     const u = await register('ty');
     const acc = await makeAccount(u.id);

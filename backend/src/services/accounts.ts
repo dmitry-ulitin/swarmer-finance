@@ -124,7 +124,7 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   const user = await getUserOrThrow(userId);
-  if (data.type !== existing.type && await hasBankLink(id)) {
+  if ((data.type !== existing.type || (data.currency ?? existing.currency) !== existing.currency) && await hasBankLink(id)) {
     throw { statusCode: 400, message: 'Unlink the bank first' };
   }
 

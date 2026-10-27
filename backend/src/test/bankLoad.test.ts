@@ -158,6 +158,35 @@ describe('POST /api/import/bank', () => {
     }
   });
 
+  it('refuses a load when the bank account currency differs from the account', async () => {
+    const { u, acc, conn } = await setup();
+    await pool.query(`UPDATE bank_connection_accounts SET currency = 'USD' WHERE connection_id = $1`, [conn]);
+    const res = await load(u, acc);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('The bank account is in USD but the account is in EUR — link it again');
+    expect(txUrls).toHaveLength(0);
+  });
+
+  it('loads only the account currency rows from an XXX bank account', async () => {
+    const u = await register('xx');
+    const acc = await makeAccount(u.id, 'USD');
+    await linkBank(u, acc);
+    const mk = (id: string, cur: string) => ({
+      entry_reference: id, transaction_id: null, transaction_amount: { amount: '5.00', currency: cur },
+      credit_debit_indicator: 'DBIT', status: 'BOOK', booking_date: '2026-10-01', value_date: null,
+      remittance_information: [`row ${id}`], creditor: null, debtor: null,
+    });
+    const impl = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string) =>
+      new URL(url).pathname.includes('/transactions')
+        ? respond(200, { transactions: [mk('1', 'EUR'), mk('2', 'USD')], continuation_key: null })
+        : impl(url)
+    );
+    const res = await load(u, acc);
+    expect(res.status).toBe(200);
+    expect(res.body.data.rows.map((r: any) => r.description)).toEqual(['row 2']);
+  });
+
   it('passes the PSU headers', async () => {
     const { u, acc } = await setup();
     await load(u, acc)
