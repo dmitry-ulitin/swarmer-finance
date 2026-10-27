@@ -7,6 +7,7 @@ import transactionRoutes from './routes/transactions';
 import accountRoutes from './routes/accounts';
 import importRoutes from './routes/import';
 import profileRoutes from './routes/profile';
+import bankRoutes from './routes/bank';
 import { errorHandler } from './middleware/error';
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/bank', bankRoutes);
 
 app.use(errorHandler);
 
