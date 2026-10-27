@@ -1,0 +1,20 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
+    <tui-textfield>
+        <label tuiLabel>Name</label>
+        <input tuiInput tuiAutoFocus formControlName="name" autocomplete="name" />
+    </tui-textfield>
+
+    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false">
+        <label tuiLabel>Currency</label>
+        <input tuiComboBox formControlName="currency" placeholder="e.g. USD, EUR" [strict]="false" />
+        <tui-data-list-wrapper *tuiDropdown [items]="currencies() | tuiFilterByInput" />
+    </tui-textfield>
+    <p class="hint">Balances and totals are shown in this currency.</p>
+
+    <div class="actions">
+        <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
+        <button tuiButton size="s" type="submit" [disabled]="form.invalid || loading()">
+            {{ loading() ? 'Saving...' : 'Save' }}
+        </button>
+    </div>
+</form>

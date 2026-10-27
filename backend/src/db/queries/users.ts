@@ -26,6 +26,19 @@ export const createUser = async (
   return result[0];
 };
 
+export const updateProfile = async (
+  id: number,
+  name: string,
+  currency: string,
+  currencyScale: number
+): Promise<User | null> => {
+  return queryOne<User>(
+    `UPDATE users SET name = $2, currency = $3, currency_scale = $4 WHERE id = $1
+     RETURNING id, email, name, currency, currency_scale, created_at`,
+    [id, name, currency, currencyScale]
+  );
+};
+
 export const getPasswordHashById = async (id: number): Promise<string | null> => {
   const row = await queryOne<{ password_hash: string }>(
     'SELECT password_hash FROM users WHERE id = $1',

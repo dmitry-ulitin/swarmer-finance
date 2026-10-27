@@ -49,6 +49,15 @@ export class AuthService {
     return this.http.post<ApiResponse<{ success: boolean }>>('/api/auth/password', { currentPassword, newPassword });
   }
 
+  updateProfile(name: string, currency: string) {
+    return this.http.put<ApiResponse<User>>('/api/profile', { name, currency })
+      .pipe(tap(response => {
+        if (!response.data) return;
+        localStorage.setItem('user', JSON.stringify(response.data));
+        this.userSignal.set(response.data);
+      }));
+  }
+
   logout() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

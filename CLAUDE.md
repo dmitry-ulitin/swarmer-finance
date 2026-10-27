@@ -80,6 +80,10 @@ All API responses use this envelope format consistently.
   it); `index.ts` trusts one proxy hop for `req.ip`
 - `REGISTRATION_ENABLED=false` closes `POST /api/auth/register` (403);
   any other value or unset leaves it open
+- Users change their password via `POST /api/auth/password` (wrong current
+  password is 400, not 401; shares the login throttle) and their name and
+  display currency via `PUT /api/profile` (`routes/profile.ts`, the home for
+  future per-user settings)
 
 ### Frontend State Management
 - **AuthService** (`core/auth.service.ts`): Signal-based `accessToken`, `userSignal`, computed `isAuthenticated`
