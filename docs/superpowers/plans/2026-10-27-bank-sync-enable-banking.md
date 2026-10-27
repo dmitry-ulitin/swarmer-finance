@@ -67,8 +67,9 @@ signals, Taiga UI v5, Vitest via `ng test`.
   confirm with zero rows; it never moves backwards.
 - Expiry warning: 7 days before `valid_until`.
 - Linking an account needs ADMIN on it, and the connection must be the
-  caller's. Loading needs WRITE. A tracked (blockchain) account cannot be
-  linked, and a linked account cannot become tracked.
+  caller's. Loading needs WRITE. Only an account of type `bank` can be
+  linked (user's decision, 2026-10-27; this also rules out tracked wallets),
+  and a linked account cannot change its type.
 - Enable Banking calls are mocked in tests by replacing `global.fetch`, as
   `syncApi.test.ts` does.
 - UI copy is English (as in the rest of the app).
@@ -356,16 +357,16 @@ Behaviour:
   - `deleteLinksOfUser(tx: Tx, accountId: number, userId: number): Promise<void>` — deletes links on the account whose connection belongs to `userId`.
   - `Account.bank_link?: BankLinkDto | null` in `types/index.ts`; `getAccounts` fills it (null when none).
 
-Rules: the account must not be tracked (400 `A blockchain-synced account cannot be linked to a bank`); the connection must be the caller's (404 as in Task 5) and have the uid (400 `No such bank account in this connection`); a bank account currency other than `XXX` must equal the app account's (400 `The bank account is in <X> but the account is in <Y>`). Relinking replaces the link and resets `loaded_to` to null only when the uid or connection changes. `updateAccount` refuses switching a linked account to tracked (400 `Unlink the bank first`). `removeMember` calls `deleteLinksOfUser` inside both of its transactions for the departing user.
+Rules: the account must be of type `bank` (400 `Only a bank account can be linked to a bank`); the connection must be the caller's (404 as in Task 5) and have the uid (400 `No such bank account in this connection`); a bank account currency other than `XXX` must equal the app account's (400 `The bank account is in <X> but the account is in <Y>`). Relinking replaces the link and resets `loaded_to` to null only when the uid or connection changes. `updateAccount` refuses changing a linked account's type (400 `Unlink the bank first`). `removeMember` calls `deleteLinksOfUser` inside both of its transactions for the departing user.
 
 - [ ] **Step 1: Write the failing tests:**
   - `links with ADMIN, refuses WRITE`: a co-owner (level 3) links with their own connection → 200; a level-2 member → 403.
   - `refuses another user's connection` → 404.
-  - `refuses a tracked account` and `refuses a currency mismatch` (EUR bank account, USD app account) → 400 with the messages above; `XXX` bank account + USD app account → 200.
+  - `refuses a non-bank account` (a `cash` and a tracked `crypto` account) and `refuses a currency mismatch` (EUR bank account, USD app account) → 400 with the messages above; `XXX` bank account + USD app account → 200.
   - `lists the link on the account`: `GET /api/accounts` gives `bank_link.status 'active'`, `loadedTo null`, `ownConnection true`; for another member `ownConnection false`.
   - `marks a link unmapped after a reconnect drops its uid` (replace the connection's accounts by SQL) → `status 'unmapped'`.
   - `drops the link when its owner leaves the account`: member links with own connection, then `DELETE /api/accounts/:id/shares/<member>` by the owner → `bank_link` null; same for the member leaving.
-  - `refuses making a linked account tracked` → 400 `Unlink the bank first`.
+  - `refuses changing a linked account's type` (bank → cash) → 400 `Unlink the bank first`.
 - [ ] **Step 2:** `npx jest --testPathPatterns=bankLinks` — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the new suite plus `accounts|accountShares|sharing` — PASS. Commit `feat(bank): link accounts to bank accounts`.
