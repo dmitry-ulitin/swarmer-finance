@@ -16,6 +16,10 @@ h3 {
     color: var(--tui-text-secondary);
 }
 
+.warning {
+    color: var(--tui-status-warning);
+}
+
 .url {
     word-break: break-all;
     user-select: all;

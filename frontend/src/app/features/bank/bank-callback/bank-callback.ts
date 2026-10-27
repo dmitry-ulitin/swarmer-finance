@@ -34,8 +34,12 @@ export class BankCallback {
       if (error || !state || !code) {
         this.notifications.showError(error ? `The bank returned an error: ${error}` : 'Unknown or expired connection request');
       } else {
-        await firstValueFrom(this.api.completeBankConnection(state, code));
-        this.notifications.showSuccess('Bank connected');
+        const connection = (await firstValueFrom(this.api.completeBankConnection(state, code))).data;
+        if (connection?.accounts.length === 0) {
+          this.notifications.showError('The bank shared no accounts. Link them with "Link accounts" in the Enable Banking control panel, then press Reconnect.');
+        } else {
+          this.notifications.showSuccess('Bank connected');
+        }
       }
     } catch (e) {
       this.notifications.showError(e, 'Failed to connect the bank');

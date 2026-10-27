@@ -8,7 +8,7 @@ import { ApiService } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
 import { BankDialogService } from '../bank-dialog.service';
 
-async function render(query: Record<string, string>, complete = vi.fn(() => of({ data: {}, error: null }))) {
+async function render(query: Record<string, string>, complete = vi.fn(() => of({ data: { accounts: [{ uid: 'u1' }] }, error: null }))) {
   const api = { completeBankConnection: complete };
   const router = { navigate: vi.fn(() => Promise.resolve(true)) };
   const notifications = { showError: vi.fn(), showSuccess: vi.fn() };
@@ -37,6 +37,13 @@ describe('BankCallback', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/dashboard'], { replaceUrl: true });
     expect(dialogs.openConnections).toHaveBeenCalled();
     expect(notifications.showSuccess).toHaveBeenCalledWith('Bank connected');
+  });
+
+  it('warns when the bank shared no accounts', async () => {
+    const { notifications, dialogs } = await render({ state: 's', code: 'c' }, vi.fn(() => of({ data: { accounts: [] }, error: null })));
+    expect(notifications.showSuccess).not.toHaveBeenCalled();
+    expect(notifications.showError).toHaveBeenCalledWith(expect.stringContaining('Link accounts'));
+    expect(dialogs.openConnections).toHaveBeenCalled();
   });
 
   it('shows the error and does not complete when the bank reports one', async () => {

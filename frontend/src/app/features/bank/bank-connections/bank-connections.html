@@ -52,6 +52,13 @@
                         </div>
                         @for (a of c.bankAccounts; track a.uid) {
                             <div class="account">{{ a.label }}</div>
+                        } @empty {
+                            @if (c.status !== 'pending') {
+                                <p class="hint warning">
+                                    The bank shared no accounts. Link this bank's accounts with "Link accounts"
+                                    in the Enable Banking control panel, then press Reconnect.
+                                </p>
+                            }
                         }
                     </div>
                 } @empty {
@@ -73,6 +80,11 @@
                         <input tuiSelect formControlName="bank" />
                         <tui-data-list-wrapper *tuiDropdown [items]="bankNames()" />
                     </tui-textfield>
+
+                    <p class="hint">
+                        Only accounts linked in the Enable Banking control panel are available. Link the bank's
+                        accounts there with "Link accounts" first, then connect the bank here.
+                    </p>
 
                     <div class="actions">
                         <button tuiButton size="s" type="submit" [disabled]="connectForm.invalid || busy()">Connect</button>

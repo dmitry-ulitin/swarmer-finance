@@ -74,6 +74,15 @@ describe('BankConnections', () => {
     expect(el.textContent).toContain('Activate by linking accounts');
   });
 
+  it('warns under a connection that shares no accounts, but not under a pending one', async () => {
+    const { el } = await render({ enabled: true, applicationId: 'app-1', hasKey: true }, [
+      connection({ accounts: [] }),
+      connection({ id: 2, aspspName: 'Caixa', status: 'pending', accounts: [] }),
+    ]);
+    expect(el.querySelectorAll('.warning').length).toBe(1);
+    expect(el.querySelector('.warning')!.textContent).toContain('The bank shared no accounts');
+  });
+
   it('starts a connection with the callback address', async () => {
     const { fixture, api } = await render({ enabled: true, applicationId: 'app-1', hasKey: true });
     const redirect = vi.spyOn(fixture.componentInstance, 'redirect').mockImplementation(() => undefined);
