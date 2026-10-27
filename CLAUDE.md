@@ -8,8 +8,9 @@ A personal finance management web app: multi-user, with per-account sharing
 (read / write / admin) between users. Core scope for now: income/expense
 transactions with hierarchical categories, multi-currency accounts, manual
 entry, bank-statement import (CSV/XLS/XLSX) and blockchain wallet sync.
-Direct bank sync via Enable Banking is designed but not built
-(`docs/superpowers/specs/2026-10-23-bank-sync-enable-banking-design.md`).
+Direct bank sync through Enable Banking (PSD2) is built (see "Bank sync"
+below; design in
+`docs/superpowers/specs/2026-10-23-bank-sync-enable-banking-design.md`).
 Investments/assets and analytics/reports beyond the category summary are
 deferred to later phases.
 
@@ -93,7 +94,7 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→017)
+- Migrations in `backend/src/db/migrations/` — run in order (001→018)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -189,6 +190,50 @@ rate) — re-checking access and hashes but not the
 advisory match. Real statements go in `backend/banks/` (gitignored);
 redacted test copies in `backend/src/test/fixtures/banks/`.
 
+#### Bank sync (Enable Banking)
+
+Migration 018: `bank_credentials` (one Enable Banking registration per user:
+application id + private key, AES-256-GCM encrypted under
+`BANK_CREDENTIALS_KEY` with AAD `user:<id>`; the key never appears in a
+response, log or error), `bank_connections` (a user's consent with one bank;
+`auth_state` is the one-time value of a pending consent),
+`bank_connection_accounts` (the accounts a session exposes; a reconnect
+replaces them and may change their `uid`s) and `bank_account_links`
+(`account_id` -> connection + `uid`, `loaded_to` marker; no FK on `uid`).
+`routes/bank.ts` (`services/bank/`): `/api/bank/credentials` (GET works
+without the key and reports `enabled`), `/aspsps?country=`, `/connections`
+(start, `/complete` with `state` + `code`, `/:id/reconnect`, DELETE) and
+`/links/:accountId` (PUT/DELETE). `services/bank/client.ts` signs an RS256
+JWT per request (`kid` = application id) and pages `continuation_key`;
+tests mock `global.fetch`. Without a valid `BANK_CREDENTIALS_KEY` (32 bytes,
+base64) every call but `GET /credentials`, and `POST /api/import/bank`,
+answer 503 `Bank sync is not configured`. The redirect URL is not stored: the
+frontend sends `${location.origin}/bank-callback`, which must be registered
+in the user's Enable Banking app, so a consent cannot complete against a
+local non-https frontend (local work relies on the mocked tests). A stale or
+foreign `state` is 400 `Unknown or expired connection request`.
+
+Linking needs ADMIN on the app account, a connection of the caller's own and
+an account of type `bank` (a linked account cannot change its type); a
+single-currency bank account must match the app account's currency, while
+a multi-currency (`XXX`) one loads only rows in the app account's currency.
+`POST /api/import/bank` (WRITE) returns the same preview as statement import
+(`source` `enablebanking`, plus `bank: { dateFrom, dateTo }`) using the
+connection owner's keys; only `BOOK` transactions come in. The window is
+`dateFrom` (default today - 90 days) on the first load, `loaded_to` - 2 days
+afterwards, ending today (UTC). Row hashes are `sha256("eb|<country>|<bank>|<entry_reference>")`,
+else `transaction_id`, else the content hash, so they never collide with
+other sources. `POST /api/import/reconcile` takes `bankLoadedTo` and moves
+the marker only then (also with zero rows, never backwards). A link whose
+`uid` vanished after a reconnect shows as "needs relinking" and loading it is
+409; an expired or pending connection is 409 `Bank access expired —
+reconnect` (expiry is flagged 7 days ahead, and when the bank refuses the
+session). A member's links through their own connection are deleted in the
+same transaction that removes them from the account
+(`accountShares.removeMember`). Frontend: header user menu "Bank connections"
+dialog, account settings "Bank link" / "Load from bank", route
+`/bank-callback`.
+
 #### Exchange rates
 
 `services/currency.ts` fetches rates from Frankfurter (ECB) and falls back to
@@ -235,6 +280,9 @@ working directory):
   start command for migrations
 - `REGISTRATION_ENABLED` — `false` closes registration (default open)
 - `TEST_DATABASE_URL` — used instead of `DATABASE_URL` by Jest when set
+- `BANK_CREDENTIALS_KEY` — 32 random bytes, base64 (`openssl rand -base64 32`);
+  unset turns bank sync off (503). Losing it makes stored keys unreadable
+- `ENABLE_BANKING_API_URL` — default `https://api.enablebanking.com`
 - `JWT_SECRET`, `JWT_REFRESH_SECRET` — token signing secrets
 - `PORT` — default 3000
 - `CORS_ORIGIN` — default `*`
