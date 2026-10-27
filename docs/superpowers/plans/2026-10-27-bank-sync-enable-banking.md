@@ -27,12 +27,16 @@ signals, Taiga UI v5, Vitest via `ng test`.
 - Keys are entered in a "Bank connections" dialog opened from the user
   dropdown in the header (next to Profile / Change password). The profile is
   a dialog, not a page; a separate dialog keeps the profile form simple.
-- The redirect URL is stored with the keys (it is registered per Enable
-  Banking app). It defaults to `${location.origin}/bank-callback`; in prod
-  that is the Render static site's `https://…/bank-callback`, which the user
-  registers in their Enable Banking app in place of the GitHub page. A local,
-  non-https dev frontend keeps the prod URL and uses the "paste the address"
-  fallback.
+- One Enable Banking registration per user: an Application ID (the
+  registration's identifier, the JWT `kid`) and its private key. The server's
+  `BANK_CREDENTIALS_KEY` is not a user key: it only encrypts the stored ones.
+- The redirect URL is not stored: the frontend sends
+  `${location.origin}/bank-callback` when it starts a consent. In prod that is
+  the Render static site's `https://…/bank-callback`, which the user registers
+  in their Enable Banking app in place of the GitHub page. No "paste the
+  address" fallback (user's decision, 2026-10-27): a consent cannot be
+  completed against a local, non-https frontend; local work relies on the
+  mocked tests, and the manual check runs on prod.
 
 ## Global Constraints
 
@@ -86,7 +90,7 @@ signals, Taiga UI v5, Vitest via `ng test`.
 4. **A stale or foreign `state` on `/bank-callback`** (double-submit, a
    callback from the prod app while testing locally, another user's state)
    → 400 `Unknown or expired connection request`, nothing changes, and the
-   frontend shows the message plus the paste fallback. Test in Tasks 5 and 9.
+   frontend shows the message. Test in Tasks 5 and 9.
 5. **The connection owner loses access to the shared account** (removed,
    or leaves). Their link on that account is deleted in the same
    `removeMember` transaction, so nobody else loads through a stranger's keys.
@@ -147,7 +151,6 @@ CREATE TABLE IF NOT EXISTS bank_credentials (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   application_id TEXT NOT NULL,
   private_key_enc TEXT NOT NULL,
-  redirect_url TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS bank_connections (
@@ -295,7 +298,7 @@ CREATE TABLE IF NOT EXISTS bank_account_links (
 **Interfaces:**
 - Consumes: Task 1 (`encryptSecret`, `decryptSecret`, `requireBankSync`, `isBankSyncEnabled`), Task 2 client.
 - Produces:
-  - `loadCredentials(userId: number): Promise<EbCredentials & { redirectUrl: string }>` — 400 `Add your Enable Banking keys first` when none.
+  - `loadCredentials(userId: number): Promise<EbCredentials>` — 400 `Add your Enable Banking keys first` when none.
   - `getConnection(userId: number, id: number)` — 404 `Bank connection not found` unless it is the caller's.
   - `markExpired(connectionId: number): Promise<void>`
   - `connectionStatus(c): 'pending' | 'active' | 'expiring' | 'expired'` — `pending` without a session; `expired` when `expired` is set or `valid_until <= now`; `expiring` within 7 days.
@@ -305,17 +308,18 @@ Endpoints (all behind `authMiddleware`; all but the first call `requireBankSync(
 
 | Method & path | Body | Response `data` |
 |---|---|---|
-| `GET /api/bank/credentials` | — | `{ enabled, applicationId: string \| null, hasKey: boolean, redirectUrl: string \| null }` |
-| `PUT /api/bank/credentials` | `{ applicationId: uuid, privateKey?: string, redirectUrl: https url or http://localhost… }` | same shape; `privateKey` may be omitted only when one is already stored (changing the redirect URL alone) |
+| `GET /api/bank/credentials` | — | `{ enabled, applicationId: string \| null, hasKey: boolean }` |
+| `PUT /api/bank/credentials` | `{ applicationId: uuid, privateKey: string }` | same shape (one record per user; saving replaces it) |
 | `DELETE /api/bank/credentials` | — | `{ success: true }` (connections stay but cannot be used) |
 | `GET /api/bank/aspsps?country=EE` | — | `{ name, country, beta, maxConsentDays }[]` |
 | `GET /api/bank/connections` | — | `BankConnectionDto[]` |
-| `POST /api/bank/connections` | `{ aspspName, country }` | `{ url }` — creates a pending connection with a new state |
-| `POST /api/bank/connections/:id/reconnect` | — | `{ url }` — new state on the existing row |
+| `POST /api/bank/connections` | `{ aspspName, country, redirectUrl }` | `{ url }` — creates a pending connection with a new state |
+| `POST /api/bank/connections/:id/reconnect` | `{ redirectUrl }` | `{ url }` — new state on the existing row |
 | `POST /api/bank/connections/complete` | `{ state, code }` | `BankConnectionDto` |
 | `DELETE /api/bank/connections/:id` | — | `{ success: true }` |
 
 Behaviour:
+- `redirectUrl` must be an `https:` URL whose path is `/bank-callback` (400 otherwise).
 - Save validates the key with `crypto.createPrivateKey` → 400 `Private key is not a valid PEM`.
 - Start / reconnect: `state = crypto.randomBytes(24).toString('hex')`, `auth_started_at = now()`; the consent length comes from the bank's entry in `getAspsps` (Global Constraints), so look it up by name.
 - Complete: finds the row by `auth_state` **and** `user_id`, started under 30 min ago, else 400 `Unknown or expired connection request`; clears `auth_state`, stores `session_id`, `valid_until`, `expired = false`, replaces `bank_connection_accounts` with the session's accounts (`iban` from `account_id.iban`). On a reconnect the old session is deleted at Enable Banking afterwards, best effort (errors ignored). Links are untouched (they match by uid).
@@ -413,26 +417,24 @@ Load rules, in order: account writable and not tracked (`loadWritableAccount`); 
 **Interfaces:**
 - Consumes: the endpoints of Tasks 5–7.
 - Produces:
-  - `models/bank.ts`: `BankCredentials`, `BankAspsp { name, country, beta, maxConsentDays }`, `BankConnection` (= `BankConnectionDto`), `BankLink` (= `BankLinkDto`), `BankStatus`; `BANK_COUNTRIES` (`EE`, `CY`, `ES`, `RO` first, then the other EEA codes); `bankRedirectUrl(): string` = `` `${location.origin}/bank-callback` ``; `parseCallbackUrl(text: string): { state: string; code: string } | null`.
+  - `models/bank.ts`: `BankCredentials`, `BankAspsp { name, country, beta, maxConsentDays }`, `BankConnection` (= `BankConnectionDto`), `BankLink` (= `BankLinkDto`), `BankStatus`; `BANK_COUNTRIES` (`EE`, `CY`, `ES`, `RO` first, then the other EEA codes); `bankRedirectUrl(): string` = `` `${location.origin}/bank-callback` ``.
   - `Account.bank_link?: BankLink | null`; `ImportParseResult.bank?: { dateFrom: string; dateTo: string }`.
-  - `ApiService`: `getBankCredentials()`, `saveBankCredentials(body)`, `deleteBankCredentials()`, `getBankAspsps(country)`, `getBankConnections()`, `startBankConnection(aspspName, country)`, `reconnectBank(id)`, `completeBankConnection(state, code)`, `deleteBankConnection(id)`, `linkBankAccount(accountId, connectionId, uid)`, `unlinkBankAccount(accountId)`, `loadFromBank(accountId, dateFrom?)`; `reconcileImport(accountId, rows, bankLoadedTo?)` sends `bankLoadedTo` only when given.
+  - `ApiService`: `getBankCredentials()`, `saveBankCredentials(body)`, `deleteBankCredentials()`, `getBankAspsps(country)`, `getBankConnections()`, `startBankConnection(aspspName, country)` and `reconnectBank(id)` (both send `redirectUrl: bankRedirectUrl()`), `completeBankConnection(state, code)`, `deleteBankConnection(id)`, `linkBankAccount(accountId, connectionId, uid)`, `unlinkBankAccount(accountId)`, `loadFromBank(accountId, dateFrom?)`; `reconcileImport(accountId, rows, bankLoadedTo?)` sends `bankLoadedTo` only when given.
   - `BankDialogService.openConnections(): Promise<void>`, `openLink(account: Account): Promise<void>` (Task 9 adds the component).
 
 Dialog content (`size: 'm'`, label `Bank connections`; Taiga form style as in `account-form` / `profile-form`):
 - `enabled: false` → one line `Bank sync is not configured on this server.` and nothing else.
-- **Keys:** Application ID, private key (textarea, or a `.pem` file read into it), Redirect URL (prefilled with `bankRedirectUrl()` when none is stored). Once a key is stored the textarea shows the placeholder `Key loaded — paste a new one to replace it`. A hint: `Register this redirect URL in your Enable Banking application, then activate the application with "Activate by linking accounts" in the Enable Banking control panel.` Buttons Save / Remove keys.
+- **Key:** Application ID and private key (textarea, or a `.pem` file read into it). Once a key is stored the textarea shows the placeholder `Key loaded — paste a new one to replace it`. A hint with `bankRedirectUrl()` shown read-only: `Register <url> as a redirect URL in your Enable Banking application, then activate the application with "Activate by linking accounts" in the Enable Banking control panel.` Buttons Save / Remove key.
 - **Banks:** each connection: bank name, country, status chip (`Active until <date>`, `Expires in N days` for `expiring`, `Expired`, `Not completed`), its bank accounts (name or IBAN, currency), buttons Reconnect and Disconnect (confirm with `TUI_CONFIRM`).
 - **Connect a bank:** country select → bank select (from `getBankAspsps`) → Connect, which does `location.assign(url)`.
-- **Paste fallback** (shown when `location.protocol !== 'https:'` or the callback page sent the user here with an error): a text field `Paste the address from the browser after confirming in the bank` + Complete, using `parseCallbackUrl`.
 - Header user dropdown: `Bank connections` (`@tui.landmark`) between Profile and Change password.
 
 - [ ] **Step 1: Write the failing specs** in `bank-connections.spec.ts` (mock `ApiService` with `vi.fn` returning `of({ data, error: null })`, as other dialog specs do):
   - `shows only the not-configured line when disabled`.
   - `never pre-fills the private key and shows the loaded placeholder`.
-  - `prefills the redirect URL with the callback address`.
+  - `shows the callback address to register`.
+  - `starts a connection with the callback address`: Connect calls `startBankConnection` and the request body has `redirectUrl` = `bankRedirectUrl()`.
   - `marks a connection expiring within 7 days` → text `Expires in 3 days`.
-  - `completes from a pasted address`: input `https://x/bank-callback?state=s1&code=c1` → `completeBankConnection('s1','c1')` called.
-  - `parseCallbackUrl` unit cases: missing code → null; `error=access_denied` → null.
 - [ ] **Step 2:** `cd frontend && npx ng test --watch=false --include=src/app/features/bank/bank-connections/bank-connections.spec.ts` — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the spec and `npm test` — PASS; `npm run build` succeeds. Commit `feat(frontend): bank connections dialog`.
@@ -447,11 +449,11 @@ Dialog content (`size: 'm'`, label `Bank connections`; Taiga form style as in `a
 - Modify: `frontend/src/app/app.routes.ts`, `frontend/src/app/features/bank/bank-dialog.service.ts`, `frontend/src/app/features/header/header.{ts,html}`
 
 **Interfaces:**
-- Consumes: Task 8 (`ApiService`, `BankDialogService`, `parseCallbackUrl`).
+- Consumes: Task 8 (`ApiService`, `BankDialogService`).
 - Produces: route `bank-callback` (`authGuard`, lazy `BankCallback`); `BankLink` dialog with `data: Account`, completes with `true` when the link changed.
 
 Behaviour:
-- `BankCallback` reads `state`, `code`, `error` from the query. With state+code it calls `completeBankConnection`, then `router.navigate(['/dashboard'], { replaceUrl: true })` and `bankDialogs.openConnections()`, and shows `Bank connected`. With `error` or a failed complete it shows the error via `NotificationService` (`Unknown or expired connection request` as the backend words it), navigates to the dashboard and opens the connections dialog, where the paste fallback is visible. While working: a `tui-loader`.
+- `BankCallback` reads `state`, `code`, `error` from the query. With state+code it calls `completeBankConnection`, then `router.navigate(['/dashboard'], { replaceUrl: true })` and `bankDialogs.openConnections()`, and shows `Bank connected`. With `error` or a failed complete it shows the error via `NotificationService` (`Unknown or expired connection request` as the backend words it), navigates to the dashboard and opens the connections dialog. While working: a `tui-loader`.
 - Header account settings dropdown, for `account.type === 'bank'` and `canEditFiltered()`: `Bank link` (`@tui.link`) → `openLink`.
 - `BankLink` dialog: a select of every bank account of the user's connections (`<bank> · <name or IBAN> · <currency>`), the current link pre-selected, Save / Unlink / Cancel. Accounts whose currency is neither `XXX` nor the app account's are shown disabled. On save `AccountsState.reload()`.
 
@@ -494,5 +496,6 @@ Behaviour:
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1:** In `CLAUDE.md`: replace "Direct bank sync via Enable Banking is designed but not built" with a one-line pointer; add a `#### Bank sync (Enable Banking)` section after "Bank-statement import" (tables of migration 018, endpoints, marker rule, hash namespace, who can link/load, link dropped with its owner's access); bump the migration range to 001→018; add `BANK_CREDENTIALS_KEY` and `ENABLE_BANKING_API_URL` to the env list. Commit `docs: document bank sync`.
-- [ ] **Step 2 (manual, with the user, dev DB `finance_db_nu`):** set `BANK_CREDENTIALS_KEY` in `backend/.env`, restart `npm run dev`; in the dialog enter the application id and `backend/banks/<app-id>.pem`, keep the prod redirect URL; connect `LHV Pank` (EE), finish through the paste fallback; link the EUR LHV account that holds the `(..7101)…` rows; Load from bank from 90 days ago. Expected: rows already in the DB are `possible_duplicate`, rows after 2026-10-11 are `new`. Confirm a few, load again: they are `duplicate`, the request starts at marker − 2 days.
-- [ ] **Step 3 (prod, the user does it):** generate the key (`openssl rand -base64 32`), set `BANK_CREDENTIALS_KEY` in the Render dashboard for `swarmer-finance-api`, register `https://<static site>/bank-callback` as a redirect URL in the Enable Banking app, and update memory `bank_sync_deferred.md`.
+- [ ] **Step 2 (prod, the user does it):** generate the key (`openssl rand -base64 32`), set `BANK_CREDENTIALS_KEY` in the Render dashboard for `swarmer-finance-api`, register `https://<static site>/bank-callback` as a redirect URL in the Enable Banking app.
+- [ ] **Step 3 (manual on prod, with the user, after deploy):** in the dialog enter the application id and `backend/banks/<app-id>.pem`; connect `LHV Pank` (EE); link the EUR LHV account that holds the `(..7101)…` rows; Load from bank from 90 days ago. Expected: rows already in the DB are `possible_duplicate`, rows after 2026-10-11 are `new`. Confirm a few, load again: they are `duplicate`, the request starts at marker − 2 days.
+- [ ] **Step 4:** update memory `bank_sync_deferred.md`.
