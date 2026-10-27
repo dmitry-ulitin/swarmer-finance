@@ -1,3 +1,4 @@
+import type { BankLinkDto } from '../services/bank/links';
 export interface User {
   id: number;
   email: string;
@@ -49,6 +50,8 @@ export interface Account {
   owner_name?: string;
   /** Transactions come from the blockchain; set by services/accounts.ts. */
   tracked?: boolean;
+  /** The bank account feeding this one; set by services/accounts.ts, null when none. */
+  bank_link?: BankLinkDto | null;
 }
 
 export interface Transaction {

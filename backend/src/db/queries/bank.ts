@@ -119,3 +119,63 @@ export const markExpired = (id: number) =>
 
 export const deleteConnection = (id: number) =>
   execute('DELETE FROM bank_connections WHERE id = $1', [id]);
+
+export interface BankLinkRow {
+  account_id: number;
+  connection_id: number;
+  uid: string;
+  loaded_to: string | null;
+  account_currency: string;
+  user_id: number;
+  session_id: string | null;
+  valid_until: Date | null;
+  expired: boolean;
+  aspsp_name: string;
+  acc_uid: string | null;
+  acc_iban: string | null;
+  acc_name: string | null;
+  acc_currency: string | null;
+}
+
+/** Links of the given accounts with their connection and, when still present, the bank account. */
+export const listLinks = (accountIds: number[]) =>
+  query<BankLinkRow>(
+    `SELECT l.account_id, l.connection_id, l.uid, to_char(l.loaded_to, 'YYYY-MM-DD') AS loaded_to,
+            a.currency AS account_currency,
+            c.user_id, c.session_id, c.valid_until, c.expired, c.aspsp_name,
+            ca.uid AS acc_uid, ca.iban AS acc_iban, ca.name AS acc_name, ca.currency AS acc_currency
+       FROM bank_account_links l
+       JOIN accounts a ON a.id = l.account_id
+       JOIN bank_connections c ON c.id = l.connection_id
+       LEFT JOIN bank_connection_accounts ca ON ca.connection_id = l.connection_id AND ca.uid = l.uid
+      WHERE l.account_id = ANY($1)`,
+    [accountIds]
+  );
+
+export const hasLink = async (accountId: number) =>
+  (await queryOne<{ one: number }>('SELECT 1 AS one FROM bank_account_links WHERE account_id = $1', [accountId])) !== null;
+
+/** Sets the link; loaded_to survives only when it still points at the same bank account. */
+export const upsertLink = (accountId: number, connectionId: number, uid: string) =>
+  execute(
+    `INSERT INTO bank_account_links (account_id, connection_id, uid)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (account_id) DO UPDATE
+       SET loaded_to = CASE WHEN bank_account_links.connection_id = EXCLUDED.connection_id
+                             AND bank_account_links.uid = EXCLUDED.uid
+                            THEN bank_account_links.loaded_to END,
+           connection_id = EXCLUDED.connection_id,
+           uid = EXCLUDED.uid`,
+    [accountId, connectionId, uid]
+  );
+
+export const deleteLink = (accountId: number) =>
+  execute('DELETE FROM bank_account_links WHERE account_id = $1', [accountId]);
+
+export const deleteLinksOfUser = (tx: Tx, accountId: number, userId: number) =>
+  tx.query(
+    `DELETE FROM bank_account_links
+      WHERE account_id = $1
+        AND connection_id IN (SELECT id FROM bank_connections WHERE user_id = $2)`,
+    [accountId, userId]
+  );

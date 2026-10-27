@@ -17,6 +17,7 @@ import { findOrCreateCategoryPath, getCategoryPath } from '../db/queries/categor
 import { withTransaction } from '../db';
 import { getUserIdByEmail } from '../db/queries/users';
 import { LEVEL, requireLevel } from './access';
+import { deleteLinksOfUser } from './bank/links';
 
 export const listMembers = async (
   accountId: number,
@@ -155,6 +156,7 @@ export const removeMember = async (
       await transferOwnership(tx, accountId, ownerId);
       await moveHistoryToOwner(tx, accountId, creator.user_id, ownerId, creatorMap);
       await remapAuthorCategories(tx, accountId, remaps);
+      await deleteLinksOfUser(tx, accountId, creator.user_id);
     });
     return getAccountMembers(accountId);
   }
@@ -170,6 +172,7 @@ export const removeMember = async (
     await moveHistoryToOwner(tx, accountId, targetUserId, creator.user_id, categoryMap);
     await remapAuthorCategories(tx, accountId, remaps);
     await deleteShare(tx, accountId, targetUserId);
+    await deleteLinksOfUser(tx, accountId, targetUserId);
   });
   return getAccountMembers(accountId);
 };

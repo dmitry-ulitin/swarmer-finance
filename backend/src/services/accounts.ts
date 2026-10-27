@@ -7,6 +7,8 @@ import { Account, AccountType, User } from '../types';
 import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel, requireLevelOnAll } from './access';
 import { ChainProvider, getProvider, isTracked } from './chain';
 import { getCurrencyScale } from './currencyScale';
+import { hasLink as hasBankLink } from '../db/queries/bank';
+import { getLinkDtos } from './bank/links';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
   return {
@@ -78,7 +80,8 @@ export const getAccounts = async (userId: number) => {
   const withLevel = accounts.map(a => ({ ...a, access_level: accessMap.get(a.id)! }));
   const withBal = await withBalances(withLevel);
   const converted = await withConvertedBalances(user, withBal);
-  return converted.map(a => toDecimalDTO(a, user.currency_scale));
+  const bankLinks = await getLinkDtos(converted.map(a => a.id), userId);
+  return converted.map(a => ({ ...toDecimalDTO(a, user.currency_scale), bank_link: bankLinks.get(a.id) ?? null }));
 };
 
 export const createAccount = async (
@@ -121,6 +124,9 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   const user = await getUserOrThrow(userId);
+  if (data.type !== existing.type && await hasBankLink(id)) {
+    throw { statusCode: 400, message: 'Unlink the bank first' };
+  }
 
   let hasTx: boolean | undefined;
   const hasTransactions = async () => hasTx ??= await accountQueries.hasTransactions(id);
