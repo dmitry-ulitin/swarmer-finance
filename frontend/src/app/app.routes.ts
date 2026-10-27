@@ -21,5 +21,10 @@ export const routes: Routes = [
     path: 'dashboard',
     loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
     canActivate: [authGuard]
+  },
+  {
+    path: 'bank-callback',
+    loadComponent: () => import('./features/bank/bank-callback/bank-callback').then(m => m.BankCallback),
+    canActivate: [authGuard]
   }
 ];

@@ -20,6 +20,9 @@
     @if (account.type === 'bank' && canWriteFiltered()) {
     <button tuiOption (click)="importFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.download'">Import</button>
     }
+    @if (account.type === 'bank' && canEditFiltered()) {
+    <button tuiOption (click)="linkFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.link'">Bank link</button>
+    }
     @if (account.tracked && canWriteFiltered()) {
     <button tuiOption (click)="syncFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.refresh-cw'" [disabled]="sync.syncing().has(account.id)">Sync</button>
     }
