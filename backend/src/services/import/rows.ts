@@ -60,7 +60,7 @@ function parseAmount(value: string, decimal: Profile['decimal']): number {
 }
 
 /** Rounds away float drift from the decimal parse, e.g. 0.1 + 0.2 cases. */
-const round2 = (n: number): number => Math.round(n * 100) / 100;
+export const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 type Candidate = Omit<ParsedRow, 'index'> & { account: string };
 

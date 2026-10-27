@@ -17,15 +17,15 @@ const normalize = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCa
  * hash otherwise cannot tell two genuinely identical charges apart, and real
  * statements contain them.
  */
-export function computeImportHashes(rows: ParsedRow[], profile: Profile): string[] {
+export function hashRows(rows: ParsedRow[], namespace: string, useReference: boolean): string[] {
   const seen = new Map<string, number>();
 
   return rows.map(row => {
-    if (profile.identity.kind === 'reference' && row.reference) {
-      return sha256(`${profile.id}|${row.reference}`);
+    if (useReference && row.reference) {
+      return sha256(`${namespace}|${row.reference}`);
     }
     const base = [
-      profile.id,
+      namespace,
       row.date,
       row.amount.toFixed(2),
       normalize(row.description),
@@ -35,4 +35,8 @@ export function computeImportHashes(rows: ParsedRow[], profile: Profile): string
     seen.set(base, occurrence + 1);
     return sha256(`${base}|${occurrence}`);
   });
+}
+
+export function computeImportHashes(rows: ParsedRow[], profile: Profile): string[] {
+  return hashRows(rows, profile.id, profile.identity.kind === 'reference');
 }
