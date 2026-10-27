@@ -1,6 +1,6 @@
 <div class="header">
-    <button tuiButton appearance="outline" size="s" (click)="accountsState.reload()"
-        [iconStart]="'@tui.refresh-cw'">Refresh</button>
+    <button tuiIconButton appearance="outline" size="s" (click)="accountsState.reload()"
+        [iconStart]="'@tui.refresh-cw'" aria-label="Refresh" title="Refresh"></button>
     <button tuiButton appearance="outline" size="s" (click)="openCreateDialog()"
         [iconStart]="'@tui.plus'">Add Account</button>
     <button tuiButton appearance="outline" size="s" [disabled]="!canManage()"
