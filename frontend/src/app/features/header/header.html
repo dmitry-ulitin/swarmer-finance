@@ -33,6 +33,7 @@
 <ng-template #userDropdown>
   <tui-data-list [size]="'s'" class="nowrap">
     <button tuiOption (click)="profile();userButton.click()" [iconEnd]="'@tui.user-pen'">Profile</button>
+    <button tuiOption (click)="bankConnections();userButton.click()" [iconEnd]="'@tui.landmark'">Bank connections</button>
     <button tuiOption (click)="changePassword();userButton.click()" [iconEnd]="'@tui.key-round'">Change password</button>
     <button tuiOption (click)="authService.logout()" [iconEnd]="'@tui.log-out'">Logout</button>
   </tui-data-list>

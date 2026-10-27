@@ -1,0 +1,48 @@
+.content,
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+h3 {
+    margin: 0 0 0.5rem;
+    font: var(--tui-typography-heading-h6);
+}
+
+.hint {
+    margin: 0;
+    font: var(--tui-typography-body-s);
+    color: var(--tui-text-secondary);
+}
+
+.url {
+    word-break: break-all;
+    user-select: all;
+}
+
+.connection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--tui-border-normal);
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.country,
+.account {
+    font: var(--tui-typography-body-s);
+    color: var(--tui-text-secondary);
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}

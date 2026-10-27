@@ -1,3 +1,5 @@
+import type { BankLink } from './bank';
+
 export type AccountType = 'cash' | 'bank' | 'crypto';
 
 /** 1 read, 2 transactions, 3 admin, 4 owner. */
@@ -49,6 +51,8 @@ interface AccountBase {
    * has none. Optional so existing fixtures need not supply it.
    */
   last_transaction_date?: string | null;
+  /** The bank account this one loads statements from; null when not linked. */
+  bank_link?: BankLink | null;
 }
 
 // A union over type, so `@if (account.type === 'crypto')` narrows

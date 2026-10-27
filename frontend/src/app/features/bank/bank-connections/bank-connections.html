@@ -1,0 +1,84 @@
+@if (loading()) {
+    <tui-loader size="l" />
+} @else if (!info()?.enabled) {
+    <p>Bank sync is not configured on this server.</p>
+} @else {
+    <div class="content">
+        <section>
+            <h3>Key</h3>
+            <form [formGroup]="form" (ngSubmit)="saveKey()" class="form" tuiTextfieldSize="m">
+                <tui-textfield>
+                    <label tuiLabel>Application ID</label>
+                    <input tuiInput formControlName="applicationId" autocomplete="off" />
+                </tui-textfield>
+
+                <tui-textfield>
+                    <label tuiLabel>Private key</label>
+                    <textarea tuiTextarea formControlName="privateKey" autocomplete="off" spellcheck="false"
+                        [placeholder]="info()?.hasKey ? 'Key loaded — paste a new one to replace it' : '-----BEGIN PRIVATE KEY-----'"></textarea>
+                </tui-textfield>
+
+                <label tuiInputFiles>
+                    <input accept=".pem,.key,text/plain" tuiInputFiles [formControl]="keyFile" />
+                </label>
+
+                <p class="hint">
+                    Register <strong class="url">{{ redirectUrl }}</strong> as a redirect URL in your Enable Banking application,
+                    then activate the application with "Activate by linking accounts" in the Enable Banking control panel.
+                </p>
+
+                <div class="actions">
+                    @if (info()?.hasKey) {
+                        <button tuiButton size="s" type="button" appearance="outline" [disabled]="busy()" (click)="removeKey()">Remove key</button>
+                    }
+                    <button tuiButton size="s" type="submit" [disabled]="form.invalid || busy()">Save</button>
+                </div>
+            </form>
+        </section>
+
+        @if (info()?.hasKey) {
+            <section>
+                <h3>Banks</h3>
+                @for (c of rows(); track c.id) {
+                    <div class="connection">
+                        <div class="head">
+                            <strong>{{ c.aspspName }}</strong>
+                            <span class="country">{{ c.country }}</span>
+                            <span tuiChip size="xs" [attr.data-status]="c.status">{{ c.statusText }}</span>
+                        </div>
+                        @for (a of c.bankAccounts; track a.uid) {
+                            <div class="account">{{ a.label }}</div>
+                        }
+                        <div class="actions">
+                            <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="reconnect(c)">Reconnect</button>
+                            <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="disconnect(c)">Disconnect</button>
+                        </div>
+                    </div>
+                } @empty {
+                    <p class="hint">No banks connected yet.</p>
+                }
+            </section>
+
+            <section>
+                <h3>Connect a bank</h3>
+                <form [formGroup]="connectForm" (ngSubmit)="connect()" class="form" tuiTextfieldSize="m">
+                    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false">
+                        <label tuiLabel>Country</label>
+                        <input tuiSelect formControlName="country" />
+                        <tui-data-list-wrapper *tuiDropdown [items]="countries" />
+                    </tui-textfield>
+
+                    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false">
+                        <label tuiLabel>Bank</label>
+                        <input tuiSelect formControlName="bank" />
+                        <tui-data-list-wrapper *tuiDropdown [items]="bankNames()" />
+                    </tui-textfield>
+
+                    <div class="actions">
+                        <button tuiButton size="s" type="submit" [disabled]="connectForm.invalid || busy()">Connect</button>
+                    </div>
+                </form>
+            </section>
+        }
+    </div>
+}

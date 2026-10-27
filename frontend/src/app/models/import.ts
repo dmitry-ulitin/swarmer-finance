@@ -27,6 +27,8 @@ export interface ImportParseResult {
   account: { id: number; name: string; currency: string; scale: number };
   rows: ImportRow[];
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
+  /** Set when the rows came from the bank: the window that was loaded. */
+  bank?: { dateFrom: string; dateTo: string };
 }
 
 /** One row as reconcile accepts it; the extra parse-only fields are ignored. */

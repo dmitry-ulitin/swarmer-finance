@@ -13,6 +13,7 @@ import { AccountSyncService } from '../accounts/account-sync.service';
 import { accessLevelOf } from '../../models/account';
 import { ChangePasswordDialogService } from '../auth/change-password-dialog.service';
 import { ProfileDialogService } from '../profile/profile-dialog.service';
+import { BankDialogService } from '../bank/bank-dialog.service';
 
 @Component({
   selector: 'app-header',
@@ -31,6 +32,7 @@ export class Header {
   private readonly importDialog = inject(ImportDialogService);
   private readonly passwordDialog = inject(ChangePasswordDialogService);
   private readonly profileDialog = inject(ProfileDialogService);
+  private readonly bankDialog = inject(BankDialogService);
   readonly sync = inject(AccountSyncService);
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
@@ -72,6 +74,10 @@ export class Header {
 
   profile(): void {
     void this.profileDialog.open();
+  }
+
+  bankConnections(): void {
+    void this.bankDialog.openConnections();
   }
 
   changePassword(): void {

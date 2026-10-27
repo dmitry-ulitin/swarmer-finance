@@ -4,6 +4,7 @@ import { Category, CategoryCreatePayload, CategoryDeletePreview, CategoryUpdateP
 import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareLevel } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
+import { BankAspsp, BankConnection, BankCredentials, BankLink, bankRedirectUrl } from '../models/bank';
 import { Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -138,7 +139,71 @@ export class ApiService {
     });
   }
 
-  reconcileImport(accountId: number, rows: ImportReconcileRow[]): Observable<ApiResponse<ImportReconcileResult>> {
-    return this.http.post<ApiResponse<ImportReconcileResult>>('/api/import/reconcile', { accountId, rows });
+  reconcileImport(accountId: number, rows: ImportReconcileRow[], bankLoadedTo?: string): Observable<ApiResponse<ImportReconcileResult>> {
+    return this.http.post<ApiResponse<ImportReconcileResult>>('/api/import/reconcile', {
+      accountId,
+      rows,
+      ...(bankLoadedTo ? { bankLoadedTo } : {}),
+    });
+  }
+
+  // Bank sync
+  getBankCredentials(): Observable<ApiResponse<BankCredentials>> {
+    return this.http.get<ApiResponse<BankCredentials>>('/api/bank/credentials');
+  }
+
+  saveBankCredentials(body: { applicationId: string; privateKey: string }): Observable<ApiResponse<BankCredentials>> {
+    return this.http.put<ApiResponse<BankCredentials>>('/api/bank/credentials', body);
+  }
+
+  deleteBankCredentials(): Observable<ApiResponse<{ success: boolean }>> {
+    return this.http.delete<ApiResponse<{ success: boolean }>>('/api/bank/credentials');
+  }
+
+  getBankAspsps(country: string): Observable<ApiResponse<BankAspsp[]>> {
+    return this.http.get<ApiResponse<BankAspsp[]>>('/api/bank/aspsps', { params: { country } });
+  }
+
+  getBankConnections(): Observable<ApiResponse<BankConnection[]>> {
+    return this.http.get<ApiResponse<BankConnection[]>>('/api/bank/connections');
+  }
+
+  /** Returns the bank's consent page address. */
+  startBankConnection(aspspName: string, country: string): Observable<ApiResponse<{ url: string }>> {
+    return this.http.post<ApiResponse<{ url: string }>>('/api/bank/connections', {
+      aspspName,
+      country,
+      redirectUrl: bankRedirectUrl(),
+    });
+  }
+
+  reconnectBank(id: number): Observable<ApiResponse<{ url: string }>> {
+    return this.http.post<ApiResponse<{ url: string }>>(`/api/bank/connections/${id}/reconnect`, {
+      redirectUrl: bankRedirectUrl(),
+    });
+  }
+
+  completeBankConnection(state: string, code: string): Observable<ApiResponse<BankConnection>> {
+    return this.http.post<ApiResponse<BankConnection>>('/api/bank/connections/complete', { state, code });
+  }
+
+  deleteBankConnection(id: number): Observable<ApiResponse<{ success: boolean }>> {
+    return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/bank/connections/${id}`);
+  }
+
+  linkBankAccount(accountId: number, connectionId: number, uid: string): Observable<ApiResponse<BankLink>> {
+    return this.http.put<ApiResponse<BankLink>>(`/api/bank/links/${accountId}`, { connectionId, uid });
+  }
+
+  unlinkBankAccount(accountId: number): Observable<ApiResponse<{ success: boolean }>> {
+    return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/bank/links/${accountId}`);
+  }
+
+  /** Loads bank transactions into an import preview; `dateFrom` only matters before the first load. */
+  loadFromBank(accountId: number, dateFrom?: string): Observable<ApiResponse<ImportParseResult>> {
+    return this.http.post<ApiResponse<ImportParseResult>>('/api/import/bank', {
+      accountId,
+      ...(dateFrom ? { dateFrom } : {}),
+    });
   }
 }
