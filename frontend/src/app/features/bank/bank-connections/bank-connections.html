@@ -45,14 +45,14 @@
                             <strong>{{ c.aspspName }}</strong>
                             <span class="country">{{ c.country }}</span>
                             <span tuiChip size="xs" [attr.data-status]="c.status">{{ c.statusText }}</span>
+                            <div class="actions">
+                                <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="reconnect(c)">Reconnect</button>
+                                <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="disconnect(c)">Disconnect</button>
+                            </div>
                         </div>
                         @for (a of c.bankAccounts; track a.uid) {
                             <div class="account">{{ a.label }}</div>
                         }
-                        <div class="actions">
-                            <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="reconnect(c)">Reconnect</button>
-                            <button tuiButton size="xs" type="button" appearance="outline" [disabled]="busy()" (click)="disconnect(c)">Disconnect</button>
-                        </div>
                     </div>
                 } @empty {
                     <p class="hint">No banks connected yet.</p>
