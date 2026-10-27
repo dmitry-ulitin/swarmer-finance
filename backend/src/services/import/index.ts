@@ -3,13 +3,14 @@ import * as transactionQueries from '../../db/queries/transactions';
 import { LEVEL, getAccessibleAccountIds, requireLevel } from '../access';
 import { convertAmount, getOrRefreshRate, toCents } from '../currency';
 import { detectProfile, getProfile, Profile } from './profiles';
-import { readStatement } from './rows';
+import { readStatement, ParsedRow } from './rows';
 import { computeImportHashes } from './hash';
-import { suggestCategories, SuggestionSource } from './categorize';
+import { suggestCategories, SuggestionSource, KeyField } from './categorize';
 import { parseCsv } from './csv';
 import { isWorkbook, parseWorkbook } from './workbook';
 import { getTreeCategoryIds, resolveCategoryForOwner } from '../categories';
 import { isTracked } from '../chain';
+import { Account } from '../../types';
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate';
 
@@ -32,10 +33,12 @@ export interface ParseResult {
   account: { id: number; name: string; currency: string; scale: number };
   rows: ImportRow[];
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
+  /** Set when the rows come from a bank connection rather than a file. */
+  bank?: { dateFrom: string; dateTo: string };
 }
 
 /** The account, once the caller is known to hold WRITE on it. */
-async function loadWritableAccount(accountId: number, userId: number) {
+export async function loadWritableAccount(accountId: number, userId: number): Promise<Account> {
   const account = await accountQueries.getAccountById(accountId);
   // Matches transactions.ts's loadAccount: a missing or deleted account
   // returns 403, not 404, so this endpoint cannot be used to enumerate
@@ -82,13 +85,24 @@ export const parseStatement = async (
 
   const hashes = computeImportHashes(rows, profile);
 
+  return buildParseResult(userId, account, rows, hashes, profile.id, profile.categoryKeys);
+};
+
+export async function buildParseResult(
+  userId: number,
+  account: Account,
+  rows: ParsedRow[],
+  hashes: string[],
+  format: string,
+  categoryKeys?: KeyField[]
+): Promise<ParseResult> {
   // Exact: hashes this account has already seen.
-  const existing = new Set(await transactionQueries.findExistingImportHashes(accountId, hashes));
+  const existing = new Set(await transactionQueries.findExistingImportHashes(account.id, hashes));
 
   // Advisory: same date and same amount, catching transactions typed in by
   // hand before importing ever started — those carry no hash at all.
   const dates = [...new Set(rows.map(r => r.date))];
-  const sameDay = await transactionQueries.findByDates(accountId, dates);
+  const sameDay = await transactionQueries.findByDates(account.id, dates);
   const byKey = new Map<string, number>();
   for (const t of sameDay) {
     const d = t.date;
@@ -98,9 +112,9 @@ export const parseStatement = async (
     // opposite sign. Transfers count too — one imported from the peer
     // account's statement shows up here again — and each side's amount is in
     // its own account's currency, so this account's side is comparable.
-    if (t.debit_account_id === accountId) {
+    if (t.debit_account_id === account.id) {
       byKey.set(`${d}|-${t.debit}`, t.id);
-    } else if (t.credit_account_id === accountId) {
+    } else if (t.credit_account_id === account.id) {
       byKey.set(`${d}|${t.credit}`, t.id);
     }
   }
@@ -120,7 +134,7 @@ export const parseStatement = async (
       const categoryId = treeIds.get(h.categoryId);
       return categoryId === undefined ? [] : [{ ...h, categoryId }];
     }),
-    profile.categoryKeys
+    categoryKeys
   );
 
   const out: ImportRow[] = rows.map((row, i) => {
@@ -154,7 +168,7 @@ export const parseStatement = async (
   });
 
   return {
-    format: profile.id,
+    format,
     account: {
       id: account.id,
       name: account.name,
@@ -169,7 +183,7 @@ export const parseStatement = async (
       possibleDuplicate: out.filter(r => r.status === 'possible_duplicate').length,
     },
   };
-};
+}
 
 const UNCATEGORIZED_INCOME_CATEGORY_ID = 3;
 const UNCATEGORIZED_EXPENSE_CATEGORY_ID = 4;
