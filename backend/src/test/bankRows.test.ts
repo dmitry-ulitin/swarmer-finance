@@ -11,6 +11,8 @@ const tx = (o: Partial<EbTransaction> = {}): EbTransaction => ({
   ...o,
 });
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
+const hashBase = (r: { date: string; amount: number; description: string; payee: string | null }) =>
+  ['eb|EE|LHV Pank', r.date, r.amount.toFixed(2), r.description.toLowerCase(), (r.payee ?? '').toLowerCase()].join('|');
 const aspsp = { name: 'LHV Pank', country: 'EE' };
 
 describe('toParsedRows', () => {
@@ -62,6 +64,24 @@ describe('toParsedRows', () => {
     expect(rows[0].amount).toBe(-5);
   });
 
+  describe('unreadable booked rows', () => {
+    const bad = { statusCode: 502, message: 'Bank returned an unreadable transaction' };
+    const cases: [string, Partial<EbTransaction>][] = [
+      ['missing date', { booking_date: null, value_date: null, transaction_date: null }],
+      ['datetime date', { booking_date: '2026-10-12T10:00:00Z' }],
+      ['empty amount', { transaction_amount: { amount: '', currency: 'EUR' } }],
+      ['non-numeric amount', { transaction_amount: { amount: 'abc', currency: 'EUR' } }],
+      ['unknown indicator', { credit_debit_indicator: 'XXXX' as never }],
+    ];
+    it.each(cases)('rejects %s', (_n, o) => {
+      expect(() => toParsedRows([tx(o)], 'EUR')).toThrow(expect.objectContaining(bad));
+    });
+
+    it('skips a PDNG row with a missing date', () => {
+      expect(toParsedRows([tx({ status: 'PDNG', booking_date: null })], 'EUR')).toEqual([]);
+    });
+  });
+
   it('drops zero amounts and keeps index contiguous', () => {
     const rows = toParsedRows(
       [tx({ transaction_amount: { amount: '0.00', currency: 'EUR' } }), tx()],
@@ -87,5 +107,6 @@ describe('computeBankHashes', () => {
     const [a, b] = computeBankHashes(rows, aspsp);
     expect(a).not.toBe(b);
     expect(a).toBe(hashRows([rows[0]], 'eb|EE|LHV Pank', true)[0]);
+    expect(b).toBe(sha(`${hashBase(rows[0])}|1`));
   });
 });
