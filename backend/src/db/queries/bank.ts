@@ -131,6 +131,7 @@ export interface BankLinkRow {
   valid_until: Date | null;
   expired: boolean;
   aspsp_name: string;
+  aspsp_country: string;
   acc_uid: string | null;
   acc_iban: string | null;
   acc_name: string | null;
@@ -142,7 +143,7 @@ export const listLinks = (accountIds: number[]) =>
   query<BankLinkRow>(
     `SELECT l.account_id, l.connection_id, l.uid, to_char(l.loaded_to, 'YYYY-MM-DD') AS loaded_to,
             a.currency AS account_currency,
-            c.user_id, c.session_id, c.valid_until, c.expired, c.aspsp_name,
+            c.user_id, c.session_id, c.valid_until, c.expired, c.aspsp_name, c.aspsp_country,
             ca.uid AS acc_uid, ca.iban AS acc_iban, ca.name AS acc_name, ca.currency AS acc_currency
        FROM bank_account_links l
        JOIN accounts a ON a.id = l.account_id
@@ -168,6 +169,14 @@ export const upsertLink = (accountId: number, connectionId: number, uid: string)
            uid = EXCLUDED.uid`,
     [accountId, connectionId, uid]
   );
+
+/** Moves loaded_to forward to `date`, never back; false when the account has no link. */
+export const advanceLoadedTo = async (accountId: number, date: string) =>
+  (await execute(
+    `UPDATE bank_account_links SET loaded_to = GREATEST(COALESCE(loaded_to, $2::date), $2::date)
+      WHERE account_id = $1`,
+    [accountId, date]
+  )) > 0;
 
 export const deleteLink = (accountId: number) =>
   execute('DELETE FROM bank_account_links WHERE account_id = $1', [accountId]);

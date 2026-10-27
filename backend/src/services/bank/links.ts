@@ -3,7 +3,18 @@ import * as bankQueries from '../../db/queries/bank';
 import { BankLinkRow } from '../../db/queries/bank';
 import { getAccountById } from '../../db/queries/accounts';
 import { LEVEL, requireLevel } from '../access';
-import { BankConnectionStatus, connectionStatus, getConnection } from './connections';
+import { BankConnectionStatus, connectionStatus, getConnection, loadCredentials, markExpired } from './connections';
+import { BankAccessError, EbTransaction, PsuContext, fetchTransactions } from './client';
+import { computeBankHashes, toParsedRows } from './rows';
+import { ParseResult, buildParseResult, loadWritableAccount } from '../import';
+import { addDays, todayUtc } from '../date';
+
+const FIRST_LOAD_DAYS = 90;
+/** A later load re-reads this many days before the marker, for late bookings. */
+const OVERLAP_DAYS = 2;
+
+const notLinked = () => ({ statusCode: 400, message: 'This account is not linked to a bank' });
+const accessExpired = () => ({ statusCode: 409, message: 'Bank access expired — reconnect' });
 
 export interface BankLinkDto {
   connectionId: number;
@@ -69,4 +80,54 @@ export async function removeLink(accountId: number, userId: number): Promise<voi
 /** Drops the links on the account whose connection belongs to the user, so nobody loads through their keys. */
 export async function deleteLinksOfUser(tx: Tx, accountId: number, userId: number): Promise<void> {
   await bankQueries.deleteLinksOfUser(tx, accountId, userId);
+}
+
+/**
+ * The account's bank transactions as an import preview. The window starts
+ * at `dateFrom` (default today − 90) on the first load, two days before the
+ * marker afterwards, and ends today (UTC). Uses the connection owner's keys.
+ */
+export async function loadFromBank(
+  userId: number,
+  accountId: number,
+  opts: { dateFrom?: string; psu: PsuContext }
+): Promise<ParseResult> {
+  const account = await loadWritableAccount(accountId, userId);
+  const [link] = await bankQueries.listLinks([accountId]);
+  if (!link) throw notLinked();
+  if (link.acc_uid === null) {
+    throw { statusCode: 409, message: 'This bank account is no longer in the connection — link it again' };
+  }
+  const status = connectionStatus(link);
+  if (status === 'expired' || status === 'pending') throw accessExpired();
+  const cred = await loadCredentials(link.user_id);
+
+  const dateTo = todayUtc();
+  if (opts.dateFrom && opts.dateFrom > dateTo) {
+    throw { statusCode: 400, message: 'The start date is in the future' };
+  }
+  const dateFrom = link.loaded_to
+    ? addDays(link.loaded_to, -OVERLAP_DAYS)
+    : opts.dateFrom ?? addDays(dateTo, -FIRST_LOAD_DAYS);
+
+  let txs: EbTransaction[];
+  try {
+    txs = await fetchTransactions(cred, link.uid, dateFrom, dateTo, opts.psu);
+  } catch (error) {
+    if (error instanceof BankAccessError) {
+      await markExpired(link.connection_id);
+      throw accessExpired();
+    }
+    throw error;
+  }
+
+  const rows = toParsedRows(txs, account.currency);
+  const hashes = computeBankHashes(rows, { name: link.aspsp_name, country: link.aspsp_country });
+  const result = await buildParseResult(userId, account, rows, hashes, 'enablebanking');
+  return { ...result, bank: { dateFrom, dateTo } };
+}
+
+/** Moves the account's "loaded up to" marker forward to `date`; it never goes back. */
+export async function advanceLoadedTo(accountId: number, date: string): Promise<void> {
+  if (!(await bankQueries.advanceLoadedTo(accountId, date))) throw notLinked();
 }

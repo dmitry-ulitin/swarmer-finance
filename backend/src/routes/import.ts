@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isoDateSchema, validate } from '../middleware/validation';
 import * as importService from '../services/import';
+import { requireBankSync } from '../services/bank/crypto';
+import { loadFromBank } from '../services/bank/links';
 
 const router = Router();
 
@@ -15,8 +17,16 @@ const parseSchema = z.object({
   content: z.string().min(1),
 });
 
+const bankLoadSchema = z.object({
+  accountId: z.number().int().positive(),
+  /** First load only: where the window starts (default today − 90 days). */
+  dateFrom: isoDateSchema.optional(),
+});
+
 const reconcileSchema = z.object({
   accountId: z.number().int().positive(),
+  /** Set when confirming a bank load: the window's end, the new "loaded up to" marker. */
+  bankLoadedTo: isoDateSchema.optional(),
   rows: z.array(
     z.object({
       date: isoDateSchema,
@@ -27,7 +37,10 @@ const reconcileSchema = z.object({
       categoryId: z.number().int().positive().nullish(),
       transferAccountId: z.number().int().positive().nullish(),
     })
-  ).min(1),
+  ),
+}).refine((b) => b.rows.length > 0 || b.bankLoadedTo !== undefined, {
+  path: ['rows'],
+  message: 'At least one row is required',
 });
 
 router.post('/parse', validate(parseSchema), async (req: AuthRequest, res, next) => {
@@ -40,10 +53,24 @@ router.post('/parse', validate(parseSchema), async (req: AuthRequest, res, next)
   }
 });
 
+router.post('/bank', validate(bankLoadSchema), async (req: AuthRequest, res, next) => {
+  try {
+    requireBankSync();
+    const { accountId, dateFrom } = req.body;
+    // The user's own address for the bank: the client end of X-Forwarded-For.
+    const forwarded = req.get('X-Forwarded-For')?.split(',')[0]?.trim();
+    const psu = { ip: forwarded || req.ip, userAgent: req.get('User-Agent') };
+    const result = await loadFromBank(req.userId!, accountId, { dateFrom, psu });
+    res.json({ data: result, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/reconcile', validate(reconcileSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { accountId, rows } = req.body;
-    const result = await importService.reconcile(req.userId!, accountId, rows);
+    const { accountId, rows, bankLoadedTo } = req.body;
+    const result = await importService.reconcile(req.userId!, accountId, rows, { bankLoadedTo });
     res.json({ data: result, error: null });
   } catch (error) {
     next(error);

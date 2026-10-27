@@ -10,6 +10,9 @@ import { parseCsv } from './csv';
 import { isWorkbook, parseWorkbook } from './workbook';
 import { getTreeCategoryIds, resolveCategoryForOwner } from '../categories';
 import { isTracked } from '../chain';
+import { todayUtc } from '../date';
+import * as bankQueries from '../../db/queries/bank';
+import { advanceLoadedTo } from '../bank/links';
 import { Account } from '../../types';
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate';
@@ -211,14 +214,40 @@ export interface ReconcileRow {
  * a row the user reviewed as possible_duplicate and chose to keep must
  * import, and re-applying the advisory match here would silently discard
  * exactly the rows the user made a decision about.
+ *
+ * `bankLoadedTo` confirms a bank load: the account's "loaded up to" marker
+ * moves to it once the rows are in (also when there are none).
  */
 export const reconcile = async (
   userId: number,
   accountId: number,
-  rows: ReconcileRow[]
+  rows: ReconcileRow[],
+  opts: { bankLoadedTo?: string } = {}
 ): Promise<{ created: number; skipped: number }> => {
   const account = await loadWritableAccount(accountId, userId);
 
+  const { bankLoadedTo } = opts;
+  if (bankLoadedTo !== undefined) {
+    if (bankLoadedTo > todayUtc()) {
+      throw { statusCode: 400, message: 'The loaded-up-to date is in the future' };
+    }
+    if (!(await bankQueries.hasLink(accountId))) {
+      throw { statusCode: 400, message: 'This account is not linked to a bank' };
+    }
+  }
+
+  const result = await insertRows(userId, account, rows);
+  // Only after the rows are in: a failed confirm leaves the marker alone.
+  if (bankLoadedTo !== undefined) await advanceLoadedTo(accountId, bankLoadedTo);
+  return result;
+};
+
+async function insertRows(
+  userId: number,
+  account: Account,
+  rows: ReconcileRow[]
+): Promise<{ created: number; skipped: number }> {
+  const accountId = account.id;
   if (rows.length === 0) return { created: 0, skipped: 0 };
 
   for (const row of rows) {
@@ -313,4 +342,4 @@ export const reconcile = async (
 
   const created = await transactionQueries.createImportedTransactions(userId, payload);
   return { created, skipped: rows.length - created };
-};
+}
