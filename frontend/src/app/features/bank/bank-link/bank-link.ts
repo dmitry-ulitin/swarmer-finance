@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TuiButton, TuiDataList, TuiLoader, TuiTextfield, type TuiDialogContext } from '@taiga-ui/core';
 import { TuiChevron, TuiSelect } from '@taiga-ui/kit';
@@ -11,6 +12,7 @@ import type { Account } from '../../../models/account';
 import type { BankConnection } from '../../../models/bank';
 
 interface LinkOption {
+  key: string;
   label: string;
   connectionId: number;
   uid: string;
@@ -35,16 +37,23 @@ export class BankLink {
   readonly busy = signal(false);
   readonly connections = signal<BankConnection[]>([]);
   readonly control = new FormControl('', { nonNullable: true });
+  private readonly value = toSignal(this.control.valueChanges, { initialValue: '' });
 
   /** Every bank account of the user's connections; other currencies than the account's are disabled. */
   readonly options = computed<LinkOption[]>(() =>
     this.connections().flatMap(c => c.accounts.map(a => ({
+      key: `${c.id}:${a.uid}`,
       label: `${c.aspspName} · ${a.name || a.iban || a.uid} · ${a.currency === 'XXX' ? 'multi-currency' : a.currency}`,
       connectionId: c.id,
       uid: a.uid,
       disabled: a.currency !== 'XXX' && a.currency !== this.account.currency,
     })))
   );
+  readonly selected = computed(() => {
+    const key = this.value();
+    return this.options().find(o => o.key === key) ?? null;
+  });
+  readonly stringify = (key: string): string => this.options().find(o => o.key === key)?.label ?? '';
   readonly linked = !!this.account.bank_link;
 
   constructor() {
@@ -56,7 +65,7 @@ export class BankLink {
       this.connections.set((await firstValueFrom(this.api.getBankConnections())).data ?? []);
       const link = this.account.bank_link;
       const current = link && this.options().find(o => o.connectionId === link.connectionId && o.uid === link.uid);
-      if (current) this.control.setValue(current.label);
+      if (current) this.control.setValue(current.key);
     } catch (e) {
       this.notifications.showError(e, 'Failed to load bank accounts');
     } finally {
@@ -65,7 +74,7 @@ export class BankLink {
   }
 
   async save(): Promise<void> {
-    const option = this.options().find(o => o.label === this.control.value);
+    const option = this.selected();
     if (!option || option.disabled) return;
     await this.run(
       () => firstValueFrom(this.api.linkBankAccount(this.account.id, option.connectionId, option.uid)),

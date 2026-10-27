@@ -20,9 +20,9 @@ const connections: BankConnection[] = [{
   ],
 }];
 
-async function render(bank_link: unknown = null) {
+async function render(bank_link: unknown = null, conns: BankConnection[] = connections) {
   const api = {
-    getBankConnections: vi.fn(() => ok(connections)),
+    getBankConnections: vi.fn(() => ok(conns)),
     linkBankAccount: vi.fn(() => ok({})),
     unlinkBankAccount: vi.fn(() => ok({ success: true })),
   };
@@ -55,7 +55,7 @@ describe('BankLink', () => {
 
   it('saves the chosen link and reloads accounts', async () => {
     const { cmp, api, completeWith, accounts } = await render();
-    cmp.control.setValue(cmp.options().find(o => o.uid === 'eur')!.label);
+    cmp.control.setValue(cmp.options().find(o => o.uid === 'eur')!.key);
     await cmp.save();
     expect(api.linkBankAccount).toHaveBeenCalledWith(3, 7, 'eur');
     expect(accounts.reload).toHaveBeenCalled();
@@ -64,9 +64,36 @@ describe('BankLink', () => {
 
   it('preselects the current link and unlinks it', async () => {
     const { cmp, api, completeWith } = await render({ connectionId: 7, uid: 'eur' });
-    expect(cmp.control.value).toBe('LHV · Main · EUR');
+    expect(cmp.selected()?.label).toBe('LHV · Main · EUR');
     await cmp.unlink();
     expect(api.unlinkBankAccount).toHaveBeenCalledWith(3);
     expect(completeWith).toHaveBeenCalledWith(true);
+  });
+
+  describe('identical labels', () => {
+    const twin = (id: number): BankConnection => ({
+      id, aspspName: 'LHV', country: 'EE', status: 'active', validUntil: null,
+      accounts: [{ uid: `u${id}`, iban: 'EE1', name: null, currency: 'EUR' }],
+    });
+    const twins = [twin(1), twin(2)];
+
+    it('links the second connection when it is picked', async () => {
+      const { cmp, api } = await render(null, twins);
+      expect(cmp.options()[0].label).toBe(cmp.options()[1].label);
+      cmp.control.setValue(cmp.options()[1].key);
+      await cmp.save();
+      expect(api.linkBankAccount).toHaveBeenCalledWith(3, 2, 'u2');
+    });
+
+    it('preselects the option of the linked connection', async () => {
+      const { cmp } = await render({ connectionId: 2, uid: 'u2' }, twins);
+      expect(cmp.selected()?.connectionId).toBe(2);
+    });
+  });
+
+  it('does not allow saving a currency-mismatched option', async () => {
+    const { cmp } = await render();
+    cmp.control.setValue(cmp.options().find(o => o.uid === 'usd')!.key);
+    expect(cmp.selected()?.disabled).toBe(true);
   });
 });

@@ -5,12 +5,12 @@
         @if (options().length === 0) {
             <p>No bank accounts yet. Connect a bank first.</p>
         } @else {
-            <tui-textfield tuiChevron [tuiTextfieldCleaner]="false">
+            <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="stringify">
                 <label tuiLabel>Bank account</label>
                 <input tuiSelect [formControl]="control" />
                 <tui-data-list *tuiDropdown>
-                    @for (o of options(); track o.label) {
-                        <button tuiOption new type="button" [value]="o.label" [disabled]="o.disabled">{{ o.label }}</button>
+                    @for (o of options(); track o.key) {
+                        <button tuiOption new type="button" [value]="o.key" [disabled]="o.disabled">{{ o.label }}</button>
                     }
                 </tui-data-list>
             </tui-textfield>
@@ -20,7 +20,7 @@
                 <button tuiButton size="s" type="button" appearance="outline" [disabled]="busy()" (click)="unlink()">Unlink</button>
             }
             <button tuiButton size="s" type="button" appearance="secondary" [disabled]="busy()" (click)="cancel()">Cancel</button>
-            <button tuiButton size="s" type="button" [disabled]="busy() || !control.value" (click)="save()">Save</button>
+            <button tuiButton size="s" type="button" [disabled]="busy() || !selected() || selected()!.disabled" (click)="save()">Save</button>
         </div>
     </div>
 }
