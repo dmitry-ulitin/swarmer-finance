@@ -116,7 +116,7 @@
             type="button"
             [disabled]="!canSubmit() || loading()"
             (click)="submit()">
-            Import {{ selectedCount() }}
+            {{ submitLabel() }}
         </button>
     </footer>
 </div>

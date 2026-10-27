@@ -20,6 +20,9 @@
     @if (account.type === 'bank' && canWriteFiltered()) {
     <button tuiOption (click)="importFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.download'">Import</button>
     }
+    @if (account.bank_link && canWriteFiltered()) {
+    <button tuiOption (click)="loadFromBankFiltered();settingsButton.click()" [iconEnd]="'@tui.cloud-download'">{{ bankLoadLabel(account) }}</button>
+    }
     @if (account.type === 'bank' && canEditFiltered()) {
     <button tuiOption (click)="linkFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.link'">Bank link</button>
     }

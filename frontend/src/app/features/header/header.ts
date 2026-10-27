@@ -10,7 +10,7 @@ import { TuiChevron } from '@taiga-ui/kit/directives/chevron';
 import { syncedLock } from '../transactions/synced-lock';
 import { ImportDialogService } from '../import/import-dialog.service';
 import { AccountSyncService } from '../accounts/account-sync.service';
-import { accessLevelOf } from '../../models/account';
+import { accessLevelOf, type Account } from '../../models/account';
 import { ChangePasswordDialogService } from '../auth/change-password-dialog.service';
 import { ProfileDialogService } from '../profile/profile-dialog.service';
 import { BankDialogService } from '../bank/bank-dialog.service';
@@ -111,6 +111,16 @@ export class Header {
   linkFilteredAccount(): void {
     const account = this.filteredAccount();
     if (account && this.canEditFiltered()) void this.bankDialog.openLink(account);
+  }
+
+  loadFromBankFiltered(): void {
+    const account = this.filteredAccount();
+    if (account?.bank_link && this.canWriteFiltered()) void this.importDialog.openFromBank(account);
+  }
+
+  bankLoadLabel(account: Account): string {
+    const status = account.bank_link?.status;
+    return status === 'expired' ? 'Load from bank (expired)' : status === 'unmapped' ? 'Load from bank (relink)' : 'Load from bank';
   }
 
   syncFilteredAccount(): void {

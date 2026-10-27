@@ -158,6 +158,27 @@ describe('ImportReview', () => {
     });
   });
 
+  describe('bank load', () => {
+    const bankResult = () => ({ ...makeResult([makeRow(0, 'duplicate')]), bank: { dateFrom: '2026-07-01', dateTo: '2026-10-27' } });
+
+    it('allows submitting nothing, reading Mark as loaded, and sends the marker', async () => {
+      const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 0, skipped: 0 }, error: null }));
+      const { component } = configure(bankResult(), { reconcileImport } as never);
+
+      expect(component.canSubmit()).toBe(true);
+      expect(component.submitLabel()).toBe('Mark as loaded');
+      await component.submit();
+
+      expect(reconcileImport).toHaveBeenCalledWith(7, [], '2026-10-27');
+    });
+
+    it('still needs a selection for a file import', () => {
+      const { component } = configure(makeResult([makeRow(0, 'duplicate')]));
+      expect(component.canSubmit()).toBe(false);
+      expect(component.submitLabel()).toBe('Import 0');
+    });
+  });
+
   describe('submit', () => {
     it('sends only the selected rows', async () => {
       const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 1, skipped: 0 }, error: null }));

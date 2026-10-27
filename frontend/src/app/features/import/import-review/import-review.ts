@@ -99,7 +99,10 @@ export class ImportReview {
   readonly selectedCount = computed(() => this.rows().filter(r => r.selected).length);
   /** A selected transfer with no account cannot be imported. */
   readonly canSubmit = computed(
-    () => this.selectedCount() > 0 && !this.rows().some(r => r.selected && r.transfer && !r.transferAccount)
+    () => (this.selectedCount() > 0 || !!this.result.bank) && !this.rows().some(r => r.selected && r.transfer && !r.transferAccount)
+  );
+  readonly submitLabel = computed(() =>
+    this.result.bank && this.selectedCount() === 0 ? 'Mark as loaded' : `Import ${this.selectedCount()}`
   );
   readonly allSelected = computed(
     () => this.rows().length > 0 && this.selectedCount() === this.rows().length
@@ -176,7 +179,7 @@ export class ImportReview {
         categoryId: r.transfer ? null : (this.categoryOf(r)?.id ?? null),
         transferAccountId: r.transfer ? r.transferAccount!.id : null,
       }));
-      const response = await firstValueFrom(this.api.reconcileImport(this.account.id, payload));
+      const response = await firstValueFrom(this.api.reconcileImport(this.account.id, payload, this.result.bank?.dateTo));
       if (response.data) {
         this.context.completeWith(response.data);
       }
