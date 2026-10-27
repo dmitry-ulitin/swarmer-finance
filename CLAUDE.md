@@ -218,14 +218,14 @@ an account of type `bank` (a linked account cannot change its type); a
 single-currency bank account must match the app account's currency, while
 a multi-currency (`XXX`) one loads only rows in the app account's currency.
 `POST /api/import/bank` (WRITE) returns the same preview as statement import
-(`source` `enablebanking`, plus `bank: { dateFrom, dateTo }`) using the
+(`format` `enablebanking`, plus `bank: { dateFrom, dateTo }`) using the
 connection owner's keys; only `BOOK` transactions come in. The window is
 `dateFrom` (default today - 90 days) on the first load, `loaded_to` - 2 days
 afterwards, ending today (UTC). Row hashes are `sha256("eb|<country>|<bank>|<entry_reference>")`,
 else `transaction_id`, else the content hash, so they never collide with
 other sources. `POST /api/import/reconcile` takes `bankLoadedTo` and moves
 the marker only then (also with zero rows, never backwards). A link whose
-`uid` vanished after a reconnect shows as "needs relinking" and loading it is
+`uid` vanished after a reconnect has status `unmapped` ("needs relinking") and loading it is
 409; an expired or pending connection is 409 `Bank access expired —
 reconnect` (expiry is flagged 7 days ahead, and when the bank refuses the
 session). A member's links through their own connection are deleted in the
