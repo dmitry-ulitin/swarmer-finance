@@ -37,7 +37,7 @@ export interface ParseResult {
   rows: ImportRow[];
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
   /** Set when the rows come from a bank connection rather than a file. */
-  bank?: { dateFrom: string; dateTo: string };
+  bank?: { aspspName: string; dateFrom: string; dateTo: string };
 }
 
 /** The account, once the caller is known to hold WRITE on it. */

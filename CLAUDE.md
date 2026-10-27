@@ -226,7 +226,7 @@ else `transaction_id`, else the content hash, so they never collide with
 other sources. `POST /api/import/reconcile` takes `bankLoadedTo` and moves
 the marker only then (also with zero rows, never backwards). A link whose
 `uid` vanished after a reconnect has status `unmapped` ("needs relinking") and loading it is
-409; an expired or pending connection is 409 `Bank access expired —
+409; relinking it within the same connection keeps `loaded_to`; an expired or pending connection is 409 `Bank access expired —
 reconnect` (expiry is flagged 7 days ahead, and when the bank refuses the
 session). A member's links through their own connection are deleted in the
 same transaction that removes them from the account

@@ -130,7 +130,7 @@ export async function loadFromBank(
   const rows = toParsedRows(txs, account.currency);
   const hashes = computeBankHashes(rows, { name: link.aspsp_name, country: link.aspsp_country });
   const result = await buildParseResult(userId, account, rows, hashes, 'enablebanking');
-  return { ...result, bank: { dateFrom, dateTo } };
+  return { ...result, bank: { aspspName: link.aspsp_name, dateFrom, dateTo } };
 }
 
 /** Moves the account's "loaded up to" marker forward to `date`; it never goes back. */

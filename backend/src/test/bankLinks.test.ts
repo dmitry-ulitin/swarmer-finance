@@ -148,6 +148,23 @@ describe('/api/bank/links', () => {
     expect((await bankLink(u, acc)).loadedTo).toBeNull();
   });
 
+  it('keeps loaded_to when relinking an unmapped link within its connection', async () => {
+    const u = await register('ru');
+    const acc = await makeAccount(u.id);
+    const conn = await makeConnection(u.id);
+    await link(u, acc, conn);
+    await pool.query("UPDATE bank_account_links SET loaded_to = '2026-10-01' WHERE account_id = $1", [acc]);
+    await pool.query('DELETE FROM bank_connection_accounts WHERE connection_id = $1', [conn]);
+    await pool.query(
+      `INSERT INTO bank_connection_accounts (connection_id, uid, iban, name, currency)
+       VALUES ($1, 'uid-new', 'EE01', 'Main', 'USD')`, [conn]);
+    await link(u, acc, conn, 'uid-new');
+    expect(await bankLink(u, acc)).toMatchObject({ status: 'active', uid: 'uid-new', loadedTo: '2026-10-01' });
+    const other = await makeConnection(u.id);
+    await link(u, acc, other);
+    expect((await bankLink(u, acc)).loadedTo).toBeNull();
+  });
+
   it('marks a link unmapped after a reconnect drops its uid', async () => {
     const u = await register('um');
     const acc = await makeAccount(u.id);

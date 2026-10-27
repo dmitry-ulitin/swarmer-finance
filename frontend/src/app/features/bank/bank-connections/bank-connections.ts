@@ -136,11 +136,22 @@ export class BankConnections {
   }
 
   async removeKey(): Promise<void> {
+    const data: TuiConfirmData = {
+      content: 'Remove your Enable Banking key? Connected banks stay, but no account can load transactions until you add a key again.',
+      yes: 'Remove key',
+      no: 'Cancel',
+    };
+    const confirmed = await firstValueFrom(
+      this.dialogs.open<boolean>(TUI_CONFIRM, { label: 'Remove Key', size: 's', data }),
+      { defaultValue: false }
+    );
+    if (!confirmed) return;
     await this.run(async () => {
       await firstValueFrom(this.api.deleteBankCredentials());
       this.info.update(i => (i ? { ...i, applicationId: null, hasKey: false } : i));
       this.form.reset({ applicationId: '', privateKey: '' });
       this.connections.set([]);
+      this.notifications.showSuccess('Key removed');
     }, 'Failed to remove the key');
   }
 

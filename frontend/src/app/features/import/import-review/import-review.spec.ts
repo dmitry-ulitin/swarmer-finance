@@ -159,7 +159,7 @@ describe('ImportReview', () => {
   });
 
   describe('bank load', () => {
-    const bankResult = () => ({ ...makeResult([makeRow(0, 'duplicate')]), bank: { dateFrom: '2026-07-01', dateTo: '2026-10-27' } });
+    const bankResult = () => ({ ...makeResult([makeRow(0, 'duplicate')]), bank: { aspspName: 'LHV Pank', dateFrom: '2026-07-01', dateTo: '2026-10-27' } });
 
     it('allows submitting nothing, reading Mark as loaded, and sends the marker', async () => {
       const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 0, skipped: 0 }, error: null }));
@@ -170,6 +170,15 @@ describe('ImportReview', () => {
       await component.submit();
 
       expect(reconcileImport).toHaveBeenCalledWith(7, [], '2026-10-27');
+    });
+
+    it('names the bank and the loaded window', () => {
+      const { component } = configure(bankResult());
+      expect(component.sourceName).toBe('LHV Pank, 01 Jul 2026 – 27 Oct 2026');
+    });
+
+    it('names the format of a file import', () => {
+      expect(configure(makeResult([])).component.sourceName).toBe('LHV');
     });
 
     it('still needs a selection for a file import', () => {

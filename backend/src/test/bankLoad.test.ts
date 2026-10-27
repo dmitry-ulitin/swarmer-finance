@@ -145,7 +145,7 @@ describe('POST /api/import/bank', () => {
     expect(res.status).toBe(200);
     const data = res.body.data;
     expect(data.format).toBe('enablebanking');
-    expect(data.bank).toEqual({ dateFrom: shiftDays(today(), -90), dateTo: today() });
+    expect(data.bank).toEqual({ aspspName: 'LHV Pank', dateFrom: shiftDays(today(), -90), dateTo: today() });
     expect(data.rows.map((r: any) => r.description)).toEqual([
       'CARD PURCHASE Example Shop Tallinn', 'Rent January', 'Salary', 'Service fee',
     ]);

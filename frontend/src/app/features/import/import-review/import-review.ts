@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, LOCALE_ID, signal } from '@angular/core';
 import { TuiButton, TuiCheckbox, TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
-import { DatePipe } from '@angular/common';
+import { DatePipe, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/api.service';
 import { NotificationService } from '../../../core/notification.service';
@@ -72,12 +72,15 @@ export class ImportReview {
   private readonly notifications = inject(NotificationService);
   private readonly categories = inject(CategoriesState);
   private readonly accounts = inject(AccountsState);
+  private readonly locale = inject(LOCALE_ID);
 
   readonly result = this.context.data;
   readonly account = this.result.account;
   readonly summary = this.result.summary;
-  readonly formatName =
-    IMPORT_FORMATS.find(f => f.id === this.result.format)?.name ?? this.result.format;
+  /** A bank load names the bank and the window it covered; a file, its format. */
+  readonly sourceName = this.result.bank
+    ? `${this.result.bank.aspspName}, ${this.day(this.result.bank.dateFrom)} – ${this.day(this.result.bank.dateTo)}`
+    : IMPORT_FORMATS.find(f => f.id === this.result.format)?.name ?? this.result.format;
 
   /**
    * Only new rows start selected. Exact duplicates are hashes the server has
@@ -111,6 +114,11 @@ export class ImportReview {
   readonly statusLabel = (status: ImportRowStatus): string => STATUS_LABEL[status];
 
   readonly statusIcon = (status: ImportRowStatus): string => STATUS_ICON[status];
+
+  /** Same format as the rows' date column. */
+  private day(date: string): string {
+    return formatDate(date, 'dd MMM yyyy', this.locale);
+  }
 
   /** 1 = Income, 2 = Expenses, following the row's own sign. */
   readonly rootIdFor = (row: ReviewRow): number => (row.amount < 0 ? 2 : 1);

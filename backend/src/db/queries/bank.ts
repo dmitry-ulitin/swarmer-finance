@@ -162,8 +162,14 @@ export const upsertLink = (accountId: number, connectionId: number, uid: string)
     `INSERT INTO bank_account_links (account_id, connection_id, uid)
      VALUES ($1, $2, $3)
      ON CONFLICT (account_id) DO UPDATE
+       -- The marker survives relinking within the same connection when the
+       -- old uid is gone (the bank renumbered its accounts on a reconnect):
+       -- it is the same bank account under a new id.
        SET loaded_to = CASE WHEN bank_account_links.connection_id = EXCLUDED.connection_id
-                             AND bank_account_links.uid = EXCLUDED.uid
+                             AND (bank_account_links.uid = EXCLUDED.uid
+                                  OR NOT EXISTS (SELECT 1 FROM bank_connection_accounts a
+                                                  WHERE a.connection_id = bank_account_links.connection_id
+                                                    AND a.uid = bank_account_links.uid))
                             THEN bank_account_links.loaded_to END,
            connection_id = EXCLUDED.connection_id,
            uid = EXCLUDED.uid`,

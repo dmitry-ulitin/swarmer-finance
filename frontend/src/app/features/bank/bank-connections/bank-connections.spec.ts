@@ -24,14 +24,14 @@ function connection(over: Partial<BankConnection> = {}): BankConnection {
   };
 }
 
-async function render(credentials: BankCredentials, connections: BankConnection[] = []) {
+async function render(credentials: BankCredentials, connections: BankConnection[] = [], confirm = true) {
   const api = {
     getBankCredentials: vi.fn(() => ok(credentials)),
     getBankConnections: vi.fn(() => ok(connections)),
     getBankAspsps: vi.fn(() => ok([{ name: 'LHV', country: 'EE', beta: false, maxConsentDays: 90 }])),
     startBankConnection: vi.fn(() => ok({ url: 'https://bank.example/auth' })),
     saveBankCredentials: vi.fn(),
-    deleteBankCredentials: vi.fn(),
+    deleteBankCredentials: vi.fn(() => ok(null)),
     reconnectBank: vi.fn(),
     deleteBankConnection: vi.fn(),
   };
@@ -40,7 +40,7 @@ async function render(credentials: BankCredentials, connections: BankConnection[
       provideZonelessChangeDetection(),
       { provide: ApiService, useValue: api },
       { provide: NotificationService, useValue: { showError: vi.fn(), showSuccess: vi.fn() } },
-      { provide: TuiDialogService, useValue: { open: vi.fn(() => of(true)) } },
+      { provide: TuiDialogService, useValue: { open: vi.fn(() => of(confirm)) } },
     ],
   });
   const fixture = TestBed.createComponent(BankConnections);
@@ -83,6 +83,17 @@ describe('BankConnections', () => {
 
     expect(api.startBankConnection).toHaveBeenCalledWith('LHV', 'EE');
     expect(redirect).toHaveBeenCalledWith('https://bank.example/auth');
+  });
+
+  it('asks before removing the key', async () => {
+    const declined = await render({ enabled: true, applicationId: 'app-1', hasKey: true }, [], false);
+    await declined.fixture.componentInstance.removeKey();
+    expect(declined.api.deleteBankCredentials).not.toHaveBeenCalled();
+
+    TestBed.resetTestingModule();
+    const confirmed = await render({ enabled: true, applicationId: 'app-1', hasKey: true });
+    await confirmed.fixture.componentInstance.removeKey();
+    expect(confirmed.api.deleteBankCredentials).toHaveBeenCalled();
   });
 
   it('marks a connection expiring within 7 days', async () => {
