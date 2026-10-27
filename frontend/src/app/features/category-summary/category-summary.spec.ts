@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { CategorySummaryPanel } from './category-summary';
 import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
 import { DateRange, TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
 import { CategorySummary, CategorySummaryItem } from '../../models/transaction';
@@ -23,6 +24,7 @@ describe('CategorySummaryPanel', () => {
   let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
   let selectType: ReturnType<typeof vi.fn>;
   let showError: ReturnType<typeof vi.fn>;
+  let isAuthenticated: ReturnType<typeof signal<boolean>>;
   let fixture: ComponentFixture<CategorySummaryPanel>;
 
   function respond(summary: Partial<CategorySummary>): void {
@@ -50,10 +52,12 @@ describe('CategorySummaryPanel', () => {
     selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
     selectType = vi.fn();
     showError = vi.fn();
+    isAuthenticated = signal(true);
     TestBed.configureTestingModule({
       providers: [
         { provide: ApiService, useValue: { getCategorySummary } },
         { provide: NotificationService, useValue: { showError } },
+        { provide: AuthService, useValue: { isAuthenticated } },
         { provide: TransactionsState, useValue: { selectedAccountIds, dateRange, revision, selectedCategoryIds, selectCategory, toggleCategory, selectedType, selectType } },
       ],
     });
@@ -65,6 +69,18 @@ describe('CategorySummaryPanel', () => {
     dateRange.set({ from: '2026-03-01', to: '2026-03-31' });
     await render();
     expect(getCategorySummary).toHaveBeenLastCalledWith({ accounts: [3], from: '2026-03-01', to: '2026-03-31' });
+  });
+
+  it('does not refetch when logout resets the filters', async () => {
+    await render();
+    getCategorySummary.mockClear();
+
+    isAuthenticated.set(false);
+    revision.set(1);
+    selectedAccountIds.set([]);
+    await render();
+    expect(getCategorySummary).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
   });
 
   it('refetches when the filters change or the transactions reload', async () => {

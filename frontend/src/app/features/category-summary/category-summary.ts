@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, resource } from '
 import { firstValueFrom } from 'rxjs';
 import { TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
 import { TransactionsState } from '../../core/transactions.state';
 import { MoneyPipe } from '../../core/money.pipe';
 import { NotificationService } from '../../core/notification.service';
@@ -34,16 +35,18 @@ interface SummaryBlock {
 })
 export class CategorySummaryPanel {
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   protected readonly transactions = inject(TransactionsState);
   private readonly money = inject(MoneyPipe);
   private readonly notifications = inject(NotificationService);
 
   private readonly summary = resource({
-    params: () => ({
+    // Logout resets the filters before this panel is gone; undefined keeps it from refetching without a token.
+    params: () => this.auth.isAuthenticated() ? {
       accounts: this.transactions.selectedAccountIds(),
       range: this.transactions.dateRange(),
       revision: this.transactions.revision(),
-    }),
+    } : undefined,
     loader: async ({ params }) => {
       try {
         const r = await firstValueFrom(this.api.getCategorySummary({
