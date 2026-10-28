@@ -106,13 +106,15 @@ export class Header {
     if (account) void this.accountDialogs.openSharing(account);
   }
 
-  isValued(account: Account): boolean {
-    return account.type === 'investment' || account.type === 'property' || account.type === 'deposit';
+  /** Valued types, or any account that already has valuations (they survive a type change). */
+  hasValuations(account: Account): boolean {
+    return account.type === 'investment' || account.type === 'property' || account.type === 'deposit'
+      || !!account.last_valuation_date;
   }
 
   valuationsFiltered(): void {
     const account = this.filteredAccount();
-    if (account && this.isValued(account) && this.canWriteFiltered()) void this.accountDialogs.openValuations(account);
+    if (account && this.hasValuations(account)) void this.accountDialogs.openValuations(account);
   }
 
   toggleNetWorthFiltered(): void {

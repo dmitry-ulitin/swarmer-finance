@@ -52,6 +52,13 @@ async function setup(approximate = false, user = { currency: 'EUR', currency_sca
 describe('NetWorthPage', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
+  it('shows the gain in money and percent only when gainPct is set', async () => {
+    const { el } = await setup();
+    const gain = (id: number) => el.querySelector(`[data-test="row"][data-id="${id}"] [data-test="gain"]`)?.textContent?.trim();
+    expect(gain(2)).toBe('€200.00 (+20%)');
+    expect(gain(1)).toBe('');
+  });
+
   it('renders the total as formatted money', async () => {
     const { el } = await setup();
     expect(el.querySelector('[data-test="total"]')?.textContent).toContain('€1,500.00');

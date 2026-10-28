@@ -16,7 +16,8 @@ const wallet = { id: 7, name: 'Wallet' };
 const shared = { id: 9, name: 'Shared', access_level: 2 };
 const readOnly = { id: 10, name: 'Read only', access_level: 1 };
 const fund = { id: 11, name: 'Fund', type: 'investment', access_level: 2, in_net_worth: false };
-const accounts = [fund, wallet, { id: 8, name: 'Cash' }, shared, readOnly];
+const retyped = { id: 12, name: 'Retyped', type: 'bank', access_level: 1, last_valuation_date: '2026-05-01' };
+const accounts = [retyped, fund, wallet, { id: 8, name: 'Cash' }, shared, readOnly];
 
 function configure(selectedAccountIds: number[], selectedTransaction: unknown = null) {
   const openSharing = vi.fn(async () => {});
@@ -121,7 +122,14 @@ describe('Header transaction actions', () => {
 describe('Header net worth', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
-  it('opens valuations for a valued account with write access', () => {
+  it('opens valuations for an account that has valuations after a type change, even read-only', () => {
+    const { header, openValuations } = configure([12]);
+    expect(header.hasValuations(retyped as never)).toBe(true);
+    header.valuationsFiltered();
+    expect(openValuations).toHaveBeenCalledWith(retyped);
+  });
+
+  it('opens valuations for a valued account', () => {
     const { header, openValuations } = configure([11]);
     header.valuationsFiltered();
     expect(openValuations).toHaveBeenCalledWith(fund);

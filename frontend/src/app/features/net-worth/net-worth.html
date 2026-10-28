@@ -64,7 +64,7 @@
         <td>{{ a.name }} <span class="muted">{{ typeLabel(a.type) }}</span></td>
         <td class="num">{{ a.value | money: a.currency : accountScale(a.currency) }}</td>
         <td class="num">{{ a.invested ? (a.invested | money: a.currency : accountScale(a.currency)) : '' }}</td>
-        <td class="num">{{ a.gainPct == null ? '' : (a.gainPct >= 0 ? '+' : '') + (a.gainPct | number: '1.0-1') + '%' }}</td>
+        <td class="num" data-test="gain">{{ a.gainPct == null ? '' : (a.gain | money: a.currency : accountScale(a.currency)) + ' (' + (a.gainPct >= 0 ? '+' : '') + (a.gainPct | number: '1.0-1') + '%)' }}</td>
       </tr>
       }
     </tbody>
