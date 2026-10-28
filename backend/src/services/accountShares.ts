@@ -18,6 +18,7 @@ import { withTransaction } from '../db';
 import { getUserIdByEmail } from '../db/queries/users';
 import { LEVEL, requireLevel } from './access';
 import { deleteLinksOfUser } from './bank/links';
+import { deleteUserSettings } from '../db/queries/accountUserSettings';
 
 export const listMembers = async (
   accountId: number,
@@ -157,6 +158,7 @@ export const removeMember = async (
       await moveHistoryToOwner(tx, accountId, creator.user_id, ownerId, creatorMap);
       await remapAuthorCategories(tx, accountId, remaps);
       await deleteLinksOfUser(tx, accountId, creator.user_id);
+      await deleteUserSettings(tx, accountId, creator.user_id);
     });
     return getAccountMembers(accountId);
   }
@@ -173,6 +175,7 @@ export const removeMember = async (
     await remapAuthorCategories(tx, accountId, remaps);
     await deleteShare(tx, accountId, targetUserId);
     await deleteLinksOfUser(tx, accountId, targetUserId);
+    await deleteUserSettings(tx, accountId, targetUserId);
   });
   return getAccountMembers(accountId);
 };

@@ -6,10 +6,11 @@ import { accountValueAt } from './accountValue';
 import { withTransaction } from '../db';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
-import { LEVEL, AccessLevel, getAccessMap, getAccessibleAccountIds, requireLevel, requireLevelOnAll } from './access';
+import { LEVEL, AccessLevel, getAccessMap, getAccountLevel, getAccessibleAccountIds, requireLevel, requireLevelOnAll } from './access';
 import { ChainProvider, getProvider, isTracked } from './chain';
 import { getCurrencyScale } from './currencyScale';
 import { listLinks } from '../db/queries/bank';
+import { getNetWorthFlags, upsertNetWorthFlag } from '../db/queries/accountUserSettings';
 import { BankLinkInput, applyLink, checkLink, getLinkDtos } from './bank/links';
 
 function toDecimalDTO(account: Account, userScale: number): Account {
@@ -51,8 +52,19 @@ async function withBalances(accounts: Account[]): Promise<Account[]> {
   });
 }
 
+/** Without an explicit choice an account counts toward net worth for its (co-)owners only. */
+export function isInNetWorth(flag: boolean | undefined, level: AccessLevel): boolean {
+  return flag ?? level >= LEVEL.ADMIN;
+}
+
 async function withBankLink(account: Account, userId: number): Promise<Account> {
-  return { ...account, bank_link: (await getLinkDtos([account.id], userId)).get(account.id) ?? null };
+  const level = account.access_level ?? await getAccountLevel(account.id, userId) ?? LEVEL.READ;
+  const flag = (await getNetWorthFlags(userId, [account.id])).get(account.id);
+  return {
+    ...account,
+    bank_link: (await getLinkDtos([account.id], userId)).get(account.id) ?? null,
+    in_net_worth: isInNetWorth(flag, level),
+  };
 }
 
 async function getUserOrThrow(userId: number): Promise<User> {
@@ -101,7 +113,12 @@ export const getAccounts = async (userId: number) => {
   const withBal = await withBalances(withLevel);
   const converted = await withConvertedBalances(user, withBal);
   const bankLinks = await getLinkDtos(converted.map(a => a.id), userId);
-  return converted.map(a => ({ ...toDecimalDTO(a, user.currency_scale), bank_link: bankLinks.get(a.id) ?? null }));
+  const flags = await getNetWorthFlags(userId, converted.map(a => a.id));
+  return converted.map(a => ({
+    ...toDecimalDTO(a, user.currency_scale),
+    bank_link: bankLinks.get(a.id) ?? null,
+    in_net_worth: isInNetWorth(flags.get(a.id), a.access_level!),
+  }));
 };
 
 export const createAccount = async (
@@ -124,6 +141,24 @@ export const createAccount = async (
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   if (bankLink) await applyLink(account.id, bankLink);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), invested: Number(account.start_balance), last_transaction_date: null, last_valuation_date: null }]);
+  return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
+};
+
+/** Any member may choose whether the account counts toward their own net worth. */
+export const setInNetWorth = async (id: number, userId: number, include: boolean) => {
+  const existing = await accountQueries.getAccountById(id);
+  if (!existing) {
+    throw { statusCode: 404, message: 'Account not found' };
+  }
+  await requireLevel(id, userId, LEVEL.READ);
+  if (existing.deleted) {
+    throw { statusCode: 404, message: 'Account is deleted' };
+  }
+  await upsertNetWorthFlag(userId, id, include);
+  const user = await getUserOrThrow(userId);
+  const level = await getAccountLevel(id, userId) ?? LEVEL.READ;
+  const [withBal] = await withBalances([{ ...existing, access_level: level }]);
+  const [converted] = await withConvertedBalances(user, [withBal]);
   return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
 };
 

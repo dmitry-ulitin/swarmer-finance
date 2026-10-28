@@ -51,6 +51,8 @@ export interface Account {
   settings: Record<string, unknown>;
   /** The requesting user's level on this account; set by services/accounts.ts. */
   access_level?: 1 | 2 | 3 | 4;
+  /** Whether the account counts toward the requesting user's net worth; set by services/accounts.ts. */
+  in_net_worth?: boolean;
   /** Display name of the account's owner; set by the accounts query. */
   owner_name?: string;
   /** Transactions come from the blockchain; set by services/accounts.ts. */

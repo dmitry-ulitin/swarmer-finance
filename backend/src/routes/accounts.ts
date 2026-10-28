@@ -138,6 +138,18 @@ router.put('/:id', validate(updateAccountSchema), async (req: AuthRequest, res, 
   }
 });
 
+const netWorthSchema = z.strictObject({ include: z.boolean() });
+
+router.put('/:id/net-worth', validate(netWorthSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const account = await accountService.setInNetWorth(id, req.userId!, req.body.include);
+    res.json({ data: account, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/:id/transactions', async (req: AuthRequest, res, next) => {
   try {
     const id = parseInt(req.params.id as string, 10);
