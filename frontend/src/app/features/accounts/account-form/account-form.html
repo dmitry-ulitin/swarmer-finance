@@ -31,7 +31,7 @@
         </tui-textfield>
     </div>
 
-    @if (hasTransactions() && !tracked()) {
+    @if (hasTransactions && !tracked()) {
         <p class="hint">The account has transactions: to correct its balance, add a correcting transaction.</p>
     }
 
@@ -72,8 +72,8 @@
 
     <div class="actions">
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">Cancel</button>
-        <button tuiButton size="s" type="submit" [disabled]="loading() || (type() === 'bank' && bankMismatch())">
-            {{ loading() ? 'Saving...' : (!!accountId() ? 'Save Changes' : 'Create Account') }}
+        <button tuiButton size="s" type="submit" [disabled]="loading() || bankMismatch()">
+            {{ loading() ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Account') }}
         </button>
     </div>
 </form>

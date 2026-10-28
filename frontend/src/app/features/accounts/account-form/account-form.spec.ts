@@ -204,7 +204,7 @@ describe('AccountForm start balance with transactions', () => {
   it('locks the start balance of an account that has transactions', () => {
     const form = createForm(withTransactions);
 
-    expect(form.hasTransactions()).toBe(true);
+    expect(form.hasTransactions).toBe(true);
     expect(form.form.controls.startBalance.disabled).toBe(true);
     expect(form.buildPayload()).toMatchObject({ startBalance: 50 });
   });
@@ -221,8 +221,22 @@ describe('AccountForm start balance with transactions', () => {
   it('leaves the start balance editable without transactions', () => {
     const form = createForm({ ...withTransactions, last_transaction_date: null });
 
-    expect(form.hasTransactions()).toBe(false);
+    expect(form.hasTransactions).toBe(false);
     expect(form.form.controls.startBalance.enabled).toBe(true);
+  });
+});
+
+describe('AccountForm leaving a tracked wallet', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('restores the start balance and currency the lock replaced', () => {
+    const form = createForm({ id: 7, name: 'Savings', currency: 'EUR', type: 'cash', settings: {}, start_balance: 100 } as Partial<Account>);
+    form.form.patchValue({ type: 'crypto', address: 'bc1qxy2k', blockchain: 'bitcoin' });
+    expect(form.buildPayload()).toMatchObject({ startBalance: 0, currency: 'BTC' });
+
+    form.form.patchValue({ blockchain: '' });
+    expect(form.form.controls.startBalance.enabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 100, currency: 'EUR' });
   });
 });
 

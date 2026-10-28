@@ -50,7 +50,7 @@ export class AccountForm {
   readonly accountTypes = ACCOUNT_TYPES;
   readonly typeLabel = (type: AccountType): string => TYPE_LABELS[type];
   readonly loading = signal(false);
-  readonly accountId = signal(this.context.data?.id ?? null);
+  readonly isEdit = this.context.data?.id != null;
 
   // One group holds the controls for every type. Rebuilding a FormGroup
   // inside a live reactive form breaks formControlName bindings and
@@ -75,15 +75,16 @@ export class AccountForm {
 
   readonly blockchains: readonly string[] = ['', ...Object.keys(SYNCED_CHAINS)];
   readonly blockchainLabel = (chain: string): string => chain || 'None';
-  private readonly currency = toSignal(this.form.controls.currency.valueChanges, {
+  private readonly currencyValue = toSignal(this.form.controls.currency.valueChanges, {
     initialValue: this.form.controls.currency.value,
   });
+  private readonly currency = computed(() => normalizeCurrency(this.currencyValue() ?? ''));
   /** The backend stores the account at its currency's scale. */
-  readonly balancePrecision = computed(() => currencyScale(normalizeCurrency(this.currency() ?? '')));
+  readonly balancePrecision = computed(() => currencyScale(this.currency()));
   readonly balanceQuantum = computed(() => 1 / Math.pow(10, this.balancePrecision()));
 
   /** The backend refuses a new start balance once the account has transactions. */
-  readonly hasTransactions = signal(this.context.data?.last_transaction_date != null);
+  readonly hasTransactions = this.context.data?.last_transaction_date != null;
 
   /** Mirrors backend isTracked: transactions will come from the chain. */
   readonly tracked = signal(false);
@@ -121,16 +122,11 @@ export class AccountForm {
     initialValue: this.form.controls.bankAccount.value,
   });
   /** Mirrors the backend check: a single-currency bank account must match the account. */
-  readonly bankMismatch = computed(() => {
-    const option = this.bankOptions().find(o => o.key === this.bankAccount());
-    const currency = normalizeCurrency(this.currency() ?? '');
-    return !!option?.currency && option.currency !== 'XXX' && option.currency !== currency;
-  });
   readonly fitsBank = (key: string): boolean => {
-    const option = this.bankOptions().find(o => o.key === key);
-    const currency = normalizeCurrency(this.currency() ?? '');
-    return !option?.currency || option.currency === 'XXX' || option.currency === currency;
+    const currency = this.bankOptions().find(o => o.key === key)?.currency;
+    return !currency || currency === 'XXX' || currency === this.currency();
   };
+  readonly bankMismatch = computed(() => this.type() === 'bank' && !this.fitsBank(this.bankAccount()));
 
   constructor() {
     const data = this.context.data;
@@ -185,6 +181,7 @@ export class AccountForm {
     // backend refuses another one for the same address and chain after its
     // first sync, so the form does not offer it at all.
     const data = this.context.data;
+    const wasTracked = this.tracked();
     const sameTrackedWallet = !!data?.tracked
       && address.value.trim() === (data.settings as { address?: string })?.address
       && blockchain.value === (data.settings as { blockchain?: string })?.blockchain;
@@ -197,13 +194,14 @@ export class AccountForm {
       // Nothing to choose on a one-asset chain or for a wallet already tracked.
       if (allowed.length === 1 || sameTrackedWallet) currency.disable();
       else currency.enable();
-    } else if (this.hasTransactions()) {
-      // Back to the stored value after a sync switch-on zeroed it.
-      startBalance.setValue(data?.start_balance ?? 0);
-      startBalance.disable();
-      currency.enable();
     } else {
-      startBalance.enable();
+      if (wasTracked) {
+        // Undo what the lock forced: back to the stored values.
+        startBalance.setValue(data?.start_balance ?? 0);
+        currency.setValue(data?.currency ?? '');
+      }
+      if (this.hasTransactions) startBalance.disable();
+      else startBalance.enable();
       currency.enable();
     }
   }
@@ -238,13 +236,8 @@ export class AccountForm {
           },
         };
       }
-      case 'investment':
-      case 'property':
-      case 'deposit':
-      case 'debt':
-        return { ...base, ...this.unlinkIfLinked(), type: raw.type, settings: {} };
       default:
-        return { ...base, ...this.unlinkIfLinked(), type: 'cash', settings: {} };
+        return { ...base, ...this.unlinkIfLinked(), type: raw.type, settings: {} };
     }
   }
 
@@ -278,7 +271,7 @@ export class AccountForm {
   }
 
   async onSubmit() {
-    if (this.form.invalid || (this.type() === 'bank' && this.bankMismatch())) return;
+    if (this.form.invalid || this.bankMismatch()) return;
     if (this.switchesSyncOn() && !await this.confirmSync()) return;
 
     try {
