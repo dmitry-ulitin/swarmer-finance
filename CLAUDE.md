@@ -94,7 +94,7 @@ All API responses use this envelope format consistently.
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→018)
+- Migrations in `backend/src/db/migrations/` — run in order (001→019)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -138,6 +138,29 @@ All API responses use this envelope format consistently.
   transactions, `DELETE /api/accounts/:id?withTransactions=true` also removes
   the account. Transfers are never deleted but left to the other account as
   Uncategorized income/expense (`services/accounts.ts` `purgeAccount`).
+- Migration 019 adds the account types `investment`, `property` and
+  `deposit` (no bank link or chain tracking) and `account_valuations`
+  (`account_id`, `as_of`, `value` at the account's scale, unique per day;
+  `GET/POST /api/accounts/:id/valuations`, `PUT/DELETE .../:valuationId`:
+  READ to read, WRITE to change, future dates 400, a second valuation on a
+  day 409). An account's **value** on a date D (`services/accountValue.ts`,
+  used by `/api/accounts` and net worth alike) is its latest valuation V on
+  or before D plus the net flow dated after V, else the transactional
+  balance; `invested` is that balance, and `balance` in `/api/accounts` is the
+  value today (all flows, future-dated ones included). Before its first
+  transaction (else `created_at`) an account is worth 0 in history.
+- Whether an account counts toward a user's net worth is personal:
+  `account_user_settings` (`in_net_worth`), set by any member through
+  `PUT /api/accounts/:id/net-worth`; without a row it is on for levels 3-4
+  and off for 1-2 (`isInNetWorth`). `GET /api/net-worth`
+  (`services/netWorth.ts`) returns today's `total` in the user's currency
+  (never null: an account with no rate is skipped and sets `approximate`),
+  `byType`, `byCurrency`, `accounts[]` (every visible non-deleted account,
+  selected or not, with value, invested, gain and `gainPct`, null when
+  nothing was invested) and a monthly `history` computed on request: the
+  last day of each month from the earliest start or valuation among selected
+  accounts, rates from `getRatesOn`, then a today point that equals the
+  accounts list. Deleted accounts count in history only.
 - System category **Network fees** (id 5, under Expenses) seeded in
   migration 012; ids 1–5 are protected from edit/delete.
 
