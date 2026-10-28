@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
-import { TuiButton, TuiDialogService, TuiInput, TuiLoader } from '@taiga-ui/core';
+import { TuiButton, TuiDialogService, TuiInput, TuiLoader, TuiNumberFormat } from '@taiga-ui/core';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { TUI_CONFIRM, type TuiConfirmData, TuiInputDate, TuiInputNumber } from '@taiga-ui/kit';
-import { TuiNumberFormat } from '@taiga-ui/core';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/api.service';
@@ -30,7 +29,7 @@ export class AccountValuations {
 
   readonly account = this.context.data;
   readonly canWrite = accessLevelOf(this.account) >= 2;
-  readonly today = TuiDay.currentLocal();
+  readonly today = utcToday();
   readonly precision = this.account.scale ?? 2;
   readonly quantum = 1 / Math.pow(10, this.precision);
 
@@ -45,7 +44,7 @@ export class AccountValuations {
   readonly rows = computed(() => [...this.valuations()].sort((a, b) => b.as_of.localeCompare(a.as_of)));
 
   readonly form = new FormGroup({
-    date: new FormControl<TuiDay | null>(TuiDay.currentLocal(), [Validators.required]),
+    date: new FormControl<TuiDay | null>(utcToday(), [Validators.required, notFuture]),
     value: new FormControl<number | null>(null, [Validators.required, Validators.min(0)]),
   });
 
@@ -105,7 +104,7 @@ export class AccountValuations {
   }
 
   private resetForm(): void {
-    this.form.reset({ date: TuiDay.currentLocal(), value: null });
+    this.form.reset({ date: utcToday(), value: null });
   }
 
   /** Reloads the list and the accounts, whose values depend on the latest valuation. */
@@ -124,6 +123,17 @@ export class AccountValuations {
       this.loading.set(false);
     }
   }
+}
+
+/** The server's "today" is the UTC date. */
+function utcToday(): TuiDay {
+  const now = new Date();
+  return new TuiDay(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+function notFuture(control: AbstractControl<TuiDay | null>): ValidationErrors | null {
+  const day = control.value;
+  return day && day.dayAfter(utcToday()) ? { future: true } : null;
 }
 
 function serverMessage(e: unknown): string | null {

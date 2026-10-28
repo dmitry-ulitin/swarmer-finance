@@ -23,7 +23,7 @@
         <form [formGroup]="form" (ngSubmit)="submit()" class="add">
             <tui-textfield>
                 <label tuiLabel>Date</label>
-                <input tuiInputDate formControlName="date" />
+                <input tuiInputDate formControlName="date" [max]="today" />
                 <tui-calendar *tuiDropdown />
             </tui-textfield>
             <tui-textfield>

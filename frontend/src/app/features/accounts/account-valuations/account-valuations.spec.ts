@@ -85,4 +85,32 @@ describe('AccountValuations', () => {
     expect(el.querySelector('[data-test="delete"]')).toBeNull();
     expect(el.textContent).toContain('2026-01-10');
   });
+
+  it('rejects a future date and sends nothing', async () => {
+    const { component, http } = await setup(2, []);
+    const tomorrow = new Date(Date.now() + 2 * 86400000);
+    component.form.setValue({ date: new TuiDay(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth(), tomorrow.getUTCDate()), value: 5 });
+    expect(component.form.invalid).toBe(true);
+    await component.submit();
+    http.expectNone('/api/accounts/7/valuations');
+  });
+
+  it('sends a decimal amount unchanged', async () => {
+    const { component, http } = await setup(2, []);
+    component.form.setValue({ date: new TuiDay(2026, 0, 5), value: 1234.56 });
+    void component.submit();
+    await flushAsync();
+    expect(http.expectOne('/api/accounts/7/valuations').request.body).toEqual({ asOf: '2026-01-05', value: 1234.56 });
+  });
+
+  it('updates the edited row', async () => {
+    const { component, http } = await setup(2, [v(3, '2026-02-10', 200)]);
+    component.edit(component.valuations()[0]);
+    component.form.patchValue({ value: 250 });
+    void component.submit();
+    await flushAsync();
+    const req = http.expectOne('/api/accounts/7/valuations/3');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ asOf: '2026-02-10', value: 250 });
+  });
 });
