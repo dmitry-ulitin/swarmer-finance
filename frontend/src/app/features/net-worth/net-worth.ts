@@ -33,10 +33,11 @@ export class NetWorthPage {
   private readonly accounts = inject(AccountsState);
   private readonly notifications = inject(NotificationService);
 
-  private readonly resource = resource<NetWorth | null, boolean>({
-    params: () => this.auth.isAuthenticated(),
+  // Follows account changes (edits, valuations, imports) made while the page is open.
+  private readonly resource = resource<NetWorth | null, { authenticated: boolean; version: number }>({
+    params: () => ({ authenticated: this.auth.isAuthenticated(), version: this.accounts.version() }),
     loader: async ({ params }) => {
-      if (!params) return null;
+      if (!params.authenticated) return null;
       try {
         return (await firstValueFrom(this.api.getNetWorth())).data;
       } catch (e) {
@@ -100,10 +101,12 @@ export class NetWorthPage {
 
   async toggle(id: number, include: boolean): Promise<void> {
     try {
+      // Reloads the accounts, and with them this page.
       await firstValueFrom(this.accounts.setInNetWorth(id, include));
     } catch (e) {
       this.notifications.showError(e, 'Failed to update net worth');
+      // Puts the checkbox back.
+      this.resource.reload();
     }
-    this.resource.reload();
   }
 }

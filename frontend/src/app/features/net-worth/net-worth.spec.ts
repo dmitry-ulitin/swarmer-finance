@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { of } from 'rxjs';
 import { NetWorthPage } from './net-worth';
 import { ApiService } from '../../core/api.service';
@@ -32,12 +32,13 @@ const data = (approximate = false): NetWorth => ({
 
 async function setup(approximate = false, user = { currency: 'EUR', currency_scale: 2 }) {
   const getNetWorth = vi.fn(() => of({ data: data(approximate), error: null }));
-  const setInNetWorth = vi.fn(() => of({}));
+  const version = signal(0);
+  const setInNetWorth = vi.fn(() => { version.update(v => v + 1); return of({}); });
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
       { provide: ApiService, useValue: { getNetWorth } },
-      { provide: AccountsState, useValue: { setInNetWorth } },
+      { provide: AccountsState, useValue: { setInNetWorth, version } },
       { provide: AuthService, useValue: { isAuthenticated: () => true, user: () => user } },
       { provide: NotificationService, useValue: { showError: vi.fn() } },
     ],
@@ -46,7 +47,7 @@ async function setup(approximate = false, user = { currency: 'EUR', currency_sca
   fixture.detectChanges();
   await flushAsync();
   fixture.detectChanges();
-  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, getNetWorth, setInNetWorth };
+  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, getNetWorth, setInNetWorth, version };
 }
 
 describe('NetWorthPage', () => {
@@ -81,6 +82,15 @@ describe('NetWorthPage', () => {
     fixture.detectChanges();
     await flushAsync();
     expect(setInNetWorth).toHaveBeenCalledWith(2, false);
+    expect(getNetWorth).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches when the accounts reload', async () => {
+    const { fixture, getNetWorth, version } = await setup();
+    expect(getNetWorth).toHaveBeenCalledTimes(1);
+    version.update(v => v + 1);
+    fixture.detectChanges();
+    await flushAsync();
     expect(getNetWorth).toHaveBeenCalledTimes(2);
   });
 

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, resource } from '@angular/core';
+import { Injectable, computed, inject, resource, signal } from '@angular/core';
 import { firstValueFrom, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Account, AccountPayload, accessLevelOf } from '../models/account';
@@ -64,9 +64,13 @@ export class AccountsState {
     return [defaultCurrency, ...fromAccounts.filter(c => c !== defaultCurrency)];
   });
   readonly loading = this.resource.isLoading;
+  private readonly versionSignal = signal(0);
+  /** Bumped on every reload, so data derived from accounts elsewhere can follow. */
+  readonly version = this.versionSignal.asReadonly();
 
   reload() {
     this.resource.reload();
+    this.versionSignal.update(v => v + 1);
   }
 
   create(data: AccountPayload) {
