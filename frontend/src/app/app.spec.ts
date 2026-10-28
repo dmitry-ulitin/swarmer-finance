@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { App } from './app';
 import { TUI_OPTIONS } from '@taiga-ui/core';
 
@@ -6,7 +7,7 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [{ provide: TUI_OPTIONS, useValue: { apis: 'stable' } }],
+      providers: [provideRouter([]), { provide: TUI_OPTIONS, useValue: { apis: 'stable' } }],
     }).compileComponents();
   });
 
@@ -20,6 +21,6 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('span')?.textContent).toContain('Swarmer Finance');
+    expect(compiled.querySelector('.title')?.textContent).toContain('Swarmer Finance');
   });
 });

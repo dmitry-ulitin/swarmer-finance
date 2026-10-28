@@ -6,6 +6,7 @@ import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSync
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { BankAspsp, BankConnection, BankCredentials, bankRedirectUrl } from '../models/bank';
+import type { NetWorth } from '../models/net-worth';
 import { Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -62,6 +63,10 @@ export class ApiService {
 
   updateAccount(id: number, data: AccountPayload): Observable<ApiResponse<Account>> {
     return this.http.put<ApiResponse<Account>>(`/api/accounts/${id}`, data);
+  }
+
+  getNetWorth(): Observable<ApiResponse<NetWorth>> {
+    return this.http.get<ApiResponse<NetWorth>>('/api/net-worth');
   }
 
   setInNetWorth(id: number, include: boolean): Observable<ApiResponse<Account>> {

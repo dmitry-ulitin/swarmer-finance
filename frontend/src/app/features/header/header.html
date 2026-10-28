@@ -1,5 +1,6 @@
-<span class="title">Swarmer Finance</span>
+<a class="title" routerLink="/dashboard">Swarmer Finance</a>
 @if(authService.isAuthenticated()) {
+<a tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" class="light" routerLink="/net-worth" [iconStart]="'@tui.scale'">Net worth</a>
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="reload()" [iconStart]="'@tui.refresh-cw'" aria-label="Reload"></button>
 <button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="addTransaction()" [iconStart]="'@tui.diff'" aria-label="Add transaction" [disabled]="accountState.transferTargets().length === 0"></button>
 }

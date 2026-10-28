@@ -23,6 +23,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'net-worth',
+    loadComponent: () => import('./features/net-worth/net-worth').then(m => m.NetWorthPage),
+    canActivate: [authGuard]
+  },
+  {
     path: 'bank-callback',
     loadComponent: () => import('./features/bank/bank-callback/bank-callback').then(m => m.BankCallback),
     canActivate: [authGuard]

@@ -1,0 +1,75 @@
+<section class="page">
+  @if (data(); as nw) {
+  <h1 class="total" data-test="total">
+    @if (nw.approximate) {
+    <span class="approx" tuiHint="Some rates are missing or approximate">≈</span>
+    }
+    {{ nw.total | money: nw.currency }}
+  </h1>
+
+  @if (nw.history.length) {
+  <div class="chart-row">
+    <tui-axes class="axes" [axisXLabels]="labelsX()" [axisYLabels]="labelsY()" [horizontalLines]="4" [verticalLines]="1">
+      <tui-bar-chart [collapsed]="true" [max]="chartMax()" [value]="chartValues()" [tuiHintContent]="hint" />
+    </tui-axes>
+    <ul class="legend">
+      @for (s of series(); track s.type) {
+      <li><span class="dot" [style.background]="colorOf(s.type)"></span>{{ typeLabel(s.type) }}</li>
+      }
+    </ul>
+  </div>
+  <ng-template #hint let-index>
+    @if (point(index); as p) {
+    <div class="hint">
+      <strong>{{ p.date }}</strong>
+      @for (s of series(); track s.type) {
+      <div><span class="dot" [style.background]="colorOf(s.type)"></span>{{ typeLabel(s.type) }}: {{ s.values[index] | money: nw.currency }}</div>
+      }
+      <div><strong>{{ p.approximate ? '≈ ' : '' }}{{ p.total | money: nw.currency }}</strong></div>
+    </div>
+    }
+  </ng-template>
+  }
+
+  <div class="breakdowns">
+    <div>
+      <h3>By type</h3>
+      <ul class="breakdown" data-test="by-type">
+        @for (b of nw.byType; track b.type) {
+        <li><span>{{ typeLabel(b.type) }}</span><span>{{ b.value | money: nw.currency }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
+        }
+      </ul>
+    </div>
+    <div>
+      <h3>By currency</h3>
+      <ul class="breakdown" data-test="by-currency">
+        @for (b of nw.byCurrency; track b.currency) {
+        <li><span>{{ b.currency }}</span><span>{{ b.value | money: nw.currency }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
+        }
+      </ul>
+    </div>
+  </div>
+
+  <table class="accounts">
+    <thead>
+      <tr><th>In net worth</th><th>Account</th><th class="num">Value</th><th class="num">Invested</th><th class="num">Gain</th></tr>
+    </thead>
+    <tbody>
+      @for (a of nw.accounts; track a.id) {
+      <tr data-test="row" [attr.data-id]="a.id">
+        <td>
+          <input tuiCheckbox size="s" type="checkbox" [attr.aria-label]="'Include ' + a.name + ' in net worth'"
+                 [ngModel]="a.inNetWorth" (ngModelChange)="toggle(a.id, $event)" />
+        </td>
+        <td>{{ a.name }} <span class="muted">{{ typeLabel(a.type) }}</span></td>
+        <td class="num">{{ a.value | money: a.currency }}</td>
+        <td class="num">{{ a.invested ? (a.invested | money: a.currency) : '' }}</td>
+        <td class="num">{{ a.gainPct == null ? '' : (a.gainPct >= 0 ? '+' : '') + (a.gainPct | number: '1.0-1') + '%' }}</td>
+      </tr>
+      }
+    </tbody>
+  </table>
+  } @else if (loading()) {
+  <tui-loader />
+  }
+</section>

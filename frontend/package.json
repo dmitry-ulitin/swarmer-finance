@@ -17,6 +17,7 @@
     "@angular/forms": "^22.2.1",
     "@angular/platform-browser": "^22.2.1",
     "@angular/router": "^22.2.1",
+    "@taiga-ui/addon-charts": "^5.27.0",
     "@taiga-ui/addon-commerce": "^5.27.0",
     "@taiga-ui/cdk": "^5.27.0",
     "@taiga-ui/core": "^5.27.0",

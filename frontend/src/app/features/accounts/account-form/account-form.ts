@@ -28,7 +28,7 @@ interface BankOption {
 const bankLabel = (bank: string, account: string, currency: string): string =>
   `${bank} · ${account} · ${currency === 'XXX' ? 'multi-currency' : currency}`;
 
-const TYPE_LABELS: Record<AccountType, string> = {
+export const TYPE_LABELS: Record<AccountType, string> = {
   cash: 'Cash',
   bank: 'Bank',
   crypto: 'Crypto',

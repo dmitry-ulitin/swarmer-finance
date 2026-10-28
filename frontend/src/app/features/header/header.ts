@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { TuiButton, TuiDataList, TuiDropdown, TuiIcon } from '@taiga-ui/core';
 import { CategoryDialogService } from '../categories/category-dialog.service';
@@ -18,7 +19,7 @@ import { BankDialogService } from '../bank/bank-dialog.service';
 
 @Component({
   selector: 'app-header',
-  imports: [TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiIcon],
+  imports: [RouterLink, TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiIcon],
   templateUrl: './header.html',
   styleUrl: './header.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
