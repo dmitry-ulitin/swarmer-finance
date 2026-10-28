@@ -19,7 +19,7 @@ const fund = { id: 11, name: 'Fund', type: 'investment', access_level: 2, in_net
 const retyped = { id: 12, name: 'Retyped', type: 'bank', access_level: 1, last_valuation_date: '2026-05-01' };
 const accounts = [retyped, fund, wallet, { id: 8, name: 'Cash' }, shared, readOnly];
 
-function configure(selectedAccountIds: number[], selectedTransaction: unknown = null) {
+function configure(selectedAccountIds: number[], selectedTransaction: unknown = null, visible: unknown[] = accounts) {
   const openSharing = vi.fn(async () => {});
   const openEdit = vi.fn(async () => {});
   const openImport = vi.fn(async () => {});
@@ -30,7 +30,7 @@ function configure(selectedAccountIds: number[], selectedTransaction: unknown = 
     providers: [
       Header,
       { provide: AuthService, useValue: {} },
-      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(accounts), trackedIds: signal(new Set()), setInNetWorth } },
+      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(visible), trackedIds: signal(new Set()), setInNetWorth } },
       { provide: TransactionsState, useValue: { selectedAccountIds: signal(selectedAccountIds), selectedTransaction: signal(selectedTransaction) } },
       { provide: CategoryDialogService, useValue: {} },
       { provide: AccountDialogService, useValue: { openSharing, openEdit, openValuations } },
@@ -55,6 +55,12 @@ describe('Header sharing', () => {
     const { header, openSharing } = configure([7, 8]);
     header.shareFilteredAccount();
     expect(openSharing).not.toHaveBeenCalled();
+  });
+
+  it('uses the only visible account when nothing is selected', () => {
+    const { header, openSharing } = configure([], null, [wallet]);
+    header.shareFilteredAccount();
+    expect(openSharing).toHaveBeenCalledWith(wallet);
   });
 });
 

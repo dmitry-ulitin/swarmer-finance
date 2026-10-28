@@ -58,11 +58,13 @@ export class Header {
     const t = this.selectedTransaction();
     return !!t && this.canWrite() && !syncedLock(t, this.accountState.trackedIds()).synced;
   });
-  /** The account the filters narrow to, when exactly one is selected. */
+  /** The account the filters narrow to: exactly one selected, or the only visible one. */
   readonly filteredAccount = computed(() => {
+    const visible = this.accountState.visibleAccounts();
+    if (visible.length === 1) return visible[0];
     const ids = this.transactionsState.selectedAccountIds();
     if (ids.length !== 1) return null;
-    return this.accountState.visibleAccounts().find(a => a.id === ids[0]) ?? null;
+    return visible.find(a => a.id === ids[0]) ?? null;
   });
   /** Editing an account takes co-owner or owner, as the backend requires. */
   readonly canEditFiltered = computed(() => {
