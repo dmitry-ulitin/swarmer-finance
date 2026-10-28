@@ -1,6 +1,7 @@
 import * as exchangeRateQueries from '../db/queries/exchangeRates';
 import * as frankfurter from './rates/frankfurter';
 import * as coingecko from './rates/coingecko';
+import { addDays } from './date';
 
 // Tried in order. Frankfurter (ECB rates) is authoritative for the fiat it
 // covers; CoinGecko picks up what it does not know — crypto, and fiat such
@@ -119,6 +120,106 @@ export async function getRatesTo(
   );
 
   return new Map(entries);
+}
+
+export type HistoricalRate = { rate: number; approximate: boolean } | null;
+
+const EXACT_WINDOW_DAYS = 6;
+
+// Fetches the day rates for `from`->`to` over start..end with the first
+// provider that has them, and caches each. A throwing provider is logged and
+// the next one tried.
+async function fetchSeriesInto(from: string, to: string, start: string, end: string) {
+  for (const provider of PROVIDERS) {
+    try {
+      const series = await provider.fetchSeries(from, to, start, end);
+      if (series) {
+        for (const { date, rate } of series) {
+          await exchangeRateQueries.upsertRate(from, to, rate, date);
+        }
+        return;
+      }
+    } catch (error: unknown) {
+      const message =
+        error && typeof error === 'object' && 'message' in error ? error.message : String(error);
+      console.error(`Failed to fetch exchange rate history ${from}->${to}:`, message);
+    }
+  }
+}
+
+/**
+ * Rates `currency -> target` on each date, by currency then date. A cached
+ * rate within the 6 days up to the date is exact (the ECB skips weekends);
+ * otherwise the nearest cached rate is used with `approximate: true`; null
+ * when the pair has none. Dates without an exact rate cost one series fetch
+ * per currency over their span; cached dates are never refetched.
+ */
+export async function getRatesOn(
+  target: string,
+  currencies: string[],
+  dates: string[]
+): Promise<Map<string, Map<string, HistoricalRate>>> {
+  const result = new Map<string, Map<string, HistoricalRate>>();
+  const sorted = [...new Set(dates)].sort();
+
+  for (const currency of new Set(currencies)) {
+    const byDate = new Map<string, HistoricalRate>();
+    result.set(currency, byDate);
+    if (currency === target) {
+      for (const d of sorted) byDate.set(d, { rate: 1, approximate: false });
+      continue;
+    }
+    if (sorted.length === 0) continue;
+
+    const load = () =>
+      exchangeRateQueries.getRatesBetween(
+        currency,
+        target,
+        addDays(sorted[0], -EXACT_WINDOW_DAYS),
+        sorted[sorted.length - 1]
+      );
+    const exactOn = (rows: { as_of: string; rate: number }[], d: string) => {
+      const from = addDays(d, -EXACT_WINDOW_DAYS);
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].as_of <= d) return rows[i].as_of >= from ? rows[i] : undefined;
+      }
+      return undefined;
+    };
+
+    let rows = await load();
+    const missing = sorted.filter((d) => !exactOn(rows, d));
+    if (missing.length > 0) {
+      await fetchSeriesInto(
+        currency,
+        target,
+        addDays(missing[0], -EXACT_WINDOW_DAYS),
+        missing[missing.length - 1]
+      );
+      rows = await load();
+    }
+
+    // Nearest-row fallback needs rows outside the exact window too.
+    let all: { as_of: string; rate: number }[] | null = null;
+    for (const d of sorted) {
+      const exact = exactOn(rows, d);
+      if (exact) {
+        byDate.set(d, { rate: exact.rate, approximate: false });
+        continue;
+      }
+      all ??= await exchangeRateQueries.getRatesBetween(currency, target, '0001-01-01', '9999-12-31');
+      let best: { as_of: string; rate: number } | null = null;
+      let bestDist = Infinity;
+      for (const r of all) {
+        const dist = Math.abs(Date.parse(r.as_of) - Date.parse(d));
+        if (dist < bestDist) {
+          best = r;
+          bestDist = dist;
+        }
+      }
+      byDate.set(d, best ? { rate: best.rate, approximate: true } : null);
+    }
+  }
+  return result;
 }
 
 export function convertAmount(

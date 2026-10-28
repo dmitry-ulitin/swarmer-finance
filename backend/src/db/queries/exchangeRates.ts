@@ -1,4 +1,4 @@
-import { queryOne, execute } from '../index';
+import { queryOne, query, execute } from '../index';
 
 export interface ExchangeRateRow {
   from_currency: string;
@@ -49,3 +49,19 @@ export const upsertRate = (from: string, to: string, rate: number, asOf: string)
      ON CONFLICT (from_currency, to_currency, as_of) DO UPDATE SET rate = EXCLUDED.rate, checked_at = now()`,
     [from, to, rate, asOf]
   );
+
+/** Cached rows for the pair dated start..end inclusive, oldest first. */
+export const getRatesBetween = async (
+  from: string,
+  to: string,
+  start: string,
+  end: string
+): Promise<{ as_of: string; rate: number }[]> => {
+  const rows = await query<{ as_of: string; rate: string }>(
+    `SELECT as_of, rate FROM exchange_rates
+     WHERE from_currency = $1 AND to_currency = $2 AND as_of BETWEEN $3 AND $4
+     ORDER BY as_of`,
+    [from, to, start, end]
+  );
+  return rows.map((r) => ({ as_of: r.as_of, rate: Number(r.rate) }));
+};

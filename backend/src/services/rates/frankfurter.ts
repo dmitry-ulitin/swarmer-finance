@@ -25,3 +25,30 @@ export async function fetchRate(
 
   return { rate, asOf: body.date };
 }
+
+// Daily `from`->`to` rates over start..end (ECB publishes working days only,
+// so weekends are absent). Null and throw follow the same contract as
+// fetchRate.
+export async function fetchSeries(
+  from: string,
+  to: string,
+  start: string,
+  end: string
+): Promise<{ date: string; rate: number }[] | null> {
+  const res = await fetch(`${FRANKFURTER_BASE_URL}/${start}..${end}?base=${from}&symbols=${to}`, {
+    signal: AbortSignal.timeout(FRANKFURTER_TIMEOUT_MS),
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Frankfurter request failed: ${res.status}`);
+  }
+
+  const body = (await res.json()) as { rates?: Record<string, Record<string, number>> };
+  const series: { date: string; rate: number }[] = [];
+  for (const [date, day] of Object.entries(body.rates ?? {})) {
+    const rate = day?.[to];
+    if (typeof rate === 'number') series.push({ date, rate });
+  }
+  return series.length > 0 ? series.sort((a, b) => a.date.localeCompare(b.date)) : null;
+}

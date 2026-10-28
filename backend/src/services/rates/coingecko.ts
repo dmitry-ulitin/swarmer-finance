@@ -59,7 +59,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // exchange_rates table already does the day-long caching).
 const inFlight = new Map<string, Promise<Record<string, Record<string, number>>>>();
 
-async function requestPrices(url: string): Promise<Record<string, Record<string, number>>> {
+async function requestPrices<T = Record<string, Record<string, number>>>(url: string): Promise<T> {
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(COINGECKO_TIMEOUT_MS),
@@ -67,7 +67,7 @@ async function requestPrices(url: string): Promise<Record<string, Record<string,
     });
 
     if (res.ok) {
-      return (await res.json()) as Record<string, Record<string, number>>;
+      return (await res.json()) as T;
     }
 
     // Only 429 is worth retrying: other failures are not going to clear on
@@ -159,4 +159,61 @@ export async function fetchRate(
   const bridgeTo = priceOf(prices, BRIDGE_COIN, to);
   if (bridgeFrom === null || bridgeTo === null) return null;
   return { rate: bridgeTo / bridgeFrom, asOf: today() };
+}
+
+// The free tier serves history only for the last 365 days.
+const HISTORY_DAYS = 364;
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Daily `from`->`to` prices over start..end for coin->fiat, and fiat->coin by
+// inversion; every other pair is null. Nothing is requested before
+// today - 364 days. One price per UTC day: the last one of that day.
+export async function fetchSeries(
+  from: string,
+  to: string,
+  start: string,
+  end: string
+): Promise<{ date: string; rate: number }[] | null> {
+  const fromCoin = COIN_IDS[from];
+  const toCoin = COIN_IDS[to];
+  let coin: string;
+  let vs: string;
+  let invert: boolean;
+  if (fromCoin && !toCoin && VS_CURRENCIES.has(to)) {
+    coin = fromCoin;
+    vs = to;
+    invert = false;
+  } else if (toCoin && !fromCoin && VS_CURRENCIES.has(from)) {
+    coin = toCoin;
+    vs = from;
+    invert = true;
+  } else {
+    return null;
+  }
+
+  const earliest = addDays(today(), -HISTORY_DAYS);
+  const first = start < earliest ? earliest : start;
+  if (first > end) return null;
+
+  const fromTs = Date.parse(`${first}T00:00:00Z`) / 1000;
+  const toTs = Date.parse(`${addDays(end, 1)}T00:00:00Z`) / 1000 - 1;
+  const url =
+    `${COINGECKO_BASE_URL}/coins/${coin}/market_chart/range` +
+    `?vs_currency=${vs.toLowerCase()}&from=${fromTs}&to=${toTs}`;
+  const body = await requestPrices<{ prices?: [number, number][] }>(url);
+
+  const byDay = new Map<string, number>();
+  for (const [ms, price] of [...(body.prices ?? [])].sort((a, b) => a[0] - b[0])) {
+    if (typeof price !== 'number' || !(price > 0)) continue;
+    const date = new Date(ms).toISOString().slice(0, 10);
+    if (date < first || date > end) continue;
+    byDay.set(date, invert ? 1 / price : price);
+  }
+  if (byDay.size === 0) return null;
+  return [...byDay].map(([date, rate]) => ({ date, rate }));
 }
