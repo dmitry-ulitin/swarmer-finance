@@ -7,7 +7,7 @@ CREATE TABLE account_valuations (
   id SERIAL PRIMARY KEY,
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   as_of DATE NOT NULL,
-  value INTEGER NOT NULL,
+  value NUMERIC(24, 0) NOT NULL,
   user_id INTEGER NOT NULL REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (account_id, as_of)

@@ -66,6 +66,12 @@ describe('Account valuations', () => {
     expect(list.body.data[0].as_of).toBe('2026-01-01');
   });
 
+  it('stores values beyond int32', async () => {
+    const res = await request(app).post(url(acc)).set(auth(owner)).send({ asOf: '2026-01-02', value: 25000000 });
+    expect(res.status).toBe(200);
+    expect(res.body.data.value).toBe(25000000);
+  });
+
   it('rejects a second valuation on the same date', async () => {
     const res = await request(app).post(url(acc)).set(auth(owner)).send({ asOf: '2026-01-01', value: 5 });
     expect(res.status).toBe(409);

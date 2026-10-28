@@ -9,12 +9,15 @@ export interface ValuationRow {
   created_at: Date;
 }
 
+const num = (r: ValuationRow): ValuationRow => ({ ...r, value: Number(r.value) });
+
 export const listValuations = async (accountIds: number[]): Promise<ValuationRow[]> => {
   if (accountIds.length === 0) return [];
-  return query<ValuationRow>(
+  const rows = await query<ValuationRow>(
     'SELECT * FROM account_valuations WHERE account_id = ANY($1) ORDER BY account_id, as_of',
     [accountIds]
   );
+  return rows.map(num);
 };
 
 export const insertValuation = async (
@@ -28,7 +31,7 @@ export const insertValuation = async (
      VALUES ($1, $2, $3, $4) RETURNING *`,
     [accountId, asOf, value, userId]
   );
-  return row!;
+  return num(row!);
 };
 
 export const updateValuation = async (
@@ -37,11 +40,12 @@ export const updateValuation = async (
   asOf: string,
   value: number
 ): Promise<ValuationRow | null> => {
-  return queryOne<ValuationRow>(
+  const row = await queryOne<ValuationRow>(
     `UPDATE account_valuations SET as_of = $3, value = $4
      WHERE id = $1 AND account_id = $2 RETURNING *`,
     [valuationId, accountId, asOf, value]
   );
+  return row ? num(row) : null;
 };
 
 export const deleteValuation = async (accountId: number, valuationId: number): Promise<boolean> => {
