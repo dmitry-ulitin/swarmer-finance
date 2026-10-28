@@ -4,7 +4,7 @@
     @if (nw.approximate) {
     <span class="approx" tuiHint="Some rates are missing or approximate">≈</span>
     }
-    {{ nw.total | money: nw.currency }}
+    {{ nw.total | money: nw.currency : scale() }}
   </h1>
 
   @if (nw.history.length) {
@@ -23,9 +23,9 @@
     <div class="hint">
       <strong>{{ p.date }}</strong>
       @for (s of series(); track s.type) {
-      <div><span class="dot" [style.background]="colorOf(s.type)"></span>{{ typeLabel(s.type) }}: {{ s.values[index] | money: nw.currency }}</div>
+      <div><span class="dot" [style.background]="colorOf(s.type)"></span>{{ typeLabel(s.type) }}: {{ s.values[index] | money: nw.currency : scale() }}</div>
       }
-      <div><strong>{{ p.approximate ? '≈ ' : '' }}{{ p.total | money: nw.currency }}</strong></div>
+      <div><strong>{{ p.approximate ? '≈ ' : '' }}{{ p.total | money: nw.currency : scale() }}</strong></div>
     </div>
     }
   </ng-template>
@@ -36,7 +36,7 @@
       <h3>By type</h3>
       <ul class="breakdown" data-test="by-type">
         @for (b of nw.byType; track b.type) {
-        <li><span>{{ typeLabel(b.type) }}</span><span>{{ b.value | money: nw.currency }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
+        <li><span>{{ typeLabel(b.type) }}</span><span>{{ b.value | money: nw.currency : scale() }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
         }
       </ul>
     </div>
@@ -44,7 +44,7 @@
       <h3>By currency</h3>
       <ul class="breakdown" data-test="by-currency">
         @for (b of nw.byCurrency; track b.currency) {
-        <li><span>{{ b.currency }}</span><span>{{ b.value | money: nw.currency }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
+        <li><span>{{ b.currency }}</span><span>{{ b.value | money: nw.currency : scale() }}</span><span class="pct">{{ share(b.value) | number: '1.0-1' }}%</span></li>
         }
       </ul>
     </div>
@@ -62,8 +62,8 @@
                  [ngModel]="a.inNetWorth" (ngModelChange)="toggle(a.id, $event)" />
         </td>
         <td>{{ a.name }} <span class="muted">{{ typeLabel(a.type) }}</span></td>
-        <td class="num">{{ a.value | money: a.currency }}</td>
-        <td class="num">{{ a.invested ? (a.invested | money: a.currency) : '' }}</td>
+        <td class="num">{{ a.value | money: a.currency : accountScale(a.currency) }}</td>
+        <td class="num">{{ a.invested ? (a.invested | money: a.currency : accountScale(a.currency)) : '' }}</td>
         <td class="num">{{ a.gainPct == null ? '' : (a.gainPct >= 0 ? '+' : '') + (a.gainPct | number: '1.0-1') + '%' }}</td>
       </tr>
       }

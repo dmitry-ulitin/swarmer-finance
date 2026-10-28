@@ -21,6 +21,7 @@ const data = (approximate = false): NetWorth => ({
   byCurrency: [{ currency: 'EUR', value: 1500 }],
   accounts: [
     { id: 1, name: 'Main', type: 'bank', currency: 'EUR', value: 300, valueUser: 300, invested: 0, gain: 0, gainPct: null, inNetWorth: true },
+    { id: 3, name: 'Wallet', type: 'crypto', currency: 'BTC', value: 0.12345678, valueUser: 0, invested: 0, gain: 0, gainPct: null, inNetWorth: true },
     { id: 2, name: 'Fund', type: 'investment', currency: 'EUR', value: 1200, valueUser: 1200, invested: 1000, gain: 200, gainPct: 20, inNetWorth: true },
   ],
   history: [
@@ -29,7 +30,7 @@ const data = (approximate = false): NetWorth => ({
   ],
 });
 
-async function setup(approximate = false) {
+async function setup(approximate = false, user = { currency: 'EUR', currency_scale: 2 }) {
   const getNetWorth = vi.fn(() => of({ data: data(approximate), error: null }));
   const setInNetWorth = vi.fn(() => of({}));
   TestBed.configureTestingModule({
@@ -37,7 +38,7 @@ async function setup(approximate = false) {
       provideZonelessChangeDetection(),
       { provide: ApiService, useValue: { getNetWorth } },
       { provide: AccountsState, useValue: { setInNetWorth } },
-      { provide: AuthService, useValue: { isAuthenticated: () => true } },
+      { provide: AuthService, useValue: { isAuthenticated: () => true, user: () => user } },
       { provide: NotificationService, useValue: { showError: vi.fn() } },
     ],
   });
@@ -74,6 +75,19 @@ describe('NetWorthPage', () => {
     await flushAsync();
     expect(setInNetWorth).toHaveBeenCalledWith(2, false);
     expect(getNetWorth).toHaveBeenCalledTimes(2);
+  });
+
+  it('formats user-currency amounts at the user scale', async () => {
+    const { el } = await setup(false, { currency: 'JPY', currency_scale: 0 });
+    const total = el.querySelector('[data-test="total"]')?.textContent ?? '';
+    expect(total).toContain('1,500');
+    expect(total).not.toContain('.');
+  });
+
+  it('formats account values at the account currency scale', async () => {
+    const { el } = await setup();
+    const row = el.querySelector('[data-test="row"][data-id="3"]')?.textContent ?? '';
+    expect(row).toContain('0.12345678');
   });
 
   it('gives the bar chart one series per type with a non-zero value', async () => {

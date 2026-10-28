@@ -2,6 +2,15 @@ import type { BankLink } from './bank';
 
 export type AccountType = 'cash' | 'bank' | 'crypto' | 'investment' | 'property' | 'deposit';
 
+export const TYPE_LABELS: Record<AccountType, string> = {
+  cash: 'Cash',
+  bank: 'Bank',
+  crypto: 'Crypto',
+  investment: 'Investment',
+  property: 'Property',
+  deposit: 'Deposit',
+};
+
 /** 1 read, 2 transactions, 3 admin, 4 owner. */
 export type AccessLevel = 1 | 2 | 3 | 4;
 

@@ -6,7 +6,7 @@ import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListW
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
-import { SYNCED_CHAINS, type Account, type AccountPayload, type AccountType } from '../../../models/account';
+import { SYNCED_CHAINS, TYPE_LABELS, type Account, type AccountPayload, type AccountType } from '../../../models/account';
 import { firstValueFrom, merge, startWith } from 'rxjs';
 import { TuiAutoFocus } from '@taiga-ui/cdk/directives/auto-focus';
 import { NotificationService } from '../../../core/notification.service';
@@ -27,15 +27,6 @@ interface BankOption {
 
 const bankLabel = (bank: string, account: string, currency: string): string =>
   `${bank} · ${account} · ${currency === 'XXX' ? 'multi-currency' : currency}`;
-
-export const TYPE_LABELS: Record<AccountType, string> = {
-  cash: 'Cash',
-  bank: 'Bank',
-  crypto: 'Crypto',
-  investment: 'Investment',
-  property: 'Property',
-  deposit: 'Deposit',
-};
 
 /** The combo box takes free text; the backend wants an upper-case code. */
 const normalizeCurrency = (currency: string): string => currency.trim().toUpperCase();

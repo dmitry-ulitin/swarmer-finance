@@ -11,8 +11,8 @@ import { AccountsState } from '../../core/accounts.state';
 import { AuthService } from '../../core/auth.service';
 import { NotificationService } from '../../core/notification.service';
 import { MoneyPipe } from '../../core/money.pipe';
-import { TYPE_LABELS } from '../accounts/account-form/account-form';
-import type { AccountType } from '../../models/account';
+import { currencyScale } from '../../core/currency-scale';
+import { TYPE_LABELS, type AccountType } from '../../models/account';
 import type { NetWorth } from '../../models/net-worth';
 
 const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
@@ -48,6 +48,10 @@ export class NetWorthPage {
   // value() throws while the resource is in its error state.
   readonly data = computed(() => (this.resource.hasValue() ? this.resource.value() : null));
   readonly loading = this.resource.isLoading;
+
+  /** Decimals of the user's currency, for every amount converted into it. */
+  readonly scale = computed(() => this.auth.user()?.currency_scale ?? 2);
+  readonly accountScale = currencyScale;
 
   readonly typeLabel = (type: AccountType): string => TYPE_LABELS[type];
 
