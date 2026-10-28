@@ -1,9 +1,9 @@
 import { pool } from '../db';
-import { getRatesOn } from '../services/currency';
+import { getRatesOn, resetHistoryAttempts } from '../services/currency';
 import { addDays, todayUtc } from '../services/date';
 
 const TARGET = 'CHF';
-const SOURCES = ['USD', 'BTC', 'ZZZ'];
+const SOURCES = ['USD', 'BTC', 'ZZZ', 'EUR'];
 
 // Two month-ends in 2024: 2024-03-29 is a Friday, 2024-03-31 a Sunday,
 // 2024-04-30 a Tuesday.
@@ -34,7 +34,10 @@ describe('getRatesOn', () => {
       TARGET,
       SOURCES,
     ]);
-  beforeEach(clean);
+  beforeEach(async () => {
+    resetHistoryAttempts();
+    await clean();
+  });
   afterEach(async () => {
     global.fetch = originalFetch;
     await clean();
@@ -118,5 +121,46 @@ describe('getRatesOn', () => {
     global.fetch = routedFetch({ series: [FRIDAY], coingecko: {} }) as unknown as typeof fetch;
     await getRatesOn(TARGET, ['USD'], [FRIDAY]);
     expect((await getLatestRate('USD', TARGET))!.as_of).toBe('2030-01-01');
+  });
+
+  it('never overwrites a cached rate inside the fetched span', async () => {
+    await pool.query(
+      `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of)
+       VALUES ('USD', $1, 0.5, '2024-04-29')`,
+      [TARGET]
+    );
+    global.fetch = routedFetch({ series: [FRIDAY, '2024-04-29', APR_END], coingecko: {} }) as unknown as typeof fetch;
+    await getRatesOn(TARGET, ['USD'], [FRIDAY, APR_END]);
+    const { rows } = await pool.query(
+      `SELECT rate FROM exchange_rates WHERE from_currency = 'USD' AND to_currency = $1 AND as_of = '2024-04-29'`,
+      [TARGET]
+    );
+    expect(Number(rows[0].rate)).toBe(0.5);
+  });
+
+  it('does not ask again within the hour for dates that came back empty', async () => {
+    const old = addDays(todayUtc(), -400);
+    const recent = addDays(todayUtc(), -20);
+    const ms = Date.parse(`${recent}T12:00:00Z`);
+    const mock = routedFetch({ series: [], coingecko: { prices: [[ms, 100]] } });
+    global.fetch = mock as unknown as typeof fetch;
+
+    const first = await getRatesOn(TARGET, ['BTC'], [old, recent]);
+    expect(first.get('BTC')!.get(recent)).toEqual({ rate: 100, approximate: false });
+    expect(first.get('BTC')!.get(old)).toEqual({ rate: 100, approximate: true });
+    const calls = mock.mock.calls.length;
+    await getRatesOn(TARGET, ['BTC'], [old, recent]);
+    expect(mock).toHaveBeenCalledTimes(calls);
+  });
+
+  it('inverts a fiat to coin CoinGecko price', async () => {
+    const day = addDays(todayUtc(), -30);
+    global.fetch = routedFetch({
+      series: [],
+      coingecko: { prices: [[Date.parse(`${day}T00:00:00Z`), 50000]] },
+    }) as unknown as typeof fetch;
+    const result = await getRatesOn('BTC', ['EUR'], [day]);
+    expect(result.get('EUR')!.get(day)).toEqual({ rate: 1 / 50000, approximate: false });
+    await pool.query(`DELETE FROM exchange_rates WHERE to_currency = 'BTC' AND from_currency = 'EUR'`);
   });
 });

@@ -126,6 +126,23 @@ export type HistoricalRate = { rate: number; approximate: boolean } | null;
 
 const EXACT_WINDOW_DAYS = 6;
 
+// Dates already asked of the providers, so ones that came back empty (crypto
+// older than the free tier serves, uncovered currencies) are not asked again
+// on every call. Valid for an hour.
+const ATTEMPT_TTL_MS = 60 * 60 * 1000;
+const attempted = new Map<string, number>();
+
+/** Forgets which history dates were attempted (tests). */
+export function resetHistoryAttempts(): void {
+  attempted.clear();
+}
+
+const attemptKey = (from: string, to: string, date: string) => `${from}|${to}|${date}`;
+const wasAttempted = (from: string, to: string, date: string) => {
+  const at = attempted.get(attemptKey(from, to, date));
+  return at !== undefined && Date.now() - at < ATTEMPT_TTL_MS;
+};
+
 // Fetches the day rates for `from`->`to` over start..end with the first
 // provider that has them, and caches each. A throwing provider is logged and
 // the next one tried.
@@ -134,9 +151,7 @@ async function fetchSeriesInto(from: string, to: string, start: string, end: str
     try {
       const series = await provider.fetchSeries(from, to, start, end);
       if (series) {
-        for (const { date, rate } of series) {
-          await exchangeRateQueries.upsertRate(from, to, rate, date);
-        }
+        await exchangeRateQueries.insertHistoricalRates(from, to, series);
         return;
       }
     } catch (error: unknown) {
@@ -187,7 +202,9 @@ export async function getRatesOn(
     };
 
     let rows = await load();
-    const missing = sorted.filter((d) => !exactOn(rows, d));
+    const missing = sorted.filter(
+      (d) => !exactOn(rows, d) && !wasAttempted(currency, target, d)
+    );
     if (missing.length > 0) {
       await fetchSeriesInto(
         currency,
@@ -195,6 +212,8 @@ export async function getRatesOn(
         addDays(missing[0], -EXACT_WINDOW_DAYS),
         missing[missing.length - 1]
       );
+      const now = Date.now();
+      for (const d of missing) attempted.set(attemptKey(currency, target, d), now);
       rows = await load();
     }
 

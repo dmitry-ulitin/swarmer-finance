@@ -1,3 +1,5 @@
+import { addDays } from '../date';
+
 // A demo key raises the rate limit well above the keyless tier's handful of
 // requests per minute. Demo keys are served from the public host with an
 // x-cg-demo-api-key header; paid keys use pro-api.coingecko.com instead, so
@@ -163,12 +165,6 @@ export async function fetchRate(
 
 // The free tier serves history only for the last 365 days.
 const HISTORY_DAYS = 364;
-
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 // Daily `from`->`to` prices over start..end for coin->fiat, and fiat->coin by
 // inversion; every other pair is null. Nothing is requested before

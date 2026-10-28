@@ -65,3 +65,20 @@ export const getRatesBetween = async (
   );
   return rows.map((r) => ({ as_of: r.as_of, rate: Number(r.rate) }));
 };
+
+/**
+ * Caches a day-rate series in one statement. History is immutable: an
+ * existing (pair, as_of) row is never overwritten.
+ */
+export const insertHistoricalRates = (
+  from: string,
+  to: string,
+  series: { date: string; rate: number }[]
+) =>
+  execute(
+    `INSERT INTO exchange_rates (from_currency, to_currency, rate, as_of, checked_at)
+     SELECT $1, $2, t.rate, t.as_of, now()
+     FROM unnest($3::date[], $4::numeric[]) AS t(as_of, rate)
+     ON CONFLICT (from_currency, to_currency, as_of) DO NOTHING`,
+    [from, to, series.map((r) => r.date), series.map((r) => r.rate)]
+  );
