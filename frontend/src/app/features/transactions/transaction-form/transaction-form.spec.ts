@@ -331,6 +331,17 @@ describe('TransactionForm transfer accounts', () => {
     expect(configure({ debit_account: a }, [a, c]).canTransfer()).toBe(true);
   });
 
+  it("keeps a saved transfer's accounts and amounts when it opens", () => {
+    const usdt = { id: 14, name: 'Ledger', currency: 'USDT', scale: 6 };
+    const form = configure({ id: 9, debit_account: a, credit_account: usdt, debit: 980000, credit: 12000 }, [a, b, usdt], [14]);
+    TestBed.tick();
+    const c = form.form.controls;
+    expect(c.toAccount.value).toEqual(usdt);
+    expect(c.creditAmount.value).toBe(12000);
+    expect(c.creditAmount.disabled).toBe(true);
+    expect(form.isSameCurrency()).toBe(false);
+  });
+
   it('leaves the other side alone for a different account', () => {
     const form = transfer();
     form.form.controls.fromAccount.setValue(c);

@@ -275,9 +275,10 @@ export class TransactionForm {
         }
         break;
       case TransactionType.Transfer:
-        if (fromAccount) {
+        // Only an empty side is filled in: a saved transfer keeps its accounts.
+        if (fromAccount && !toAccount) {
           c.toAccount.setValue(this.transferPeer(fromAccount, 'debit_account'));
-        } else if (toAccount) {
+        } else if (toAccount && !fromAccount) {
           c.fromAccount.setValue(this.transferPeer(toAccount, 'credit_account'));
         }
         break;
