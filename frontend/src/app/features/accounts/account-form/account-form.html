@@ -32,7 +32,7 @@
     </div>
 
     @if (hasTransactions && !tracked()) {
-        <p class="hint">The account has transactions: to correct its balance, add a correcting transaction.</p>
+        <p class="hint">The account has transactions: its currency and start balance are fixed. To correct its balance, add a correcting transaction.</p>
     }
 
     @if (type() === 'bank') {

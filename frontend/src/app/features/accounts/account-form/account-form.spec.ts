@@ -206,7 +206,8 @@ describe('AccountForm start balance with transactions', () => {
 
     expect(form.hasTransactions).toBe(true);
     expect(form.form.controls.startBalance.disabled).toBe(true);
-    expect(form.buildPayload()).toMatchObject({ startBalance: 50 });
+    expect(form.form.controls.currency.disabled).toBe(true);
+    expect(form.buildPayload()).toMatchObject({ startBalance: 50, currency: 'USD' });
   });
 
   it('keeps it locked, at the stored value, when sync is switched off again', () => {
@@ -223,6 +224,7 @@ describe('AccountForm start balance with transactions', () => {
 
     expect(form.hasTransactions).toBe(false);
     expect(form.form.controls.startBalance.enabled).toBe(true);
+    expect(form.form.controls.currency.enabled).toBe(true);
   });
 });
 

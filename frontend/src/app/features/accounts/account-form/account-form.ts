@@ -200,9 +200,14 @@ export class AccountForm {
         startBalance.setValue(data?.start_balance ?? 0);
         currency.setValue(data?.currency ?? '');
       }
-      if (this.hasTransactions) startBalance.disable();
-      else startBalance.enable();
-      currency.enable();
+      // The backend refuses both once the account has transactions.
+      if (this.hasTransactions) {
+        startBalance.disable();
+        currency.disable();
+      } else {
+        startBalance.enable();
+        currency.enable();
+      }
     }
   }
 

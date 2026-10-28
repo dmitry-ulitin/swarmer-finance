@@ -266,6 +266,12 @@ export const updateAccount = async (
   // and reconcile the rows already here.
   const enablesTracking = provider !== null && !wasTracked;
   const walletChanges = provider !== null && !sameWallet;
+  // Stored amounts carry no currency of their own: a new one would relabel
+  // every row. A wallet switch is the exception, its next sync reconciles
+  // every row with the chain.
+  if (currency !== existing.currency && !walletChanges && await hasTransactions()) {
+    throw { statusCode: 400, message: 'Cannot change the currency: the account already has transactions' };
+  }
 
   const startBalance = enablesTracking
     ? 0

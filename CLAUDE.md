@@ -116,8 +116,9 @@ All API responses use this envelope format consistently.
   lock the field.
 - An account's `scale` (decimal places of its stored integers) is set by the
   backend from the currency (`services/currencyScale.ts`: ISO minor units,
-  BTC/ETH 8, USDT/USDC/TRX 6, SOL/TON 9); the API does not accept it, and a
-  currency change that would rescale existing transactions is refused.
+  BTC/ETH 8, USDT/USDC/TRX 6, SOL/TON 9); the API does not accept it. Once an
+  account has transactions its currency cannot change (400; the form locks
+  it), except a never-synced tracked wallet's switch, which the sync reconciles.
 - Transactions created in migration 004: `debit`/`credit` stored as **INTEGERs** at the account's scale; `debit_account_id` and `credit_account_id` (both nullable); `category_id` (nullable)
 - `account_shares` added in migration 009: `(account_id, user_id, level)`,
   level 1 = read, 2 = transactions, 3 = admin. The owner is **not** stored

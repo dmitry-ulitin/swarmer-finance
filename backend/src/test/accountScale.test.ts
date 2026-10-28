@@ -92,9 +92,16 @@ describe('Account scale follows the currency', () => {
     expect(res.body.error).toMatch(/scale/);
   });
 
-  it('allows a currency change between currencies of the same scale', async () => {
+  it('refuses a currency change of the same scale once there are transactions', async () => {
     const created = await create('EUR');
     await addTransaction(created.body.data.id);
+    const res = await update(created.body.data.id, 'USD');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Cannot change the currency: the account already has transactions');
+  });
+
+  it('allows a currency change of the same scale without transactions', async () => {
+    const created = await create('EUR');
     const res = await update(created.body.data.id, 'USD');
     expect(res.status).toBe(200);
   });
