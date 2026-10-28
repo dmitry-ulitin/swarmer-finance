@@ -149,7 +149,8 @@ All API responses use this envelope format consistently.
   or before D plus the net flow dated after V, else the transactional
   balance; `invested` is that balance, and `balance` in `/api/accounts` is the
   value today (all flows, future-dated ones included). Before its first
-  transaction (else `created_at`) an account is worth 0 in history.
+  transaction (else `created_at`) `invested` is 0 in history, but a valuation
+  dated earlier still counts for the value.
 - Whether an account counts toward a user's net worth is personal:
   `account_user_settings` (`in_net_worth`), set by any member through
   `PUT /api/accounts/:id/net-worth`; without a row it is on for levels 3-4
@@ -158,10 +159,13 @@ All API responses use this envelope format consistently.
   (never null: an account with no rate is skipped and sets `approximate`),
   `byType`, `byCurrency`, `accounts[]` (every visible non-deleted account,
   selected or not, with value, invested, gain and `gainPct`, null when
-  nothing was invested) and a monthly `history` computed on request: the
+  nothing was invested or the account has no valuation) and a monthly `history` computed on request: the
   last day of each month from the earliest start or valuation among selected
   accounts, rates from `getRatesOn`, then a today point that equals the
-  accounts list. Deleted accounts count in history only.
+  accounts list. Deleted accounts count in history only, and add 0 after
+  their last flow or valuation date (a stale valuation does not linger). An
+  account worth 0 on a month-end needs no rate and never sets `approximate`;
+  rates are requested per currency only for dates with a non-zero value.
 - System category **Network fees** (id 5, under Expenses) seeded in
   migration 012; ids 1–5 are protected from edit/delete.
 

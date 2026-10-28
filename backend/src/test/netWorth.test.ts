@@ -140,7 +140,7 @@ describe('GET /api/net-worth', () => {
       value: 1500, valueUser: 1500, invested: 1000, gain: 500, gainPct: 50, inNetWorth: true,
     });
     const bankRow = data.accounts.find((a: { id: number }) => a.id === bank);
-    expect(bankRow.gainPct).toBe(0);
+    expect(bankRow.gainPct).toBeNull();
   });
 
   it('gives gainPct null when nothing was invested', async () => {
@@ -183,6 +183,43 @@ describe('GET /api/net-worth', () => {
     expect(data.total).toBe(300);
     expect(data.accounts.map((a: { id: number }) => a.id)).toEqual([live]);
     expect(data.byType).toEqual([{ type: 'cash', value: 300 }]);
+  });
+
+  it('gives a deleted account no value after it was closed out', async () => {
+    const live = await makeAccount('Live', 'EUR', 'cash');
+    const dep = await makeAccount('Deposit', 'EUR', 'deposit');
+    await income(dep, 1000000, '2026-03-10');
+    await pool.query(
+      `INSERT INTO account_valuations (account_id, as_of, value, user_id) VALUES ($1, '2026-04-15', 1050000, $2)`,
+      [dep, userId]
+    );
+    await transfer(dep, live, 1000000, '2026-06-05');
+    await pool.query('UPDATE accounts SET deleted = true WHERE id = $1', [dep]);
+
+    const data = await get();
+    expect(point(data, '2026-04-30').byType.deposit).toBe(10500);
+    expect(point(data, '2026-05-31').byType.deposit).toBe(10500);
+    for (const d of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-30']) {
+      expect(point(data, d).byType.deposit).toBe(0);
+    }
+  });
+
+  it('needs no rate for an account worth zero', async () => {
+    const cash = await makeAccount('Cash', 'EUR', 'cash');
+    const odd = await makeAccount('Odd', 'XYZ', 'cash');
+    await income(cash, 10000, '2026-08-15');
+    await income(odd, 5000, `${todayUtc().slice(0, 7)}-01`);
+
+    const data = await get();
+    expect(data.history.filter((p: any) => p.date < todayUtc()).every((p: any) => !p.approximate)).toBe(true);
+    expect(data.approximate).toBe(true);
+  });
+
+  it('gives gainPct only for accounts with a valuation', async () => {
+    const bank = await makeAccount('Bank', 'EUR', 'bank');
+    await income(bank, 10000, '2026-08-01');
+    const row = (await get()).accounts.find((a: { id: number }) => a.id === bank);
+    expect(row).toMatchObject({ gain: 0, gainPct: null });
   });
 
   it('skips an account with no rate and marks the result approximate', async () => {

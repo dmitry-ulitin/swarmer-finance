@@ -7,7 +7,7 @@ import { accountStartDate, accountValueAt, AccountValueInput } from './accountVa
 import { getAccessMap } from './access';
 import { isInNetWorth } from './accounts';
 import { convertAmount, getRatesOn, getRatesTo, toDecimal } from './currency';
-import { addDays, todayUtc } from './date';
+import { todayUtc } from './date';
 import { Account, AccountType } from '../types';
 
 const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
@@ -91,14 +91,39 @@ export const getNetWorth = async (userId: number): Promise<NetWorthDto> => {
   // Past month-ends, then today.
   const starts = selected.flatMap(a => [inputs.get(a.id)!.startDate!, ...inputs.get(a.id)!.valuations.map(v => v.as_of)]);
   const dates = starts.length ? monthEnds(starts.sort()[0], today) : [];
-  const pastRates = await getRatesOn(target, selected.map(a => a.currency), dates);
+  // A deleted account was emptied before it was deleted: it adds nothing
+  // after its last flow or valuation, whatever a stale valuation says.
+  const closedAfter = (a: Account): string | null => {
+    if (!a.deleted) return null;
+    const input = inputs.get(a.id)!;
+    return [input.flows.at(-1)?.date, input.valuations.at(-1)?.as_of].filter(Boolean).sort().at(-1) ?? null;
+  };
+  const values = new Map<string, number>(); // `${account}|${date}`, non-zero only
+  const datesOf = new Map<string, Set<string>>(); // currency -> dates needing a rate
+  for (const account of selected) {
+    const closed = closedAfter(account);
+    for (const date of dates) {
+      if (closed !== null && date > closed) continue;
+      const { value } = accountValueAt(inputs.get(account.id)!, date);
+      if (value === 0) continue;
+      values.set(`${account.id}|${date}`, value);
+      if (!datesOf.has(account.currency)) datesOf.set(account.currency, new Set());
+      datesOf.get(account.currency)!.add(date);
+    }
+  }
+  const pastRates = new Map<string, Map<string, { rate: number; approximate: boolean } | null>>();
+  for (const [currency, set] of datesOf) {
+    const got = await getRatesOn(target, [currency], [...set]);
+    pastRates.set(currency, got.get(currency)!);
+  }
   const history: NetWorthDto['history'] = dates.map(date => {
     const point = { total: 0, byType: emptyByType(), approximate: false };
     for (const account of selected) {
+      const value = values.get(`${account.id}|${date}`);
+      if (value === undefined) continue;
       const rate = pastRates.get(account.currency)?.get(date) ?? null;
       if (!rate) { point.approximate = true; continue; }
       if (rate.approximate) point.approximate = true;
-      const { value } = accountValueAt(inputs.get(account.id)!, date);
       const converted = convertAmount(value, account.scale, rate.rate, userScale)!;
       point.total += converted;
       point.byType[account.type] += converted;
@@ -119,15 +144,17 @@ export const getNetWorth = async (userId: number): Promise<NetWorthDto> => {
     approximate,
     byType: [...byType].map(([type, value]) => ({ type, value: toDecimal(value, userScale) })),
     byCurrency: [...byCurrency].map(([currency, value]) => ({ currency, value: toDecimal(value, userScale) })),
-    accounts: rows.map(({ account, value, invested, valueUser, inNetWorth }) => ({
+    accounts: rows.map(({ account, value, invested, valueUser, inNetWorth }) => {
+      const hasValuation = inputs.get(account.id)!.valuations.length > 0;
+      return {
       id: account.id, name: account.name, type: account.type, currency: account.currency,
       value: toDecimal(value, account.scale),
       valueUser: valueUser === null ? null : toDecimal(valueUser, userScale),
       invested: toDecimal(invested, account.scale),
       gain: toDecimal(value - invested, account.scale),
-      gainPct: invested > 0 ? Math.round((value - invested) / invested * 10000) / 100 : null,
+      gainPct: hasValuation && invested > 0 ? Math.round((value - invested) / invested * 10000) / 100 : null,
       inNetWorth,
-    })),
+    }; }),
     history,
   };
 };

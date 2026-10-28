@@ -146,20 +146,23 @@ const wasAttempted = (from: string, to: string, date: string) => {
 // Fetches the day rates for `from`->`to` over start..end with the first
 // provider that has them, and caches each. A throwing provider is logged and
 // the next one tried.
-async function fetchSeriesInto(from: string, to: string, start: string, end: string) {
+async function fetchSeriesInto(from: string, to: string, start: string, end: string): Promise<boolean> {
+  let clean = true;
   for (const provider of PROVIDERS) {
     try {
       const series = await provider.fetchSeries(from, to, start, end);
       if (series) {
         await exchangeRateQueries.insertHistoricalRates(from, to, series);
-        return;
+        return clean;
       }
     } catch (error: unknown) {
+      clean = false;
       const message =
         error && typeof error === 'object' && 'message' in error ? error.message : String(error);
       console.error(`Failed to fetch exchange rate history ${from}->${to}:`, message);
     }
   }
+  return clean;
 }
 
 /**
@@ -206,14 +209,14 @@ export async function getRatesOn(
       (d) => !exactOn(rows, d) && !wasAttempted(currency, target, d)
     );
     if (missing.length > 0) {
-      await fetchSeriesInto(
+      const clean = await fetchSeriesInto(
         currency,
         target,
         addDays(missing[0], -EXACT_WINDOW_DAYS),
         missing[missing.length - 1]
       );
       const now = Date.now();
-      for (const d of missing) attempted.set(attemptKey(currency, target, d), now);
+      if (clean) for (const d of missing) attempted.set(attemptKey(currency, target, d), now);
       rows = await load();
     }
 

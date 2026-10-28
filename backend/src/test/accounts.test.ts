@@ -414,7 +414,7 @@ describe('Accounts API — balance field', () => {
         .set({ Authorization: `Bearer ${token}` });
 
       expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/non-zero balance/);
+      expect(res.body.error).toMatch(/non-zero transaction balance/);
 
       // Verify the row is still active
       const r = await pool.query('SELECT deleted FROM accounts WHERE id = $1', [id]);

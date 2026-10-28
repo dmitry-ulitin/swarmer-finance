@@ -111,6 +111,18 @@ describe('getRatesOn', () => {
     err.mockRestore();
   });
 
+  it('retries after a provider threw instead of remembering the attempt', async () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const failing = jest.fn().mockRejectedValue(new Error('down'));
+    global.fetch = failing as unknown as typeof fetch;
+    await getRatesOn(TARGET, ['USD'], [FRIDAY]);
+    const first = failing.mock.calls.length;
+    expect(first).toBeGreaterThan(0);
+    await getRatesOn(TARGET, ['USD'], [FRIDAY]);
+    expect(failing.mock.calls.length).toBeGreaterThan(first);
+    err.mockRestore();
+  });
+
   it('does not disturb the latest rate', async () => {
     const { getLatestRate } = await import('../db/queries/exchangeRates');
     await pool.query(

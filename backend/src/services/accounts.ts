@@ -345,7 +345,7 @@ export const deleteAccount = async (
   if (balance !== 0) {
     throw {
       statusCode: 409,
-      message: `Account has a non-zero balance (${balance}) and transactions; cannot delete`,
+      message: `Account has a non-zero transaction balance (${balance}) and transactions; cannot delete`,
     };
   }
 
