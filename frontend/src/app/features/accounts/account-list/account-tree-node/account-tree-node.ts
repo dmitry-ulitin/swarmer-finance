@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { MoneyPipe } from '../../../../core/money.pipe';
 import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, collectAccounts, collectUserBalance, sumByCurrency } from '../../../../core/account-tree';
 import { amountsHint } from '../../../../core/money-hint';
+import { gainPct } from '../../../../core/account-gain';
 import { AccountListStore } from '../account-list.store';
 import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';
@@ -72,6 +73,14 @@ export class AccountTreeNode {
   /** Importing and syncing take write access. */
   protected canWrite(account: Account): boolean {
     return accessLevelOf(account) >= 2;
+  }
+
+  /** Rounded gain of a valued account, e.g. '+30%' or '−5%'; null when it has none. */
+  protected gain(account: Account): { text: string; positive: boolean } | null {
+    const pct = gainPct(account);
+    if (pct === null) return null;
+    const rounded = Math.round(pct);
+    return { text: `${rounded < 0 ? '−' : '+'}${Math.abs(rounded)}%`, positive: rounded >= 0 };
   }
 
   protected onImport(account: Account): void {

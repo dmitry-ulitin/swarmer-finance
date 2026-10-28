@@ -38,6 +38,19 @@ describe('AccountForm payload', () => {
     });
   });
 
+  it('offers the valued account types', () => {
+    const form = createForm({ currency: 'USD' });
+    expect(form.accountTypes).toEqual(expect.arrayContaining(['investment', 'property', 'deposit']));
+    expect(form.typeLabel('investment')).toBe('Investment');
+  });
+
+  it.each(['investment', 'property', 'deposit'] as const)('sends empty settings for a %s account', type => {
+    const form = createForm({ currency: 'USD' });
+    form.form.patchValue({ name: 'X', currency: 'USD', startBalance: 0, type });
+
+    expect(form.buildPayload()).toEqual({ name: 'X', currency: 'USD', startBalance: 0, type, settings: {} });
+  });
+
   it('sends a typed currency trimmed and upper-cased', () => {
     const form = createForm({ currency: 'USD' });
     form.form.patchValue({ name: 'Wallet', currency: ' usdt ', startBalance: 0 });

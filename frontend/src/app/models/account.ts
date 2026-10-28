@@ -1,6 +1,6 @@
 import type { BankLink } from './bank';
 
-export type AccountType = 'cash' | 'bank' | 'crypto';
+export type AccountType = 'cash' | 'bank' | 'crypto' | 'investment' | 'property' | 'deposit';
 
 /** 1 read, 2 transactions, 3 admin, 4 owner. */
 export type AccessLevel = 1 | 2 | 3 | 4;
@@ -23,6 +23,9 @@ export interface AccountSettings {
   cash: Record<string, never>;
   bank: { accountNumber?: string };
   crypto: { address?: string; blockchain?: string };
+  investment: Record<string, never>;
+  property: Record<string, never>;
+  deposit: Record<string, never>;
 }
 
 interface AccountBase {
@@ -34,6 +37,12 @@ interface AccountBase {
   start_balance: number;
   balance: number;
   user_balance: number | null;
+  /** Money put in, in the account currency; equals `balance` until a valuation is recorded. */
+  invested?: number;
+  /** Date (YYYY-MM-DD) of the latest valuation; null when there is none. */
+  last_valuation_date?: string | null;
+  /** Whether the account counts toward the user's net worth. */
+  in_net_worth?: boolean;
   deleted: boolean;
   created_at: string;
   /**

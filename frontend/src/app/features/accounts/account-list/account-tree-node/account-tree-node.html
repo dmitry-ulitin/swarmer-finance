@@ -35,6 +35,9 @@
         Sync
       </button>
       }
+      @if (gain(account); as g) {
+        <span class="row-gain" [class.negative]="!g.positive">{{ g.text }}</span>
+      }
       @if (account.balance !== null) {
         @if (accountHint(); as hint) {
           <span class="row-balance" [tuiHint]="hint">{{ account.balance | money: account.currency : account.scale }}</span>

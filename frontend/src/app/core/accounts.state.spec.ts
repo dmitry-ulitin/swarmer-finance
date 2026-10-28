@@ -41,3 +41,53 @@ describe('AccountsState when the load fails', () => {
     expect(state.accounts().map(a => a.id)).toEqual([1]);
   });
 });
+
+describe('AccountsState net worth', () => {
+  const acc = (id: number, user_balance: number | null, in_net_worth: boolean) =>
+    ({ id, name: `A${id}`, type: 'cash', settings: {}, currency: 'EUR', deleted: false, user_balance, in_net_worth });
+  let setInNetWorth: ReturnType<typeof vi.fn>;
+  let getAccounts: ReturnType<typeof vi.fn>;
+  let state: AccountsState;
+
+  function setup(accounts: unknown[]) {
+    getAccounts = vi.fn(() => of({ data: accounts, error: null }));
+    setInNetWorth = vi.fn(() => of({ id: 1 }));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ApiService, useValue: { getAccounts, setInNetWorth } },
+        { provide: AuthService, useValue: { isAuthenticated: signal(true), user: signal({ currency: 'EUR', currency_scale: 2 }) } },
+        { provide: NotificationService, useValue: { showError: vi.fn() } },
+      ],
+    });
+    state = TestBed.inject(AccountsState);
+  }
+
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('sums only accounts in net worth', async () => {
+    setup([acc(1, 100, true), acc(2, 50, false)]);
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(state.summary()).toEqual({ currency: 'EUR', scale: 2, total: 100, incomplete: false });
+  });
+
+  it('ignores a missing rate on a deselected account', async () => {
+    setup([acc(1, 100, true), acc(2, null, false)]);
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(state.summary()).toEqual({ currency: 'EUR', scale: 2, total: 100, incomplete: false });
+  });
+
+  it('is incomplete when a selected account has no rate', async () => {
+    setup([acc(1, 100, true), acc(2, null, true)]);
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(state.summary()?.incomplete).toBe(true);
+  });
+
+  it('reloads the accounts after changing the selection', async () => {
+    setup([acc(1, 100, true)]);
+    await TestBed.inject(ApplicationRef).whenStable();
+    await new Promise<void>(resolve => state.setInNetWorth(1, false).subscribe({ complete: resolve }));
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(setInNetWorth).toHaveBeenCalledWith(1, false);
+    expect(getAccounts).toHaveBeenCalledTimes(2);
+  });
+});

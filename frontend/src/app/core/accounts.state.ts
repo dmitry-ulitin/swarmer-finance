@@ -52,7 +52,7 @@ export class AccountsState {
   readonly summary = computed<BalanceSummary | null>(() => {
     const user = this.auth.user();
     if (!user) return null;
-    const accounts = this.visibleAccounts();
+    const accounts = this.visibleAccounts().filter(a => a.in_net_worth);
     const incomplete = accounts.some(a => a.user_balance === null);
     const total = incomplete ? 0 : accounts.reduce((sum, a) => sum + (a.user_balance ?? 0), 0);
     return { currency: user.currency, scale: user.currency_scale, total, incomplete };
@@ -83,6 +83,10 @@ export class AccountsState {
 
   purgeTransactions(id: number) {
     return this.api.purgeAccountTransactions(id).pipe(tap(() => this.reload()));
+  }
+
+  setInNetWorth(id: number, include: boolean) {
+    return this.api.setInNetWorth(id, include).pipe(tap(() => this.reload()));
   }
 
   deleteWithTransactions(id: number) {

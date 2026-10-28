@@ -14,7 +14,7 @@ import { currencyScale } from '../../../core/currency-scale';
 import { ApiService } from '../../../core/api.service';
 import type { BankConnection } from '../../../models/bank';
 
-const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto'];
+const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
 
 /** A bank account the app account can load from; key '' is "not linked". */
 interface BankOption {
@@ -32,6 +32,9 @@ const TYPE_LABELS: Record<AccountType, string> = {
   cash: 'Cash',
   bank: 'Bank',
   crypto: 'Crypto',
+  investment: 'Investment',
+  property: 'Property',
+  deposit: 'Deposit',
 };
 
 /** The combo box takes free text; the backend wants an upper-case code. */
@@ -242,6 +245,10 @@ export class AccountForm {
           },
         };
       }
+      case 'investment':
+      case 'property':
+      case 'deposit':
+        return { ...base, ...this.unlinkIfLinked(), type: raw.type, settings: {} };
       default:
         return { ...base, ...this.unlinkIfLinked(), type: 'cash', settings: {} };
     }

@@ -63,6 +63,10 @@ export class ApiService {
     return this.http.put<ApiResponse<Account>>(`/api/accounts/${id}`, data);
   }
 
+  setInNetWorth(id: number, include: boolean): Observable<ApiResponse<Account>> {
+    return this.http.put<ApiResponse<Account>>(`/api/accounts/${id}/net-worth`, { include });
+  }
+
   deleteAccount(id: number): Observable<ApiResponse<{ success: boolean }>> {
     return this.http.delete<ApiResponse<{ success: boolean }>>(`/api/accounts/${id}`);
   }

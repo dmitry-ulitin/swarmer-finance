@@ -76,3 +76,13 @@
         color: var(--tui-text-primary);
     };
 }
+
+.row-gain {
+  flex-shrink: 0;
+  color: var(--tui-status-positive);
+  font-size: 0.8rem;
+
+  &.negative {
+    color: var(--tui-status-negative);
+  }
+}
