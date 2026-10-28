@@ -170,6 +170,21 @@ export class TransactionForm {
     if (this.isNetworkFee) {
       c.category.disable();
     }
+    // A same-currency transfer shows one amount, saved to both sides: with
+    // the credit side synced, that amount is the chain's and cannot change.
+    if (this.lock.creditLocked) {
+      effect(() => {
+        const mirrored = this.isTransfer() && this.isSameCurrency();
+        untracked(() => {
+          if (mirrored) {
+            c.debitAmount.setValue(c.creditAmount.value);
+            c.debitAmount.disable();
+          } else {
+            c.debitAmount.enable();
+          }
+        });
+      });
+    }
     this.swapOnClash(c.fromAccount, c.toAccount);
     this.swapOnClash(c.toAccount, c.fromAccount);
 

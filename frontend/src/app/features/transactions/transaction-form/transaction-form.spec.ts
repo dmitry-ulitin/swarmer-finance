@@ -191,6 +191,30 @@ describe('TransactionForm on a synced account', () => {
     expect(form.canTransfer()).toBe(true);
   });
 
+  it('locks the shared amount of a same-currency transfer into a synced wallet', () => {
+    const usdt = { id: 4, name: 'USDT wallet', currency: 'USDT', scale: 6 };
+    const debts = { id: 8, name: 'debts', currency: 'USDT', scale: 6 };
+    const eur = { id: 9, name: 'Bank', currency: 'EUR', scale: 2 };
+    const form = configure(
+      { id: 5, debit_account: debts, credit_account: usdt, debit: 10000, credit: 10000 },
+      [usdt, debts, eur],
+      [4]
+    );
+    const c = form.form.controls;
+    TestBed.tick();
+    expect(c.debitAmount.disabled).toBe(true);
+
+    c.fromAccount.setValue(eur);
+    TestBed.tick();
+    expect(c.debitAmount.enabled).toBe(true);
+
+    c.debitAmount.setValue(9000);
+    c.fromAccount.setValue(debts);
+    TestBed.tick();
+    expect(c.debitAmount.disabled).toBe(true);
+    expect(c.debitAmount.value).toBe(10000);
+  });
+
   it('allows no type change on a transfer between synced wallets', () => {
     const other = { id: 2, name: 'Hot', currency: 'BTC', scale: 8 };
     const form = configure({ id: 6, debit_account: wallet, credit_account: other }, [wallet, other], [1, 2]);
