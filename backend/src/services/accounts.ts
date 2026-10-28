@@ -206,7 +206,12 @@ export const updateAccount = async (
   const nextCurrency = data.currency ?? existing.currency;
   if (linkChanges && data.bankLink) {
     await checkLink(userId, { type: data.type, currency: nextCurrency }, data.bankLink);
-  } else if (currentLink && !linkChanges && (data.type !== existing.type || nextCurrency !== existing.currency)) {
+  } else if (currentLink && !linkChanges && (
+    data.type !== existing.type
+    // A multi-currency bank account fits any currency; the connection's
+    // owner need not be the one changing it.
+    || (nextCurrency !== existing.currency && currentLink.acc_currency !== 'XXX')
+  )) {
     // The link was checked against the old type and currency.
     throw { statusCode: 400, message: 'Unlink the bank first' };
   }

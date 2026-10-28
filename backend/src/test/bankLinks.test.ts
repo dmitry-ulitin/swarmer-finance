@@ -234,6 +234,21 @@ describe('bank links on accounts', () => {
     expect(res.body.error).toBe('Unlink the bank first');
   });
 
+  it('changes the currency of an account linked to a multi-currency bank account', async () => {
+    const owner = await register('mo');
+    const coOwner = await register('mc');
+    const acc = await makeAccount(owner.id);
+    await grant(acc, coOwner.id, 3);
+    await link(owner, acc, await makeConnection(owner.id, 'XXX'));
+    const res = await request(app)
+      .put(`/api/accounts/${acc}`)
+      .set(auth(coOwner))
+      .send({ name: 'Acc', currency: 'EUR', type: 'bank', settings: {} });
+    expect(res.status).toBe(200);
+    expect(res.body.data.currency).toBe('EUR');
+    expect(res.body.data.bank_link).toMatchObject({ currency: 'XXX' });
+  });
+
   it('changes the currency together with a matching new link', async () => {
     const u = await register('cl');
     const acc = await makeAccount(u.id);
