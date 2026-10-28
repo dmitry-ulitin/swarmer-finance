@@ -17,6 +17,10 @@
     @if (filteredAccount(); as account) {
     <button tuiOption (click)="editFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.pencil'" [disabled]="!canEditFiltered()">{{ account.name }}</button>
     <button tuiOption (click)="shareFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.users'">Sharing</button>
+    @if (isValued(account)) {
+    <button tuiOption (click)="valuationsFiltered();settingsButton.click()" [iconEnd]="'@tui.line-chart'" [disabled]="!canWriteFiltered()">Valuations</button>
+    }
+    <button tuiOption (click)="toggleNetWorthFiltered();settingsButton.click()" [iconEnd]="'@tui.scale'">{{ account.in_net_worth ? 'Exclude from net worth' : 'Include in net worth' }}</button>
     @if (account.type === 'bank' && canWriteFiltered()) {
     <button tuiOption (click)="importFilteredAccount();settingsButton.click()" [iconEnd]="'@tui.download'">Import</button>
     }

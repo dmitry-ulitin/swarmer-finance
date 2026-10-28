@@ -1,3 +1,4 @@
+import { of } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -14,27 +15,30 @@ import { AccountSyncService } from '../accounts/account-sync.service';
 const wallet = { id: 7, name: 'Wallet' };
 const shared = { id: 9, name: 'Shared', access_level: 2 };
 const readOnly = { id: 10, name: 'Read only', access_level: 1 };
-const accounts = [wallet, { id: 8, name: 'Cash' }, shared, readOnly];
+const fund = { id: 11, name: 'Fund', type: 'investment', access_level: 2, in_net_worth: false };
+const accounts = [fund, wallet, { id: 8, name: 'Cash' }, shared, readOnly];
 
 function configure(selectedAccountIds: number[], selectedTransaction: unknown = null) {
   const openSharing = vi.fn(async () => {});
   const openEdit = vi.fn(async () => {});
   const openImport = vi.fn(async () => {});
   const sync = vi.fn(async () => {});
+  const openValuations = vi.fn(async () => {});
+  const setInNetWorth = vi.fn(() => of({ data: null, error: null }));
   TestBed.configureTestingModule({
     providers: [
       Header,
       { provide: AuthService, useValue: {} },
-      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(accounts), trackedIds: signal(new Set()) } },
+      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(accounts), trackedIds: signal(new Set()), setInNetWorth } },
       { provide: TransactionsState, useValue: { selectedAccountIds: signal(selectedAccountIds), selectedTransaction: signal(selectedTransaction) } },
       { provide: CategoryDialogService, useValue: {} },
-      { provide: AccountDialogService, useValue: { openSharing, openEdit } },
+      { provide: AccountDialogService, useValue: { openSharing, openEdit, openValuations } },
       { provide: TransactionDialogService, useValue: {} },
       { provide: ImportDialogService, useValue: { open: openImport } },
       { provide: AccountSyncService, useValue: { sync } },
     ],
   });
-  return { header: TestBed.inject(Header), openSharing, openEdit, openImport, sync };
+  return { header: TestBed.inject(Header), openValuations, setInNetWorth, openSharing, openEdit, openImport, sync };
 }
 
 describe('Header sharing', () => {
@@ -111,5 +115,27 @@ describe('Header transaction actions', () => {
   it('offers neither on a read-only expense', () => {
     const { header } = configure([], { id: 1, debit_account: readOnly, credit_account: null });
     expect(header.canWrite()).toBe(false);
+  });
+});
+
+describe('Header net worth', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('opens valuations for a valued account with write access', () => {
+    const { header, openValuations } = configure([11]);
+    header.valuationsFiltered();
+    expect(openValuations).toHaveBeenCalledWith(fund);
+  });
+
+  it('does not open valuations for a plain account', () => {
+    const { header, openValuations } = configure([9]);
+    header.valuationsFiltered();
+    expect(openValuations).not.toHaveBeenCalled();
+  });
+
+  it('toggles net worth inclusion', () => {
+    const { header, setInNetWorth } = configure([11]);
+    header.toggleNetWorthFiltered();
+    expect(setInNetWorth).toHaveBeenCalledWith(11, true);
   });
 });

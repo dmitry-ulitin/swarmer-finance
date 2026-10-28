@@ -1,0 +1,45 @@
+<div class="valuations" tuiTextfieldSize="s">
+    <tui-loader [loading]="loading()">
+        @if (!loading() && rows().length === 0) {
+            <p class="empty">No valuations yet.</p>
+        }
+        <ul class="rows">
+            @for (row of rows(); track row.id) {
+                <li class="row" data-test="row">
+                    <span class="date" data-test="date">{{ row.as_of }}</span>
+                    <span class="amount">{{ row.value | money: account.currency : account.scale }}</span>
+                    @if (canWrite) {
+                        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" aria-label="Edit" data-test="edit"
+                            [disabled]="busy()" (click)="edit(row)"></button>
+                        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" aria-label="Delete" data-test="delete"
+                            [disabled]="busy()" (click)="remove(row)"></button>
+                    }
+                </li>
+            }
+        </ul>
+    </tui-loader>
+
+    @if (canWrite) {
+        <form [formGroup]="form" (ngSubmit)="submit()" class="add">
+            <tui-textfield>
+                <label tuiLabel>Date</label>
+                <input tuiInputDate formControlName="date" />
+                <tui-calendar *tuiDropdown />
+            </tui-textfield>
+            <tui-textfield>
+                <label tuiLabel>Value, {{ account.currency }}</label>
+                <input tuiInputNumber formControlName="value" [min]="0" [quantum]="quantum"
+                    [tuiNumberFormat]="{ precision: precision }" placeholder="0.00" />
+            </tui-textfield>
+            <button tuiButton type="submit" size="s" [disabled]="busy() || form.invalid" data-test="save">
+                {{ editingId() === null ? 'Add' : 'Save' }}
+            </button>
+            @if (editingId() !== null) {
+                <button tuiButton type="button" size="s" appearance="flat" [disabled]="busy()" (click)="cancelEdit()">Cancel</button>
+            }
+        </form>
+        @if (error(); as message) {
+            <p class="error" data-test="error">{{ message }}</p>
+        }
+    }
+</div>

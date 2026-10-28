@@ -81,6 +81,21 @@ export class AccountDialogService {
     }
   }
 
+  async openValuations(account: Account): Promise<void> {
+    try {
+      const { AccountValuations } = await import('./account-valuations/account-valuations');
+      await firstValueFrom(
+        this.dialogs.open<void>(
+          new PolymorpheusComponent(AccountValuations, this.injector),
+          { data: account, label: `Valuations: ${account.name}`, size: 's' }
+        ),
+        { defaultValue: undefined }
+      );
+    } catch (e) {
+      this.notifications.showError(e, 'Failed to open valuations');
+    }
+  }
+
   async openDelete(account: Account): Promise<boolean> {
     const data: TuiConfirmData = {
       content: `Are you sure you want to delete "${account.name}"?`,

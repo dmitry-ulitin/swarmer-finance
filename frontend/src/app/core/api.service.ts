@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Category, CategoryCreatePayload, CategoryDeletePreview, CategoryUpdatePayload } from '../models/category';
+import type { Valuation, ValuationPayload } from '../models/valuation';
 import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareLevel } from '../models/account';
 import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
@@ -97,6 +98,22 @@ export class ApiService {
 
   removeAccountShare(accountId: number, userId: number): Observable<ApiResponse<AccountMember[]>> {
     return this.http.delete<ApiResponse<AccountMember[]>>(`/api/accounts/${accountId}/shares/${userId}`);
+  }
+
+  getValuations(accountId: number): Observable<ApiResponse<Valuation[]>> {
+    return this.http.get<ApiResponse<Valuation[]>>(`/api/accounts/${accountId}/valuations`);
+  }
+
+  createValuation(accountId: number, data: ValuationPayload): Observable<ApiResponse<Valuation>> {
+    return this.http.post<ApiResponse<Valuation>>(`/api/accounts/${accountId}/valuations`, data);
+  }
+
+  updateValuation(accountId: number, id: number, data: ValuationPayload): Observable<ApiResponse<Valuation>> {
+    return this.http.put<ApiResponse<Valuation>>(`/api/accounts/${accountId}/valuations/${id}`, data);
+  }
+
+  deleteValuation(accountId: number, id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`/api/accounts/${accountId}/valuations/${id}`);
   }
 
   // Transactions
