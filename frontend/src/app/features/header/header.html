@@ -1,13 +1,16 @@
 <a class="title" routerLink="/dashboard">Swarmer Finance</a>
 @if(authService.isAuthenticated()) {
-<a tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" class="light" routerLink="/net-worth" [iconStart]="'@tui.scale'">Net worth</a>
-<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="reload()" [iconStart]="'@tui.refresh-cw'" aria-label="Reload"></button>
-<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="addTransaction()" [iconStart]="'@tui.diff'" aria-label="Add transaction" [disabled]="accountState.transferTargets().length === 0"></button>
+<a tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" class="light nav" routerLink="/dashboard" routerLinkActive="active" [iconStart]="'@tui.list'">Transactions</a>
+<a tuiButton tuiTheme="dark" appearance="flat-grayscale" size="xs" class="light nav" routerLink="/net-worth" routerLinkActive="active" [iconStart]="'@tui.scale'">Net worth</a>
+@if (pageReload.hint(); as hint) {
+<span class="separator"></span>
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="pageReload.reload()" [iconStart]="'@tui.refresh-cw'" [attr.aria-label]="hint" [tuiHint]="hint" tuiHintDirection="bottom"></button>
 }
-@if(authService.isAuthenticated() && canWrite()) {
-<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="editTransaction()" [iconStart]="'@tui.pencil'" aria-label="Edit transaction"></button>
-@if (canDelete()) {
-<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="deleteTransaction()" [iconStart]="'@tui.trash-2'" aria-label="Delete transaction"></button>
+@if (onTransactions()) {
+<span class="separator"></span>
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="addTransaction()" [iconStart]="'@tui.diff'" aria-label="Add transaction" tuiHint="Add transaction" tuiHintDirection="bottom" [disabled]="accountState.transferTargets().length === 0"></button>
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="editTransaction()" [iconStart]="'@tui.pencil'" aria-label="Edit transaction" tuiHint="Edit transaction" tuiHintDirection="bottom" [disabled]="!canWrite()"></button>
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" (click)="deleteTransaction()" [iconStart]="'@tui.trash-2'" aria-label="Delete transaction" tuiHint="Delete transaction" tuiHintDirection="bottom" [disabled]="!canDelete()"></button>
 }
 }
 <div class="fill"></div>

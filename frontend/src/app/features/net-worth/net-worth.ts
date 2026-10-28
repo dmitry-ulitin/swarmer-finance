@@ -11,6 +11,7 @@ import { AccountsState } from '../../core/accounts.state';
 import { AuthService } from '../../core/auth.service';
 import { NotificationService } from '../../core/notification.service';
 import { MoneyPipe } from '../../core/money.pipe';
+import { PageReload } from '../../core/page-reload';
 import { currencyScale } from '../../core/currency-scale';
 import { TYPE_LABELS, type AccountType } from '../../models/account';
 import type { NetWorth } from '../../models/net-worth';
@@ -44,6 +45,10 @@ export class NetWorthPage {
       }
     },
   });
+
+  constructor() {
+    inject(PageReload).register('Reload net worth', () => this.resource.reload());
+  }
 
   // value() throws while the resource is in its error state.
   readonly data = computed(() => (this.resource.hasValue() ? this.resource.value() : null));

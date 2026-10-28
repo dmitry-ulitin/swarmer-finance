@@ -27,6 +27,21 @@
     white-space: nowrap;
 }
 
+.nav {
+    opacity: .75;
+}
+
+.nav.active {
+    opacity: 1;
+    background: rgb(255 255 255 / 18%);
+}
+
+.separator {
+    width: 1px;
+    height: 1.25rem;
+    background: rgb(255 255 255 / 35%);
+}
+
 .light {
     color: var(--tui-text-primary-on-accent-1);
 }

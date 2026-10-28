@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { isActive, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
-import { TuiButton, TuiDataList, TuiDropdown, TuiIcon } from '@taiga-ui/core';
+import { TuiButton, TuiDataList, TuiDropdown, TuiHint, TuiIcon } from '@taiga-ui/core';
 import { CategoryDialogService } from '../categories/category-dialog.service';
 import { AccountDialogService } from '../accounts/account-dialog.service';
 import { TransactionsState } from '../../core/transactions.state';
@@ -16,10 +16,11 @@ import { ChangePasswordDialogService } from '../auth/change-password-dialog.serv
 import { ProfileDialogService } from '../profile/profile-dialog.service';
 import { NotificationService } from '../../core/notification.service';
 import { BankDialogService } from '../bank/bank-dialog.service';
+import { PageReload } from '../../core/page-reload';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiIcon],
+  imports: [RouterLink, RouterLinkActive, TuiButton, TuiChevron, TuiDataList, TuiDropdown, TuiHint, TuiIcon],
   templateUrl: './header.html',
   styleUrl: './header.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,6 +38,9 @@ export class Header {
   private readonly notifications = inject(NotificationService);
   private readonly bankDialog = inject(BankDialogService);
   readonly sync = inject(AccountSyncService);
+  readonly pageReload = inject(PageReload);
+  /** The transaction actions belong to the transactions page only. */
+  readonly onTransactions = isActive('/dashboard', inject(Router));
 
   readonly selectedTransaction = this.transactionsState.selectedTransaction;
   /** Changing a transaction takes write access on every account it touches, as the backend requires. */
@@ -85,11 +89,6 @@ export class Header {
 
   changePassword(): void {
     void this.passwordDialog.open();
-  }
-
-  reload(): void {
-    this.accountState.reload();
-    this.transactionsState.reload();
   }
 
   accounts(): void {

@@ -92,6 +92,7 @@ All API responses use this envelope format consistently.
 - **AccountsState** (`core/accounts.state.ts`): Same pattern as CategoriesState — flat list of user accounts
 - **TransactionsState** (`core/transactions.state.ts`): filters and the paged transaction list (20 per page)
 - **ApiService** (`core/api.service.ts`): Thin HttpClient wrapper
+- **PageReload** (`core/page-reload.ts`): each page registers its own reload and tooltip text; the header's refresh button runs whatever is registered
 - **Net worth page** (`features/net-worth`, route `/net-worth`, header link): owns a `resource()` over `GET /api/net-worth`; stacked `tui-bar-chart` (`@taiga-ui/addon-charts`, imported from its subpaths, the barrel hits a circular import), breakdowns, and accounts table with the in-net-worth checkbox
 
 ### Database
