@@ -10,7 +10,7 @@ import { convertAmount, getRatesOn, getRatesTo, toDecimal } from './currency';
 import { todayUtc } from './date';
 import { Account, AccountType } from '../types';
 
-const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
+const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'];
 
 export interface NetWorthDto {
   currency: string;

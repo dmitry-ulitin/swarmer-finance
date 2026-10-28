@@ -15,7 +15,7 @@ import { currencyScale } from '../../core/currency-scale';
 import { TYPE_LABELS, type AccountType } from '../../models/account';
 import type { NetWorth } from '../../models/net-worth';
 
-const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
+const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'];
 /** Roughly how many month labels fit under the chart. */
 const MAX_LABELS = 12;
 

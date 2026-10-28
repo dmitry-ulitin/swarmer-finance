@@ -11,7 +11,7 @@ import type { NetWorth } from '../../models/net-worth';
 
 const flushAsync = () => new Promise(resolve => setTimeout(resolve));
 
-const zero = { cash: 0, bank: 0, crypto: 0, investment: 0, property: 0, deposit: 0 };
+const zero = { cash: 0, bank: 0, crypto: 0, investment: 0, property: 0, deposit: 0, debt: 0 };
 
 const data = (approximate = false): NetWorth => ({
   currency: 'EUR',

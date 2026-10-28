@@ -204,7 +204,7 @@ describe('Accounts API — balance field', () => {
       expect(res.body.data.currency).toBe('USDT');
     });
 
-    it.each(['investment', 'property', 'deposit'])('creates an account of type %s', async (type) => {
+    it.each(['investment', 'property', 'deposit', 'debt'])('creates an account of type %s', async (type) => {
       const res = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
@@ -571,7 +571,7 @@ describe('Accounts API — balance field', () => {
       const res = await request(app)
         .post('/api/accounts')
         .set({ Authorization: `Bearer ${token}` })
-        .send({ name: 'Debt', currency: 'USD', startBalance: 0, type: 'debt' });
+        .send({ name: 'Loan', currency: 'USD', startBalance: 0, type: 'loan' });
 
       expect(res.status).toBe(400);
     });

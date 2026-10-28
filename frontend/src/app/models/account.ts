@@ -1,6 +1,6 @@
 import type { BankLink } from './bank';
 
-export type AccountType = 'cash' | 'bank' | 'crypto' | 'investment' | 'property' | 'deposit';
+export type AccountType = 'cash' | 'bank' | 'crypto' | 'investment' | 'property' | 'deposit' | 'debt';
 
 export const TYPE_LABELS: Record<AccountType, string> = {
   cash: 'Cash',
@@ -9,6 +9,7 @@ export const TYPE_LABELS: Record<AccountType, string> = {
   investment: 'Investment',
   property: 'Property',
   deposit: 'Deposit',
+  debt: 'Debt',
 };
 
 /** 1 read, 2 transactions, 3 admin, 4 owner. */
@@ -35,6 +36,7 @@ export interface AccountSettings {
   investment: Record<string, never>;
   property: Record<string, never>;
   deposit: Record<string, never>;
+  debt: Record<string, never>;
 }
 
 interface AccountBase {

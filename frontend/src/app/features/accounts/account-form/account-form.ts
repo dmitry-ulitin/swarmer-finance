@@ -14,7 +14,7 @@ import { currencyScale } from '../../../core/currency-scale';
 import { ApiService } from '../../../core/api.service';
 import type { BankConnection } from '../../../models/bank';
 
-const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit'];
+const ACCOUNT_TYPES: readonly AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'];
 
 /** A bank account the app account can load from; key '' is "not linked". */
 interface BankOption {
@@ -239,6 +239,7 @@ export class AccountForm {
       case 'investment':
       case 'property':
       case 'deposit':
+      case 'debt':
         return { ...base, ...this.unlinkIfLinked(), type: raw.type, settings: {} };
       default:
         return { ...base, ...this.unlinkIfLinked(), type: 'cash', settings: {} };

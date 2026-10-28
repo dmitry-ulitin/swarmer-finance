@@ -39,6 +39,7 @@ const settingsByType = {
   investment: z.strictObject({}),
   property: z.strictObject({}),
   deposit: z.strictObject({}),
+  debt: z.strictObject({}),
 };
 
 // Base fields are spread into each union member rather than combined with
@@ -72,6 +73,7 @@ const createAccountSchema = z.preprocess(
     z.strictObject({ ...createBase, type: z.literal('investment'), settings: settingsByType.investment.default({}) }),
     z.strictObject({ ...createBase, type: z.literal('property'), settings: settingsByType.property.default({}) }),
     z.strictObject({ ...createBase, type: z.literal('deposit'), settings: settingsByType.deposit.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('debt'), settings: settingsByType.debt.default({}) }),
   ])
 );
 
@@ -98,6 +100,7 @@ const updateAccountSchema = z.discriminatedUnion('type', [
   z.strictObject({ ...updateBase, type: z.literal('investment'), settings: settingsByType.investment }),
   z.strictObject({ ...updateBase, type: z.literal('property'), settings: settingsByType.property }),
   z.strictObject({ ...updateBase, type: z.literal('deposit'), settings: settingsByType.deposit }),
+  z.strictObject({ ...updateBase, type: z.literal('debt'), settings: settingsByType.debt }),
 ]);
 
 const addShareSchema = z.strictObject({

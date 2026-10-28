@@ -139,8 +139,8 @@ All API responses use this envelope format consistently.
   transactions, `DELETE /api/accounts/:id?withTransactions=true` also removes
   the account. Transfers are never deleted but left to the other account as
   Uncategorized income/expense (`services/accounts.ts` `purgeAccount`).
-- Migration 019 adds the account types `investment`, `property` and
-  `deposit` (no bank link or chain tracking) and `account_valuations`
+- Migration 019 adds the account types `investment`, `property`, `deposit` and
+  `debt` (no bank link or chain tracking) and `account_valuations`
   (`account_id`, `as_of`, `value` at the account's scale, unique per day;
   `GET/POST /api/accounts/:id/valuations`, `PUT/DELETE .../:valuationId`:
   READ to read, WRITE to change, future dates 400, a second valuation on a

@@ -1,7 +1,7 @@
 ALTER TABLE accounts DROP CONSTRAINT chk_accounts_type;
 ALTER TABLE accounts
   ADD CONSTRAINT chk_accounts_type
-  CHECK (type IN ('cash', 'bank', 'crypto', 'investment', 'property', 'deposit'));
+  CHECK (type IN ('cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'));
 
 CREATE TABLE account_valuations (
   id SERIAL PRIMARY KEY,
