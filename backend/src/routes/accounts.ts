@@ -1,16 +1,18 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { validate, validateIdParam } from '../middleware/validation';
+import { isoDateSchema, validate, validateIdParam } from '../middleware/validation';
 import * as accountService from '../services/accounts';
 import * as chainSync from '../services/chainSync';
 import * as shareService from '../services/accountShares';
+import * as valuationService from '../services/valuations';
 
 const router = Router();
 
 router.use(authMiddleware);
 router.param('id', validateIdParam);
 router.param('userId', validateIdParam);
+router.param('valuationId', validateIdParam);
 
 // Currency code: 3 uppercase ASCII letters (ISO 4217, e.g. USD, EUR, GBP)
 // or 4 uppercase ASCII letters (crypto-style tickers like USDT, USDC).
@@ -208,6 +210,47 @@ router.delete('/:id/shares/:userId', async (req: AuthRequest, res, next) => {
     const targetId = parseInt(req.params.userId as string, 10);
     const members = await shareService.removeMember(id, req.userId!, targetId);
     res.json({ data: members, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const valuationSchema = z.strictObject({ asOf: isoDateSchema, value: z.number().min(0) });
+
+router.get('/:id/valuations', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    res.json({ data: await valuationService.listAccountValuations(id, req.userId!), error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/valuations', validate(valuationSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    res.json({ data: await valuationService.createValuation(id, req.userId!, req.body), error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:id/valuations/:valuationId', validate(valuationSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const vid = parseInt(req.params.valuationId as string, 10);
+    res.json({ data: await valuationService.updateValuation(id, vid, req.userId!, req.body), error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id/valuations/:valuationId', async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const vid = parseInt(req.params.valuationId as string, 10);
+    await valuationService.deleteValuation(id, vid, req.userId!);
+    res.json({ data: null, error: null });
   } catch (error) {
     next(error);
   }
