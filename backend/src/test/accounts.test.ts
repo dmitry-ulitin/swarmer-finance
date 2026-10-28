@@ -203,6 +203,25 @@ describe('Accounts API — balance field', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.currency).toBe('USDT');
     });
+
+    it.each(['investment', 'property', 'deposit'])('creates an account of type %s', async (type) => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: `T ${type}`, currency: 'EUR', startBalance: 0, type });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.type).toBe(type);
+    });
+
+    it('rejects settings on an investment account', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Inv', currency: 'EUR', startBalance: 0, type: 'investment', settings: { address: 'x' } });
+
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('POST /api/accounts — currency format validation', () => {

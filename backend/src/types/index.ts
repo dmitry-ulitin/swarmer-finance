@@ -27,7 +27,7 @@ export interface Category {
   children?: Category[];
 }
 
-export type AccountType = 'cash' | 'bank' | 'crypto';
+export type AccountType = 'cash' | 'bank' | 'crypto' | 'investment' | 'property' | 'deposit';
 
 export interface Account {
   id: number;

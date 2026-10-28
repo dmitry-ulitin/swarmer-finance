@@ -34,6 +34,9 @@ const settingsByType = {
     address: z.string().max(128).optional(),
     blockchain: z.string().max(64).optional(),
   }),
+  investment: z.strictObject({}),
+  property: z.strictObject({}),
+  deposit: z.strictObject({}),
 };
 
 // Base fields are spread into each union member rather than combined with
@@ -64,6 +67,9 @@ const createAccountSchema = z.preprocess(
     z.strictObject({ ...createBase, type: z.literal('cash'), settings: settingsByType.cash.default({}) }),
     z.strictObject({ ...createBase, type: z.literal('bank'), settings: settingsByType.bank.default({}) }),
     z.strictObject({ ...createBase, type: z.literal('crypto'), settings: settingsByType.crypto.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('investment'), settings: settingsByType.investment.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('property'), settings: settingsByType.property.default({}) }),
+    z.strictObject({ ...createBase, type: z.literal('deposit'), settings: settingsByType.deposit.default({}) }),
   ])
 );
 
@@ -87,6 +93,9 @@ const updateAccountSchema = z.discriminatedUnion('type', [
   z.strictObject({ ...updateBase, type: z.literal('cash'), settings: settingsByType.cash }),
   z.strictObject({ ...updateBase, type: z.literal('bank'), settings: settingsByType.bank }),
   z.strictObject({ ...updateBase, type: z.literal('crypto'), settings: settingsByType.crypto }),
+  z.strictObject({ ...updateBase, type: z.literal('investment'), settings: settingsByType.investment }),
+  z.strictObject({ ...updateBase, type: z.literal('property'), settings: settingsByType.property }),
+  z.strictObject({ ...updateBase, type: z.literal('deposit'), settings: settingsByType.deposit }),
 ]);
 
 const addShareSchema = z.strictObject({
