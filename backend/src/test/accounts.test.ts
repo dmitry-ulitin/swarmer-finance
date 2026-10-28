@@ -703,3 +703,85 @@ describe('Accounts API — user not found', () => {
     expect(res.body.error).toBe('User not found');
   });
 });
+
+describe('Accounts API — valuations', () => {
+  let token: string;
+  let userId: number;
+  let categoryId: number;
+  const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+
+  const originalFetch = global.fetch;
+  beforeAll(async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: day(0), rates: {} }),
+    }) as unknown as typeof fetch;
+    const email = `accval${Date.now()}@example.com`;
+    const res = await request(app).post('/api/auth/register').send({ email, password: 'password123' });
+    token = res.body.data.accessToken;
+    userId = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
+    categoryId = (await pool.query(
+      'SELECT c.id FROM categories c WHERE c.user_id = $1 AND c.parent_id = 1 LIMIT 1', [userId]
+    )).rows[0].id;
+  });
+  afterAll(async () => {
+    global.fetch = originalFetch;
+    await pool.query('DELETE FROM account_valuations WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)', [userId]);
+    await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM accounts WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM categories WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+  });
+
+  const makeAccount = async (name: string, type: string) =>
+    (await pool.query(
+      `INSERT INTO accounts (user_id, name, currency, start_balance, scale, type)
+       VALUES ($1, $2, 'USD', 0, 2, $3) RETURNING id`, [userId, name, type]
+    )).rows[0].id as number;
+  const income = (accountId: number, cents: number, date: string) =>
+    pool.query(
+      `INSERT INTO transactions (user_id, category_id, credit_account_id, debit, credit, date)
+       VALUES ($1, $2, $3, $4, $4, $5)`, [userId, categoryId, accountId, cents, date]
+    );
+  const expense = (accountId: number, cents: number, date: string) =>
+    pool.query(
+      `INSERT INTO transactions (user_id, category_id, debit_account_id, debit, credit, date)
+       VALUES ($1, $2, $3, $4, $4, $5)`, [userId, categoryId, accountId, cents, date]
+    );
+  const find = async (id: number) =>
+    (await request(app).get('/api/accounts').set(auth())).body.data.find((a: { id: number }) => a.id === id);
+
+  it('values an account by its latest valuation plus later flows', async () => {
+    const id = await makeAccount('Fund', 'investment');
+    await income(id, 100000, day(-5));
+    const v = await request(app).post(`/api/accounts/${id}/valuations`).set(auth()).send({ asOf: day(-1), value: 1200 });
+    expect(v.status).toBe(200);
+    await income(id, 10000, day(0));
+    const account = await find(id);
+    expect(account.balance).toBe(1300);
+    expect(account.invested).toBe(1100);
+    expect(account.last_valuation_date).toBe(day(-1));
+  });
+
+  it('cash account without valuations has balance equal to invested', async () => {
+    const id = await makeAccount('Cash', 'cash');
+    await income(id, 2500, day(-2));
+    const account = await find(id);
+    expect(account.balance).toBe(25);
+    expect(account.invested).toBe(25);
+    expect(account.last_valuation_date).toBeNull();
+  });
+
+  it('deletes a valued account whose invested is 0', async () => {
+    const id = await makeAccount('Round trip', 'investment');
+    await income(id, 1000, day(-5));
+    await expense(id, 1000, day(-4));
+    await request(app).post(`/api/accounts/${id}/valuations`).set(auth()).send({ asOf: day(-1), value: 50 });
+    const account = await find(id);
+    expect(account.invested).toBe(0);
+    expect(account.balance).toBe(50);
+    const res = await request(app).delete(`/api/accounts/${id}`).set(auth());
+    expect(res.status).toBe(200);
+  });
+});

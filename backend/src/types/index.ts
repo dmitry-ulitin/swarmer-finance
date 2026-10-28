@@ -36,7 +36,12 @@ export interface Account {
   currency: string;
   start_balance: number;
   scale: number;
+  /** Current value: the latest valuation plus later flows, else `invested`. */
   balance: number;
+  /** Opening balance plus all transaction flows. Set by services/accounts.ts. */
+  invested?: number;
+  /** Date of the latest valuation; null when none. Set by services/accounts.ts. */
+  last_valuation_date?: string | null;
   user_balance?: number | null;
   /** Date (YYYY-MM-DD) of the latest transaction on either side; null when none. Set by services/accounts.ts. */
   last_transaction_date?: string | null;

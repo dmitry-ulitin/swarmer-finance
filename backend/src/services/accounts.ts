@@ -1,6 +1,8 @@
 import * as accountQueries from '../db/queries/accounts';
 import * as userQueries from '../db/queries/users';
-import { getAccountBalances, findTransferPeersForUpdate, purgeAccountTransactions, clearSeenTxids, findSeenTxids } from '../db/queries/transactions';
+import { getAccountBalances, getAccountDailyFlows, findTransferPeersForUpdate, purgeAccountTransactions, clearSeenTxids, findSeenTxids } from '../db/queries/transactions';
+import { listValuations } from '../db/queries/valuations';
+import { accountValueAt } from './accountValue';
 import { withTransaction } from '../db';
 import { getRatesTo, convertAmount, toDecimal, toCents } from './currency';
 import { Account, AccountType, User } from '../types';
@@ -15,23 +17,37 @@ function toDecimalDTO(account: Account, userScale: number): Account {
     ...account,
     start_balance: toDecimal(account.start_balance, account.scale),
     balance: toDecimal(account.balance, account.scale),
+    invested: account.invested != null ? toDecimal(account.invested, account.scale) : account.invested,
     user_balance: account.user_balance != null ? toDecimal(account.user_balance, userScale) : account.user_balance,
     tracked: isTracked(account),
   };
 }
 
 async function withBalances(accounts: Account[]): Promise<Account[]> {
-  const rows = await getAccountBalances(accounts.map(a => a.id));
+  const ids = accounts.map(a => a.id);
+  const [rows, valuations] = await Promise.all([getAccountBalances(ids), listValuations(ids)]);
+  const valuedIds = [...new Set(valuations.map(v => v.account_id))];
+  const flows = await getAccountDailyFlows(valuedIds);
   return accounts.map(account => {
-    let balance = Number(account.start_balance);
+    let invested = Number(account.start_balance);
     let lastDate: string | null = null;
     for (const row of rows) {
-      if (row.credit_account_id === account.id) balance += row.credit;
-      if (row.debit_account_id === account.id) balance -= row.debit;
+      if (row.credit_account_id === account.id) invested += row.credit;
+      if (row.debit_account_id === account.id) invested -= row.debit;
       if ((row.credit_account_id === account.id || row.debit_account_id === account.id)
         && (lastDate === null || row.last_date > lastDate)) lastDate = row.last_date;
     }
-    return { ...account, balance, last_transaction_date: lastDate };
+    const own = valuations.filter(v => v.account_id === account.id);
+    const balance = own.length === 0 ? invested : accountValueAt({
+      startBalance: Number(account.start_balance),
+      startDate: null,
+      flows: flows.filter(f => f.account_id === account.id),
+      valuations: own.map(v => ({ as_of: v.as_of, value: Number(v.value) })),
+    }, null).value;
+    return {
+      ...account, balance, invested, last_transaction_date: lastDate,
+      last_valuation_date: own.length ? own[own.length - 1].as_of : null,
+    };
   });
 }
 
@@ -107,7 +123,7 @@ export const createAccount = async (
   const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   if (bankLink) await applyLink(account.id, bankLink);
-  const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), last_transaction_date: null }]);
+  const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), invested: Number(account.start_balance), last_transaction_date: null, last_valuation_date: null }]);
   return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
 };
 
@@ -289,7 +305,7 @@ export const deleteAccount = async (
 
   // Transactions exist — check balance.
   const [accountWithBalance] = await withBalances([existing]);
-  const balance = accountWithBalance.balance;
+  const balance = accountWithBalance.invested;
 
   if (balance !== 0) {
     throw {

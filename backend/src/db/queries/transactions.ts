@@ -334,6 +334,30 @@ export const getAccountBalances = async (
   return rows.map(row => ({ ...row, debit: Number(row.debit), credit: Number(row.credit) }));
 };
 
+export interface AccountDailyFlow {
+  account_id: number;
+  date: string;
+  delta: number;
+}
+
+/** Net change per account and day: credits add, debits subtract. */
+export const getAccountDailyFlows = async (accountIds: number[]): Promise<AccountDailyFlow[]> => {
+  if (accountIds.length === 0) return [];
+  const rows = await query<{ account_id: number; date: string; delta: string }>(
+    `SELECT account_id, date, SUM(delta) AS delta FROM (
+       SELECT credit_account_id AS account_id, date, credit AS delta FROM transactions
+        WHERE credit_account_id = ANY($1::int[])
+       UNION ALL
+       SELECT debit_account_id AS account_id, date, -debit AS delta FROM transactions
+        WHERE debit_account_id = ANY($1::int[])
+     ) f
+     GROUP BY account_id, date
+     ORDER BY date, account_id`,
+    [accountIds]
+  );
+  return rows.map(r => ({ ...r, delta: Number(r.delta) }));
+};
+
 export interface CategorySummaryRow {
   type: 'income' | 'expense';
   category_id: number;
