@@ -57,6 +57,14 @@ export function isInNetWorth(flag: boolean | undefined, level: AccessLevel): boo
   return flag ?? level >= LEVEL.ADMIN;
 }
 
+/** Stores the user's choice only when it differs from what they have now, so defaults stay defaults. */
+async function applyNetWorthFlag(accountId: number, userId: number, include: boolean | undefined): Promise<void> {
+  if (include === undefined) return;
+  const level = await getAccountLevel(accountId, userId) ?? LEVEL.READ;
+  const flag = (await getNetWorthFlags(userId, [accountId])).get(accountId);
+  if (isInNetWorth(flag, level) !== include) await upsertNetWorthFlag(userId, accountId, include);
+}
+
 async function withBankLink(account: Account, userId: number): Promise<Account> {
   const level = account.access_level ?? await getAccountLevel(account.id, userId) ?? LEVEL.READ;
   const flag = (await getNetWorthFlags(userId, [account.id])).get(account.id);
@@ -128,7 +136,8 @@ export const createAccount = async (
   startBalance: number,
   type: AccountType = 'cash',
   settings: Record<string, unknown> = {},
-  bankLink: BankLinkInput | null = null
+  bankLink: BankLinkInput | null = null,
+  inNetWorth?: boolean
 ) => {
   const user = await getUserOrThrow(userId);
   if (bankLink) await checkLink(userId, { type, currency }, bankLink);
@@ -140,6 +149,7 @@ export const createAccount = async (
   const scale = getCurrencyScale(currency);
   const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
   if (bankLink) await applyLink(account.id, bankLink);
+  await applyNetWorthFlag(account.id, userId, inNetWorth);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), invested: Number(account.start_balance), last_transaction_date: null, last_valuation_date: null }]);
   return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);
 };
@@ -173,6 +183,8 @@ export const updateAccount = async (
     settings: Record<string, unknown>;
     /** Omitted keeps the current link, null removes it. */
     bankLink?: BankLinkInput | null;
+    /** The caller's own net-worth choice; omitted keeps it. */
+    inNetWorth?: boolean;
   }
 ) => {
   const existing = await accountQueries.getAccountById(id);
@@ -281,6 +293,7 @@ export const updateAccount = async (
     throw { statusCode: 404, message: 'Account is deleted' };
   }
   if (linkChanges) await applyLink(id, data.bankLink!);
+  await applyNetWorthFlag(id, userId, data.inNetWorth);
   const [withBal] = await withBalances([account]);
   const [converted] = await withConvertedBalances(user, [withBal]);
   return withBankLink(toDecimalDTO(converted, user.currency_scale), userId);

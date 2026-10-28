@@ -154,7 +154,9 @@ All API responses use this envelope format consistently.
   dated earlier still counts for the value.
 - Whether an account counts toward a user's net worth is personal:
   `account_user_settings` (`in_net_worth`), set by any member through
-  `PUT /api/accounts/:id/net-worth`; without a row it is on for levels 3-4
+  `PUT /api/accounts/:id/net-worth` (the net worth page), or by `inNetWorth`
+  on `POST/PUT /api/accounts` (the account form; a row is written only when
+  the choice differs from the current value); without a row it is on for levels 3-4
   and off for 1-2 (`isInNetWorth`). `GET /api/net-worth`
   (`services/netWorth.ts`) returns today's `total` in the user's currency
   (never null: an account with no rate is skipped and sets `approximate`),

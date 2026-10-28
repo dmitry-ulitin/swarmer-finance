@@ -1,4 +1,3 @@
-import { of } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -25,12 +24,11 @@ function configure(selectedAccountIds: number[], selectedTransaction: unknown = 
   const openImport = vi.fn(async () => {});
   const sync = vi.fn(async () => {});
   const openValuations = vi.fn(async () => {});
-  const setInNetWorth = vi.fn(() => of({ data: null, error: null }));
   TestBed.configureTestingModule({
     providers: [
       Header,
       { provide: AuthService, useValue: {} },
-      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(visible), trackedIds: signal(new Set()), setInNetWorth } },
+      { provide: AccountsState, useValue: { accounts: signal(accounts), visibleAccounts: signal(visible), trackedIds: signal(new Set()) } },
       { provide: TransactionsState, useValue: { selectedAccountIds: signal(selectedAccountIds), selectedTransaction: signal(selectedTransaction) } },
       { provide: CategoryDialogService, useValue: {} },
       { provide: AccountDialogService, useValue: { openSharing, openEdit, openValuations } },
@@ -39,7 +37,7 @@ function configure(selectedAccountIds: number[], selectedTransaction: unknown = 
       { provide: AccountSyncService, useValue: { sync } },
     ],
   });
-  return { header: TestBed.inject(Header), openValuations, setInNetWorth, openSharing, openEdit, openImport, sync };
+  return { header: TestBed.inject(Header), openValuations, openSharing, openEdit, openImport, sync };
 }
 
 describe('Header sharing', () => {
@@ -145,11 +143,5 @@ describe('Header net worth', () => {
     const { header, openValuations } = configure([9]);
     header.valuationsFiltered();
     expect(openValuations).not.toHaveBeenCalled();
-  });
-
-  it('toggles net worth inclusion', () => {
-    const { header, setInNetWorth } = configure([11]);
-    header.toggleNetWorthFiltered();
-    expect(setInNetWorth).toHaveBeenCalledWith(11, true);
   });
 });

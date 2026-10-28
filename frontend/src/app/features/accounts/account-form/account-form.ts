@@ -1,7 +1,7 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TuiButton, TuiDataList, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiNumberFormat } from '@taiga-ui/core';
+import { TuiButton, TuiCheckbox, TuiDataList, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiLabel, TuiNumberFormat } from '@taiga-ui/core';
 import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
@@ -33,7 +33,7 @@ const normalizeCurrency = (currency: string): string => currency.trim().toUpperC
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat, TuiDataList],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat, TuiDataList, TuiCheckbox, TuiLabel],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,6 +65,8 @@ export class AccountForm {
     address: new FormControl<string>('', { nonNullable: true }),
     blockchain: new FormControl<string>('', { nonNullable: true }),
     bankAccount: new FormControl<string>(this.linkKey(this.context.data?.bank_link), { nonNullable: true }),
+    // A new account is the user's own, which counts toward net worth by default.
+    inNetWorth: new FormControl<boolean>(this.context.data?.in_net_worth ?? true, { nonNullable: true }),
   });
 
   readonly type = toSignal(this.form.controls.type.valueChanges, {
@@ -211,7 +213,7 @@ export class AccountForm {
   // stored settings hold only keys the user actually filled in.
   buildPayload(): AccountPayload {
     const raw = this.form.getRawValue();
-    const base = { name: raw.name, currency: normalizeCurrency(raw.currency), startBalance: raw.startBalance };
+    const base = { name: raw.name, currency: normalizeCurrency(raw.currency), startBalance: raw.startBalance, inNetWorth: raw.inNetWorth };
     const clean = (value: string): string | undefined => {
       const trimmed = value.trim();
       return trimmed === '' ? undefined : trimmed;

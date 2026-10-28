@@ -1,9 +1,16 @@
 <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form" tuiTextfieldSize="m">
-    <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="typeLabel">
-        <label tuiLabel>Type</label>
-        <input tuiSelect formControlName="type" />
-        <tui-data-list-wrapper *tuiDropdown [items]="accountTypes" [itemContent]="typeLabel | tuiStringifyContent" />
-    </tui-textfield>
+    <div class="row">
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false" [stringify]="typeLabel">
+            <label tuiLabel>Type</label>
+            <input tuiSelect formControlName="type" />
+            <tui-data-list-wrapper *tuiDropdown [items]="accountTypes" [itemContent]="typeLabel | tuiStringifyContent" />
+        </tui-textfield>
+
+        <label tuiLabel class="net-worth">
+            <input tuiCheckbox type="checkbox" formControlName="inNetWorth" />
+            In net worth
+        </label>
+    </div>
 
     <tui-textfield>
         <label tuiLabel>Name</label>

@@ -92,6 +92,8 @@ export type AccountPayload = {
   startBalance: number;
   /** The bank account to load from; null unlinks, omitted keeps the current link. */
   bankLink?: { connectionId: number; uid: string } | null;
+  /** The user's own choice whether the account counts toward their net worth. */
+  inNetWorth: boolean;
 } & {
   [T in AccountType]: { type: T; settings: AccountSettings[T] };
 }[AccountType];

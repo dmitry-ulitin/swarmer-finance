@@ -77,3 +77,63 @@ describe('Per-user net worth selection', () => {
     expect(after.rowCount).toBe(0);
   });
 });
+
+describe('Net worth flag in the account payload', () => {
+  const originalFetch = global.fetch;
+  let token: string;
+  let userId: number;
+
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+  const rows = async (accountId: number) =>
+    (await pool.query('SELECT in_net_worth FROM account_user_settings WHERE account_id = $1 AND user_id = $2', [accountId, userId])).rows;
+
+  beforeAll(async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: new Date().toISOString().slice(0, 10), rates: {} }),
+    }) as unknown as typeof fetch;
+    const res = await request(app).post('/api/auth/register').send({ email: 'nw-payload@example.com', password: 'password123' });
+    token = res.body.data.accessToken;
+    userId = (await pool.query('SELECT id FROM users WHERE email = $1', ['nw-payload@example.com'])).rows[0].id;
+  });
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('creates an account excluded from net worth', async () => {
+    const res = await request(app).post('/api/accounts').set(auth())
+      .send({ name: 'Out', currency: 'EUR', startBalance: 0, inNetWorth: false });
+    expect(res.status).toBe(200);
+    expect(res.body.data.in_net_worth).toBe(false);
+    expect(await rows(res.body.data.id)).toEqual([{ in_net_worth: false }]);
+  });
+
+  it('stores no row when the flag matches the default', async () => {
+    const res = await request(app).post('/api/accounts').set(auth())
+      .send({ name: 'In', currency: 'EUR', startBalance: 0, inNetWorth: true });
+    expect(res.body.data.in_net_worth).toBe(true);
+    expect(await rows(res.body.data.id)).toEqual([]);
+  });
+
+  it('changes the flag on update and keeps it when omitted', async () => {
+    const created = await request(app).post('/api/accounts').set(auth())
+      .send({ name: 'Edit', currency: 'EUR', startBalance: 0 });
+    const id = created.body.data.id;
+    const off = await request(app).put(`/api/accounts/${id}`).set(auth())
+      .send({ name: 'Edit', type: 'cash', settings: {}, inNetWorth: false });
+    expect(off.status).toBe(200);
+    expect(off.body.data.in_net_worth).toBe(false);
+    const kept = await request(app).put(`/api/accounts/${id}`).set(auth())
+      .send({ name: 'Edited', type: 'cash', settings: {} });
+    expect(kept.body.data.in_net_worth).toBe(false);
+    const on = await request(app).put(`/api/accounts/${id}`).set(auth())
+      .send({ name: 'Edited', type: 'cash', settings: {}, inNetWorth: true });
+    expect(on.body.data.in_net_worth).toBe(true);
+  });
+
+  it('rejects a non-boolean flag', async () => {
+    const res = await request(app).post('/api/accounts').set(auth())
+      .send({ name: 'Bad', currency: 'EUR', startBalance: 0, inNetWorth: 'no' });
+    expect(res.status).toBe(400);
+  });
+});

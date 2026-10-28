@@ -14,7 +14,6 @@ import { AccountSyncService } from '../accounts/account-sync.service';
 import { accessLevelOf, type Account } from '../../models/account';
 import { ChangePasswordDialogService } from '../auth/change-password-dialog.service';
 import { ProfileDialogService } from '../profile/profile-dialog.service';
-import { NotificationService } from '../../core/notification.service';
 import { BankDialogService } from '../bank/bank-dialog.service';
 import { PageReload } from '../../core/page-reload';
 
@@ -35,7 +34,6 @@ export class Header {
   private readonly importDialog = inject(ImportDialogService);
   private readonly passwordDialog = inject(ChangePasswordDialogService);
   private readonly profileDialog = inject(ProfileDialogService);
-  private readonly notifications = inject(NotificationService);
   private readonly bankDialog = inject(BankDialogService);
   readonly sync = inject(AccountSyncService);
   readonly pageReload = inject(PageReload);
@@ -116,14 +114,6 @@ export class Header {
   valuationsFiltered(): void {
     const account = this.filteredAccount();
     if (account && this.hasValuations(account)) void this.accountDialogs.openValuations(account);
-  }
-
-  toggleNetWorthFiltered(): void {
-    const account = this.filteredAccount();
-    if (!account) return;
-    this.accountState.setInNetWorth(account.id, !account.in_net_worth).subscribe({
-      error: e => this.notifications.showError(e, 'Failed to update net worth'),
-    });
   }
 
   importFilteredAccount(): void {

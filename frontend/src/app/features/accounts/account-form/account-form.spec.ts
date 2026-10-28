@@ -33,9 +33,16 @@ describe('AccountForm payload', () => {
     form.form.patchValue({ name: 'Wallet', currency: 'USD', startBalance: 0 });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Wallet', currency: 'USD', startBalance: 0,
+      name: 'Wallet', currency: 'USD', startBalance: 0, inNetWorth: true,
       type: 'cash', settings: {},
     });
+  });
+
+  it('takes the net worth flag from the account and sends it back', () => {
+    const form = createForm({ id: 1, name: 'Old', currency: 'USD', type: 'cash', in_net_worth: false });
+    expect(form.form.controls.inNetWorth.value).toBe(false);
+    form.form.patchValue({ inNetWorth: true });
+    expect(form.buildPayload().inNetWorth).toBe(true);
   });
 
   it('offers the valued account types', () => {
@@ -48,7 +55,7 @@ describe('AccountForm payload', () => {
     const form = createForm({ currency: 'USD' });
     form.form.patchValue({ name: 'X', currency: 'USD', startBalance: 0, type });
 
-    expect(form.buildPayload()).toEqual({ name: 'X', currency: 'USD', startBalance: 0, type, settings: {} });
+    expect(form.buildPayload()).toEqual({ name: 'X', currency: 'USD', startBalance: 0, inNetWorth: true, type, settings: {} });
   });
 
   it('sends a typed currency trimmed and upper-cased', () => {
@@ -67,7 +74,7 @@ describe('AccountForm payload', () => {
     });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Ledger', currency: 'BTC', startBalance: 0,
+      name: 'Ledger', currency: 'BTC', startBalance: 0, inNetWorth: true,
       type: 'crypto', settings: { address: 'bc1qxy2k', blockchain: 'bitcoin' },
     });
   });
@@ -80,7 +87,7 @@ describe('AccountForm payload', () => {
     });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Checking', currency: 'USD', startBalance: 0,
+      name: 'Checking', currency: 'USD', startBalance: 0, inNetWorth: true,
       type: 'bank', settings: {}, bankLink: null,
     });
   });
