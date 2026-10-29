@@ -19,6 +19,8 @@ import type { NetWorth } from '../../models/net-worth';
 const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'];
 /** Roughly how many month labels fit under the chart. */
 const MAX_LABELS = 12;
+/** Beyond this many months fixed-width bars no longer fit, so they share the width instead. */
+const MAX_FIXED_BARS = 24;
 
 @Component({
   selector: 'app-net-worth',
@@ -69,6 +71,7 @@ export class NetWorthPage {
       .filter(s => s.values.some(v => v !== 0));
   });
   readonly chartValues = computed(() => this.series().map(s => s.values));
+  readonly barSize = computed(() => ((this.data()?.history.length ?? 0) > MAX_FIXED_BARS ? null : 'm'));
   readonly chartMax = computed(() => {
     const top = Math.max(0, ...(this.data()?.history ?? []).map(p => p.total));
     const step = 10 ** Math.max(0, Math.floor(Math.log10(top || 1)) - 1);

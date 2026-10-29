@@ -10,7 +10,7 @@
   @if (nw.history.length) {
   <div class="chart-row">
     <tui-axes class="axes" [axisXLabels]="labelsX()" [axisYLabels]="labelsY()" [horizontalLines]="4" [verticalLines]="1">
-      <tui-bar-chart [collapsed]="true" [max]="chartMax()" [value]="chartValues()" [tuiHintContent]="hint" />
+      <tui-bar-chart [collapsed]="true" [size]="barSize()" [max]="chartMax()" [value]="chartValues()" [tuiHintContent]="hint" />
     </tui-axes>
     <ul class="legend">
       @for (s of series(); track s.type) {
