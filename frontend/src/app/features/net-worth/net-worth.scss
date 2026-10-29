@@ -1,7 +1,25 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+// The accounts table takes the height left under the chart and scrolls; when
+// even its minimum does not fit, the whole page scrolls instead.
 .page {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
   max-width: 60rem;
   margin: 0 auto;
   padding: 1rem;
+  overflow-y: auto;
+}
+
+.accounts-scroll {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  overflow-y: auto;
 }
 
 .total {
@@ -81,6 +99,12 @@
   th, td {
     padding: .25rem .5rem;
     text-align: start;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--tui-background-base);
   }
 
   .num {
