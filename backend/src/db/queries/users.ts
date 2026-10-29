@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../index';
+import { query, queryOne, execute, pooled, Tx } from '../index';
 import { User } from '../../types';
 
 export const getUserByEmail = async (email: string): Promise<User | null> => {
@@ -51,8 +51,8 @@ export const updatePasswordHash = async (id: number, passwordHash: string): Prom
   await execute('UPDATE users SET password_hash = $2 WHERE id = $1', [id, passwordHash]);
 };
 
-export const getUserIdByEmail = async (email: string): Promise<number | null> => {
-  const row = await queryOne<{ id: number }>(
+export const getUserIdByEmail = async (email: string, tx: Tx = pooled): Promise<number | null> => {
+  const row = await tx.queryOne<{ id: number }>(
     'SELECT id FROM users WHERE lower(email) = lower($1)',
     [email]
   );

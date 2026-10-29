@@ -18,6 +18,13 @@ export type AccessLevel = 1 | 2 | 3 | 4;
 /** The levels that can be granted; 4 (owner) is never sent. */
 export type ShareLevel = 1 | 2 | 3;
 
+/** A batch of sharing edits, applied together by `PUT /api/accounts/:id/shares`. */
+export interface ShareChanges {
+  add: { email: string; level: ShareLevel }[];
+  update: { userId: number; level: ShareLevel }[];
+  remove: number[];
+}
+
 export const LEVEL_LABELS: Record<AccessLevel, string> = { 1: 'Read', 2: 'Transactions', 3: 'Co-owner', 4: 'Owner' };
 
 /** A user with access to an account; the creator comes first. */

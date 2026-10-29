@@ -1,4 +1,4 @@
-import { query, queryOne, withTransaction, Tx } from '../index';
+import { query, queryOne, withTransaction, pooled, Tx } from '../index';
 import { Category } from '../../types';
 
 /**
@@ -35,8 +35,8 @@ export interface CategoryPathNode {
  * A category's ancestry, ordered from the system root down to the category
  * itself. Returns [] when the id does not exist.
  */
-export const getCategoryPath = async (id: number): Promise<CategoryPathNode[]> => {
-  const rows = await query<CategoryPathNode & { depth: number }>(
+export const getCategoryPath = async (id: number, tx: Tx = pooled): Promise<CategoryPathNode[]> => {
+  const rows = await tx.query<CategoryPathNode & { depth: number }>(
     `WITH RECURSIVE ancestry AS (
        SELECT id, name, parent_id, user_id, color, icon, 0 AS depth
        FROM categories WHERE id = $1
@@ -57,17 +57,18 @@ export const getCategoryPath = async (id: number): Promise<CategoryPathNode[]> =
  * root is shared by every user and is used as-is. Each level below it is
  * matched by name among the user's own children of the level above, and
  * created (borrowing the source's color and icon) when absent. The whole
- * walk runs in one transaction so a failure part-way cannot leave a
- * half-built path behind.
+ * walk runs in one transaction — `tx` when given, else its own — so a
+ * failure part-way cannot leave a half-built path behind.
  */
 export const findOrCreateCategoryPath = async (
   userId: number,
-  path: CategoryPathNode[]
+  path: CategoryPathNode[],
+  tx?: Tx
 ): Promise<number> => {
   if (path.length === 0) {
     throw new Error('findOrCreateCategoryPath: path is empty');
   }
-  return withTransaction(async (tx: Tx) => {
+  const walk = async (tx: Tx) => {
     let parentId = path[0].id; // the system root, shared by all users
     for (const node of path.slice(1)) {
       const existing = await tx.queryOne<{ id: number }>(
@@ -89,7 +90,8 @@ export const findOrCreateCategoryPath = async (
       parentId = created!.id;
     }
     return parentId;
-  });
+  };
+  return tx ? walk(tx) : withTransaction(walk);
 };
 
 /**

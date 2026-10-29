@@ -5,23 +5,46 @@
             <p class="empty">Could not load who has access.</p>
         }
         <ul class="members">
-            @for (member of members(); track member) {
-                <li class="member">
+            @for (member of members(); track member.user_id) {
+                <li class="member" [class.removed]="isRemoved(member)">
                     <div class="who">
                         <span class="name">{{ member.name }}@if (isMe(member)) { (you)}</span>
                         <span class="email">{{ member.email }}</span>
                     </div>
                     @if (canManage() && member.level !== 4) {
-                        <tui-textfield tuiChevron class="level" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
-                            <input tuiSelect [ngModel]="member.level" [ngModelOptions]="{ standalone: true }" [disabled]="busy()"
-                                (ngModelChange)="changeLevel(member, $event)" />
+                        <tui-textfield tuiChevron class="level" [class.changed]="isChanged(member)" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
+                            <input tuiSelect [ngModel]="levelOf(member)" [ngModelOptions]="{ standalone: true }" [disabled]="busy() || isRemoved(member)"
+                                (ngModelChange)="setLevel(member, $event)" />
                             <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
                         </tui-textfield>
-                        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Remove" data-test="remove"
-                            [disabled]="busy()" (click)="remove(member)"></button>
+                        <!-- Your own row has no remove: leaving is the Leave account button. -->
+                        @if (!isMe(member)) {
+                            @if (isRemoved(member)) {
+                                <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.undo-2" aria-label="Keep" data-test="undo"
+                                    [disabled]="busy()" (click)="toggleRemove(member)"></button>
+                            } @else {
+                                <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Remove" data-test="remove"
+                                    [disabled]="busy()" (click)="toggleRemove(member)"></button>
+                            }
+                        }
                     } @else {
                         <span class="level-label">{{ levelLabel(member.level) }}</span>
                     }
+                </li>
+            }
+            @for (row of added(); track row.email) {
+                <li class="member added" data-test="added">
+                    <div class="who">
+                        <span class="name">{{ row.email }}</span>
+                        <span class="email">New</span>
+                    </div>
+                    <tui-textfield tuiChevron class="level changed" [tuiTextfieldCleaner]="false" [stringify]="levelLabel">
+                        <input tuiSelect [ngModel]="row.level" [ngModelOptions]="{ standalone: true }" [disabled]="busy()"
+                            (ngModelChange)="setAddedLevel($index, $event)" />
+                        <tui-data-list-wrapper *tuiDropdown [items]="levels" [itemContent]="levelLabel | tuiStringifyContent" />
+                    </tui-textfield>
+                    <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" aria-label="Don't add" data-test="drop"
+                        [disabled]="busy()" (click)="dropAdded($index)"></button>
                 </li>
             }
         </ul>
@@ -41,9 +64,17 @@
         </form>
     }
 
-    @if (canLeave()) {
+    @if (canLeave() || canManage()) {
         <div class="actions">
-            <button tuiButton size="s" type="button" appearance="outline-destructive" [disabled]="busy()" (click)="leave()">Leave account</button>
+            @if (canLeave()) {
+                <button tuiButton size="s" type="button" appearance="outline-destructive" class="leave" [disabled]="busy() || dirty()"
+                    (click)="leave()">Leave account</button>
+            }
+            @if (canManage()) {
+                <button tuiButton size="s" type="button" appearance="secondary" data-test="cancel" [disabled]="busy() || !dirty()"
+                    (click)="cancel()">Cancel</button>
+                <button tuiButton size="s" type="button" data-test="apply" [disabled]="busy() || !dirty()" (click)="apply()">Apply</button>
+            }
         </div>
     }
 </div>

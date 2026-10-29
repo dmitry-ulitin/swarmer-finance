@@ -114,6 +114,12 @@ const setShareLevelSchema = z.strictObject({
   level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
 });
 
+const applySharesSchema = z.strictObject({
+  add: z.array(addShareSchema).default([]),
+  update: z.array(z.strictObject({ userId: z.number().int().positive(), ...setShareLevelSchema.shape })).default([]),
+  remove: z.array(z.number().int().positive()).default([]),
+});
+
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const accounts = await accountService.getAccounts(req.userId!);
@@ -204,6 +210,16 @@ router.post('/:id/shares', validate(addShareSchema), async (req: AuthRequest, re
   try {
     const id = parseInt(req.params.id as string, 10);
     const members = await shareService.addMember(id, req.userId!, req.body.email, req.body.level);
+    res.json({ data: members, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:id/shares', validate(applySharesSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const members = await shareService.applyChanges(id, req.userId!, req.body);
     res.json({ data: members, error: null });
   } catch (error) {
     next(error);

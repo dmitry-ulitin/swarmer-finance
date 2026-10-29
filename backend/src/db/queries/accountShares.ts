@@ -1,4 +1,4 @@
-import { query, queryOne, execute, Tx } from '../index';
+import { query, pooled, Tx } from '../index';
 import { AccountMember } from '../../types';
 
 export interface AccessRow {
@@ -62,8 +62,8 @@ export const getAccessRows = async (userId: number): Promise<AccessRow[]> => {
  * resolves to 3 when someone holds 3, else 4 — the same co-owned rule as
  * getAccessRows. Creator first, then strongest level, then name.
  */
-export const getAccountMembers = async (accountId: number): Promise<AccountMember[]> => {
-  return query<AccountMember>(
+export const getAccountMembers = async (accountId: number, tx: Tx = pooled): Promise<AccountMember[]> => {
+  return tx.query<AccountMember>(
     `SELECT user_id, name, email, level, is_creator FROM (
        SELECT u.id AS user_id, u.name, u.email,
               CASE WHEN EXISTS (
@@ -87,16 +87,21 @@ export const insertShare = async (
   accountId: number,
   userId: number,
   level: 1 | 2 | 3,
-  tx?: Tx
+  tx: Tx = pooled
 ): Promise<void> => {
-  const sql = 'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)';
-  const params = [accountId, userId, level];
-  await (tx ? tx.query(sql, params) : execute(sql, params));
+  await tx.query(
+    'INSERT INTO account_shares (account_id, user_id, level) VALUES ($1, $2, $3)',
+    [accountId, userId, level]
+  );
 };
 
 /** The member's stored level, or null when they hold no share row. */
-export const getShareLevel = async (accountId: number, userId: number): Promise<1 | 2 | 3 | null> => {
-  const row = await queryOne<{ level: 1 | 2 | 3 }>(
+export const getShareLevel = async (
+  accountId: number,
+  userId: number,
+  tx: Tx = pooled
+): Promise<1 | 2 | 3 | null> => {
+  const row = await tx.queryOne<{ level: 1 | 2 | 3 }>(
     'SELECT level FROM account_shares WHERE account_id = $1 AND user_id = $2',
     [accountId, userId]
   );
@@ -106,9 +111,10 @@ export const getShareLevel = async (accountId: number, userId: number): Promise<
 export const updateShareLevel = async (
   accountId: number,
   userId: number,
-  level: 1 | 2 | 3
+  level: 1 | 2 | 3,
+  tx: Tx = pooled
 ): Promise<void> => {
-  await execute(
+  await tx.query(
     'UPDATE account_shares SET level = $3 WHERE account_id = $1 AND user_id = $2',
     [accountId, userId, level]
   );
@@ -121,9 +127,10 @@ export const deleteShare = async (tx: Tx, accountId: number, userId: number): Pr
 /** Distinct categories of the expense/income rows `fromUserId` entered on the account. */
 export const getAuthoredCategoryIds = async (
   accountId: number,
-  fromUserId: number
+  fromUserId: number,
+  tx: Tx = pooled
 ): Promise<{ id: number; user_id: number | null }[]> => {
-  return query<{ id: number; user_id: number | null }>(
+  return tx.query<{ id: number; user_id: number | null }>(
     `SELECT DISTINCT c.id, c.user_id FROM transactions t
        JOIN categories c ON c.id = t.category_id
       WHERE ((t.debit_account_id = $1 AND t.credit_account_id IS NULL)
@@ -167,9 +174,10 @@ export const moveHistoryToOwner = async (
  */
 export const getOthersRowsWithCategoriesOf = async (
   accountId: number,
-  categoryOwnerId: number
+  categoryOwnerId: number,
+  tx: Tx = pooled
 ): Promise<{ author_id: number; category_id: number }[]> => {
-  return query<{ author_id: number; category_id: number }>(
+  return tx.query<{ author_id: number; category_id: number }>(
     `SELECT DISTINCT t.user_id AS author_id, t.category_id FROM transactions t
        JOIN categories c ON c.id = t.category_id
       WHERE ((t.debit_account_id = $1 AND t.credit_account_id IS NULL)
@@ -210,9 +218,10 @@ export const remapAuthorCategories = async (
 /** The co-owner (level 3) granted first, other than `excludeUserId`, or null. */
 export const getEarliestCoOwner = async (
   accountId: number,
-  excludeUserId: number
+  excludeUserId: number,
+  tx: Tx = pooled
 ): Promise<number | null> => {
-  const row = await queryOne<{ user_id: number }>(
+  const row = await tx.queryOne<{ user_id: number }>(
     `SELECT user_id FROM account_shares
       WHERE account_id = $1 AND level = 3 AND user_id <> $2
       ORDER BY created_at, user_id LIMIT 1`,

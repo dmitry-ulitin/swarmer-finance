@@ -31,6 +31,9 @@ export interface Tx {
   queryOne<T>(text: string, params?: unknown[]): Promise<T | null>;
 }
 
+/** The pool behind the Tx interface, for queries that may or may not run in a transaction. */
+export const pooled: Tx = { query, queryOne };
+
 /**
  * Run `fn` inside a single transaction, rolling back if it throws.
  *

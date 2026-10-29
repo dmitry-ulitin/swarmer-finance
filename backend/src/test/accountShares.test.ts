@@ -71,6 +71,15 @@ describe('Account share management', () => {
     request(app)
       .delete(`/api/accounts/${acc}/shares/${target}`)
       .set('Authorization', `Bearer ${token}`);
+  const apply = (token: string, changes: object) =>
+    request(app)
+      .put(`/api/accounts/${acc}/shares`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(changes);
+  const shareRows = async () =>
+    (await pool.query(
+      'SELECT user_id, level FROM account_shares WHERE account_id = $1 ORDER BY user_id', [acc]
+    )).rows;
   // A user-owned child category of a system root, returning its id.
   const makeCategory = async (userId: number, name: string, parentId: number) => {
     const res = await pool.query(
@@ -144,7 +153,7 @@ describe('Account share management', () => {
   it('404 for unknown email', async () => {
     const res = await add(tokenA, 'nobody-here@example.com', 1);
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('No user with this email');
+    expect(res.body.error).toBe('No user with this email: nobody-here@example.com');
   });
 
   it('400 sharing with yourself', async () => {
@@ -505,5 +514,87 @@ describe('Account share management', () => {
       { user_id: aId, name: 'Alice', email: aEmail, level: 3, is_creator: true },
       { user_id: bId, name: 'Bob', email: bEmail, level: 3, is_creator: false },
     ]);
+  });
+
+  describe('PUT /shares (batch)', () => {
+    it('applies an add, a level change and a removal together', async () => {
+      await grant(acc, bId, 1);
+      await grant(acc, cId, 2);
+      const d = await register(`ashare-d${Date.now()}@example.com`);
+      const dEmail = (await pool.query('SELECT email FROM users WHERE id = $1', [d.id])).rows[0].email;
+      const res = await apply(tokenA, {
+        add: [{ email: dEmail, level: 2 }],
+        update: [{ userId: bId, level: 2 }],
+        remove: [cId],
+      });
+      expect(res.status).toBe(200);
+      expect(await shareRows()).toEqual([{ user_id: bId, level: 2 }, { user_id: d.id, level: 2 }]);
+      expect(res.body.data.map((m: { user_id: number }) => m.user_id).sort()).toEqual([aId, bId, d.id].sort());
+      await pool.query('DELETE FROM account_shares WHERE user_id = $1', [d.id]);
+      await pool.query('DELETE FROM categories WHERE user_id = $1', [d.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [d.id]);
+    });
+
+    it('stores nothing when one change fails', async () => {
+      await grant(acc, bId, 1);
+      const unknown = await apply(tokenA, {
+        update: [{ userId: bId, level: 2 }],
+        add: [{ email: 'nobody-here@example.com', level: 1 }],
+      });
+      expect(unknown.status).toBe(404);
+      expect(unknown.body.error).toBe('No user with this email: nobody-here@example.com');
+
+      const notMember = await apply(tokenA, {
+        add: [{ email: cEmail, level: 1 }],
+        remove: [999999999],
+      });
+      expect(notMember.status).toBe(404);
+      expect(await shareRows()).toEqual([{ user_id: bId, level: 1 }]);
+    });
+
+    it('a creator who lowers themselves while granting co-owner hands ownership over', async () => {
+      await grant(acc, bId, 2);
+      const res = await apply(tokenA, { update: [{ userId: aId, level: 1 }, { userId: bId, level: 3 }] });
+      expect(res.status).toBe(200);
+      expect(await ownerOf()).toBe(bId);
+      expect(res.body.data).toEqual([
+        { user_id: bId, name: 'Bob', email: bEmail, level: 4, is_creator: true },
+        { user_id: aId, name: 'Alice', email: aEmail, level: 1, is_creator: false },
+      ]);
+    });
+
+    it('moves a removed member history to the owner', async () => {
+      await grant(acc, bId, 2);
+      const expense = await request(app)
+        .post('/api/transactions')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ debitAccountId: acc, categoryId: 3, debit: 5, credit: 5, date: '2026-03-02', description: 'By B' });
+      expect(expense.status).toBe(200);
+      const res = await apply(tokenA, { remove: [bId] });
+      expect(res.status).toBe(200);
+      const row = await pool.query('SELECT user_id FROM transactions WHERE id = $1', [expense.body.data.id]);
+      expect(row.rows[0].user_id).toBe(aId);
+    });
+
+    it('403 below co-owner', async () => {
+      await grant(acc, bId, 2);
+      const res = await apply(tokenB, { add: [{ email: cEmail, level: 1 }] });
+      expect(res.status).toBe(403);
+      expect(await shareRows()).toEqual([{ user_id: bId, level: 2 }]);
+    });
+
+    it('400 removing yourself', async () => {
+      await grant(acc, bId, 3);
+      const res = await apply(tokenB, { remove: [bId] });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Leave the account instead');
+    });
+
+    it('400 changing one member twice', async () => {
+      await grant(acc, bId, 1);
+      const res = await apply(tokenA, { update: [{ userId: bId, level: 2 }], remove: [bId] });
+      expect(res.status).toBe(400);
+      expect(await shareRows()).toEqual([{ user_id: bId, level: 1 }]);
+    });
   });
 });

@@ -47,9 +47,24 @@
     text-overflow: ellipsis;
 }
 
+.removed .who {
+    text-decoration: line-through;
+    color: var(--tui-text-secondary);
+}
+
+// A level that Apply will change.
+.changed input {
+    font-weight: bold;
+}
+
 .actions {
     display: flex;
     justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.leave {
+    margin-right: auto;
 }
 
 .empty {

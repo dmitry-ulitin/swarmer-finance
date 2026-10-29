@@ -128,7 +128,10 @@ All API responses use this envelope format consistently.
   level 3 for its owner too, so level 4 means "personal account".
 - `/api/accounts/:id/shares` manages members (`services/accountShares.ts`):
   GET needs level 1, POST/PUT/DELETE level 3, except DELETE on yourself
-  (leave) at any level. Removing the owner or setting them below 3 moves
+  (leave) at any level. `PUT /api/accounts/:id/shares` (`applyChanges`)
+  takes `{ add, update, remove }` and applies them in one transaction (adds,
+  others' levels, removals, the creator, the caller's own level last; any
+  error rolls all back); the sharing dialog edits a draft and sends only this. Removing the owner or setting them below 3 moves
   ownership — to the co-owner acting, or, when the owner acts on themselves,
   to the earliest-granted other co-owner; with none (personal account) it is
   refused with "Delete the account instead". When a member loses access their
