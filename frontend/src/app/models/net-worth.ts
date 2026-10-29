@@ -1,4 +1,4 @@
-import type { AccountType } from './account';
+import type { AccessLevel, AccountType } from './account';
 
 export interface NetWorthAccount {
   id: number;
@@ -11,6 +11,9 @@ export interface NetWorthAccount {
   gain: number;
   gainPct: number | null;
   inNetWorth: boolean;
+  /** The user's level on the account, 4 = their own. */
+  accessLevel: AccessLevel;
+  ownerName: string;
 }
 
 export interface NetWorthPoint {

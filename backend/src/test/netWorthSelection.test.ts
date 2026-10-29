@@ -47,6 +47,16 @@ describe('Per-user net worth selection', () => {
     expect(await flag(member)).toBe(false);
   });
 
+  it('tells each user their level and the owner', async () => {
+    const row = async (token: string) => {
+      const res = await request(app).get('/api/net-worth').set(auth(token));
+      return res.body.data.accounts.find((a: { id: number }) => a.id === acc);
+    };
+    const ownerName = (await pool.query('SELECT u.name FROM accounts a JOIN users u ON u.id = a.user_id WHERE a.id = $1', [acc])).rows[0].name;
+    expect(await row(owner)).toMatchObject({ accessLevel: 4, ownerName });
+    expect(await row(member)).toMatchObject({ accessLevel: 1, ownerName });
+  });
+
   it('a READ member can opt in without changing the owner flag', async () => {
     const res = await request(app).put(`/api/accounts/${acc}/net-worth`).set(auth(member)).send({ include: true });
     expect(res.status).toBe(200);

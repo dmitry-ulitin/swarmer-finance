@@ -166,7 +166,7 @@ All API responses use this envelope format consistently.
   (`services/netWorth.ts`) returns today's `total` in the user's currency
   (never null: an account with no rate is skipped and sets `approximate`),
   `byType`, `byCurrency`, `accounts[]` (every visible non-deleted account,
-  selected or not, with value, invested, gain and `gainPct`, null when
+  selected or not, with value, invested, gain, `accessLevel`, `ownerName` and `gainPct`, null when
   nothing was invested or the account has no valuation) and a monthly `history` computed on request: the
   last day of each month from the earliest start or valuation among selected
   accounts, rates from `getRatesOn`, then a today point that equals the

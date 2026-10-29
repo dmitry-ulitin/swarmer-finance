@@ -4,7 +4,7 @@ import { getAccountDailyFlows } from '../db/queries/transactions';
 import { listValuations } from '../db/queries/valuations';
 import { getNetWorthFlags } from '../db/queries/accountUserSettings';
 import { accountStartDate, accountValueAt, AccountValueInput } from './accountValue';
-import { getAccessMap } from './access';
+import { AccessLevel, getAccessMap } from './access';
 import { isInNetWorth } from './accounts';
 import { convertAmount, getRatesOn, getRatesTo, toDecimal } from './currency';
 import { todayUtc } from './date';
@@ -21,7 +21,7 @@ export interface NetWorthDto {
   accounts: {
     id: number; name: string; type: AccountType; currency: string;
     value: number; valueUser: number | null; invested: number; gain: number; gainPct: number | null;
-    inNetWorth: boolean;
+    inNetWorth: boolean; accessLevel: AccessLevel; ownerName: string;
   }[];
   history: { date: string; total: number; byType: Record<AccountType, number>; approximate: boolean }[];
 }
@@ -154,6 +154,7 @@ export const getNetWorth = async (userId: number): Promise<NetWorthDto> => {
       gain: toDecimal(value - invested, account.scale),
       gainPct: hasValuation && invested > 0 ? Math.round((value - invested) / invested * 10000) / 100 : null,
       inNetWorth,
+      accessLevel: accessMap.get(account.id)!, ownerName: account.owner_name!,
     }; }),
     history,
   };

@@ -1,3 +1,5 @@
+@use "../../../styles/access-levels";
+
 :host {
   display: block;
   height: 100%;
@@ -90,7 +92,6 @@
 
 .muted {
   color: var(--tui-text-secondary);
-  margin-inline-start: .5rem;
 }
 
 .accounts {
@@ -111,5 +112,14 @@
 
   .num {
     text-align: end;
+  }
+
+  // One tinted block per access level, as on the accounts page.
+  tbody {
+    @include access-levels.tints;
+  }
+
+  tbody + tbody {
+    border-top: .5rem solid var(--tui-background-base);
   }
 }

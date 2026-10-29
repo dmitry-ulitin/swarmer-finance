@@ -20,9 +20,10 @@ const data = (approximate = false): NetWorth => ({
   byType: [{ type: 'bank', value: 300 }, { type: 'investment', value: 1200 }],
   byCurrency: [{ currency: 'EUR', value: 1500 }],
   accounts: [
-    { id: 1, name: 'Main', type: 'bank', currency: 'EUR', value: 300, valueUser: 300, invested: 0, gain: 0, gainPct: null, inNetWorth: true },
-    { id: 3, name: 'Wallet', type: 'crypto', currency: 'BTC', value: 0.12345678, valueUser: 0, invested: 0, gain: 0, gainPct: null, inNetWorth: true },
-    { id: 2, name: 'Fund', type: 'investment', currency: 'EUR', value: 1200, valueUser: 1200, invested: 1000, gain: 200, gainPct: 20, inNetWorth: true },
+    { id: 1, name: 'Main', type: 'bank', currency: 'EUR', value: 300, valueUser: 300, invested: 0, gain: 0, gainPct: null, inNetWorth: true, accessLevel: 4, ownerName: 'Me' },
+    { id: 3, name: 'Wallet', type: 'crypto', currency: 'BTC', value: 0.12345678, valueUser: 0, invested: 0, gain: 0, gainPct: null, inNetWorth: true, accessLevel: 4, ownerName: 'Me' },
+    { id: 4, name: 'Shared', type: 'cash', currency: 'EUR', value: 0, valueUser: 0, invested: 0, gain: 0, gainPct: null, inNetWorth: false, accessLevel: 1, ownerName: 'Ann' },
+    { id: 2, name: 'Fund', type: 'investment', currency: 'EUR', value: 1200, valueUser: 1200, invested: 1000, gain: 200, gainPct: 20, inNetWorth: true, accessLevel: 4, ownerName: 'Me' },
   ],
   history: [
     { date: '2026-09-30', total: 1000, byType: { ...zero, bank: 300, investment: 700 }, approximate: false },
@@ -58,6 +59,19 @@ describe('NetWorthPage', () => {
     const gain = (id: number) => el.querySelector(`[data-test="row"][data-id="${id}"] [data-test="gain"]`)?.textContent?.trim();
     expect(gain(2)).toBe('€200.00 (+20%)');
     expect(gain(1)).toBe('');
+  });
+
+  it('groups rows by access level, sorted by name, naming the owner below admin', async () => {
+    const { el } = await setup();
+    const blocks = [...el.querySelectorAll('tbody')].map(b => ({
+      level: b.dataset['level'],
+      names: [...b.querySelectorAll('[data-test="row"] td:nth-child(2)')].map(td => td.textContent?.trim()),
+    }));
+    expect(blocks).toEqual([
+      { level: '4', names: ['Fund', 'Main', 'Wallet'] },
+      { level: '1', names: ['Shared (Ann)'] },
+    ]);
+    expect(el.querySelector('[data-test="row"][data-id="2"] td:nth-child(3)')?.textContent?.trim()).toBe('Investment');
   });
 
   it('renders the total as formatted money', async () => {

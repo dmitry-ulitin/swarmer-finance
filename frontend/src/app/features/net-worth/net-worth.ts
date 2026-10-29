@@ -13,8 +13,8 @@ import { NotificationService } from '../../core/notification.service';
 import { MoneyPipe } from '../../core/money.pipe';
 import { PageReload } from '../../core/page-reload';
 import { currencyScale } from '../../core/currency-scale';
-import { TYPE_LABELS, type AccountType } from '../../models/account';
-import type { NetWorth } from '../../models/net-worth';
+import { TYPE_LABELS, type AccessLevel, type AccountType } from '../../models/account';
+import type { NetWorth, NetWorthAccount } from '../../models/net-worth';
 
 const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'crypto', 'investment', 'property', 'deposit', 'debt'];
 /** Roughly how many month labels fit under the chart. */
@@ -62,6 +62,23 @@ export class NetWorthPage {
   readonly accountScale = currencyScale;
 
   readonly typeLabel = (type: AccountType): string => TYPE_LABELS[type];
+
+  /**
+   * Blocks per access level, highest first, sorted by name within, as on the
+   * accounts page; below admin an account is someone else's and says whose.
+   */
+  readonly sections = computed(() => {
+    const sorted = [...(this.data()?.accounts ?? [])].sort((a, b) =>
+      b.accessLevel - a.accessLevel || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sections: { accessLevel: AccessLevel; accounts: (NetWorthAccount & { displayName: string })[] }[] = [];
+    for (const account of sorted) {
+      const displayName = account.accessLevel < 3 ? `${account.name} (${account.ownerName})` : account.name;
+      const last = sections[sections.length - 1];
+      if (last && last.accessLevel === account.accessLevel) last.accounts.push({ ...account, displayName });
+      else sections.push({ accessLevel: account.accessLevel, accounts: [{ ...account, displayName }] });
+    }
+    return sections;
+  });
 
   /** One series per account type that has a non-zero value at some point. */
   readonly series = computed(() => {

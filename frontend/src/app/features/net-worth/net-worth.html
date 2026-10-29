@@ -53,22 +53,25 @@
   <div class="accounts-scroll">
   <table class="accounts">
     <thead>
-      <tr><th>In net worth</th><th>Account</th><th class="num">Value</th><th class="num">Invested</th><th class="num">Gain</th></tr>
+      <tr><th>In net worth</th><th>Account</th><th>Type</th><th class="num">Value</th><th class="num">Invested</th><th class="num">Gain</th></tr>
     </thead>
-    <tbody>
-      @for (a of nw.accounts; track a.id) {
+    @for (section of sections(); track section.accessLevel) {
+    <tbody [attr.data-level]="section.accessLevel">
+      @for (a of section.accounts; track a.id) {
       <tr data-test="row" [attr.data-id]="a.id">
         <td>
           <input tuiCheckbox size="s" type="checkbox" [attr.aria-label]="'Include ' + a.name + ' in net worth'"
                  [ngModel]="a.inNetWorth" (ngModelChange)="toggle(a.id, $event)" />
         </td>
-        <td>{{ a.name }} <span class="muted">{{ typeLabel(a.type) }}</span></td>
+        <td>{{ a.displayName }}</td>
+        <td class="muted">{{ typeLabel(a.type) }}</td>
         <td class="num">{{ a.value | money: a.currency : accountScale(a.currency) }}</td>
         <td class="num">{{ a.invested ? (a.invested | money: a.currency : accountScale(a.currency)) : '' }}</td>
         <td class="num" data-test="gain">{{ a.gainPct == null ? '' : (a.gain | money: a.currency : accountScale(a.currency)) + ' (' + (a.gainPct >= 0 ? '+' : '') + (a.gainPct | number: '1.0-1') + '%)' }}</td>
       </tr>
       }
     </tbody>
+    }
   </table>
   </div>
   } @else if (loading()) {
