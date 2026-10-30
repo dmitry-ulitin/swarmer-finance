@@ -38,6 +38,9 @@ export interface ParseResult {
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
   /** Set when the rows come from a bank connection rather than a file. */
   bank?: { aspspName: string; dateFrom: string; dateTo: string };
+  /** For a file covering several accounts: their names, and whose rows these are. */
+  sourceAccounts?: string[];
+  sourceAccount?: string | null;
 }
 
 /** The account, once the caller is known to hold WRITE on it. */
@@ -72,7 +75,8 @@ export const parseStatement = async (
   userId: number,
   accountId: number,
   contentBase64: string,
-  format?: string
+  format?: string,
+  sourceAccount?: string
 ): Promise<ParseResult> => {
   const account = await loadWritableAccount(accountId, userId);
 
@@ -84,11 +88,16 @@ export const parseStatement = async (
     format
   );
 
-  const { rows } = readStatement(content, profile, account.currency);
+  const { rows, ...source } = readStatement(content, profile, account.currency, {
+    scale: account.scale,
+    sourceAccount,
+    accountName: account.name,
+  });
 
   const hashes = computeImportHashes(rows, profile);
 
-  return buildParseResult(userId, account, rows, hashes, profile.id, profile.categoryKeys);
+  const result = await buildParseResult(userId, account, rows, hashes, profile.id, profile.categoryKeys);
+  return { ...result, ...source };
 };
 
 export async function buildParseResult(

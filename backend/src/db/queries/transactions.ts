@@ -11,7 +11,10 @@ export interface TransactionFilters {
   details?: string;
   type?: 'income' | 'expense' | 'transfer';
   offset?: number;
-  limit?: number;
+  /** `null` returns every match (the statement export); omitted means 20. */
+  limit?: number | null;
+  /** Oldest first, as a statement reads; the list is newest first. */
+  ascending?: boolean;
 }
 
 /**
@@ -186,13 +189,15 @@ export const getTransactions = async (
   }
 
   const whereClause = conditions.join(' AND ');
-  const limit = filters.limit ?? 20;
+  const dir = filters.ascending ? 'ASC' : 'DESC';
+  // LIMIT NULL is LIMIT ALL in Postgres.
+  const limit = filters.limit === undefined ? 20 : filters.limit;
   const offset = filters.offset ?? 0;
 
   const rows = await query<TransactionRow>(
     `${WITH_DETAILS_SQL}
      WHERE ${whereClause}
-     ORDER BY t.date DESC, t.created_at DESC, t.id DESC
+     ORDER BY t.date ${dir}, t.created_at ${dir}, t.id ${dir}
      LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
     [...params, limit, offset]
   );

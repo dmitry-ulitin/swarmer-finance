@@ -226,6 +226,17 @@ rate) — re-checking access and hashes but not the
 advisory match. Real statements go in `backend/banks/` (gitignored);
 redacted test copies in `backend/src/test/fixtures/banks/`.
 
+`GET /api/transactions/export` (`services/export.ts`) writes the
+transaction list's filters as a CSV statement (UTF-8 with BOM, oldest first,
+one row per side on an exported account, so a transfer between two exported
+accounts is two rows sharing its `Id`); `?preview=true` returns only
+`{ rows, accounts, from, to }` for the filters bar's "Export CSV" dialog. The
+import profile `swarmer` reads it back: `Id` is the reference, and since the
+file may cover several accounts (`sourceAccount` on the profile), parse takes
+`sourceAccount` and returns `sourceAccounts` (default: the file account named
+like the target, else the first; the upload dialog lets the user switch).
+Imported amounts are rounded to the account's scale, not to cents.
+
 #### Bank sync (Enable Banking)
 
 Migration 018: `bank_credentials` (one Enable Banking registration per user:

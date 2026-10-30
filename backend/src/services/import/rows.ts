@@ -104,11 +104,29 @@ export function readGrid(content: Buffer, profile: Profile): string[][] {
   return parseWorkbook(content);
 }
 
+export interface ReadOptions {
+  /** Decimal places amounts are rounded to: the account's scale (default 2). */
+  scale?: number;
+  /** For a profile with `sourceAccount`: which of the file's accounts to read. */
+  sourceAccount?: string;
+  /** The target account's name, the default source account when the file has it. */
+  accountName?: string;
+}
+
+export interface StatementRead {
+  rows: ParsedRow[];
+  /** For a profile with `sourceAccount`: the file's accounts, in file order. */
+  sourceAccounts?: string[];
+  /** The one of `sourceAccounts` whose rows were read. */
+  sourceAccount?: string | null;
+}
+
 export function readStatement(
   content: Buffer | string,
   profile: Profile,
-  accountCurrency: string
-): { rows: ParsedRow[] } {
+  accountCurrency: string,
+  options: ReadOptions = {}
+): StatementRead {
   const grid = readGrid(typeof content === 'string' ? Buffer.from(content) : content, profile);
   const header = headerRow(grid, profile);
   if (!header) {
@@ -148,8 +166,25 @@ export function readStatement(
 
   let candidates: Candidate[] = [];
   const otherCurrencies = new Set<string>();
+  const factor = 10 ** (options.scale ?? 2);
 
-  grid.slice(profile.skipLines + 1).forEach(raw => {
+  const body = grid.slice(profile.skipLines + 1);
+  let source: { accounts: string[]; chosen: string | null } | undefined;
+  if (profile.sourceAccount) {
+    const sourceIdx = col(profile.sourceAccount.column);
+    const accounts = [...new Set(body.map(r => (r[sourceIdx] ?? '').trim()))];
+    if (options.sourceAccount !== undefined && !accounts.includes(options.sourceAccount)) {
+      throw { statusCode: 400, message: `The file has no account '${options.sourceAccount}'` };
+    }
+    const chosen = options.sourceAccount
+      ?? (options.accountName !== undefined && accounts.includes(options.accountName)
+        ? options.accountName
+        : accounts[0] ?? null);
+    source = { accounts, chosen };
+  }
+
+  body.forEach(raw => {
+    if (source && (raw[col(profile.sourceAccount!.column)] ?? '').trim() !== source.chosen) return;
     if (profile.booked && (raw[col(profile.booked.column)] ?? '').trim() !== profile.booked.value) return;
 
     let amount: number;
@@ -175,7 +210,7 @@ export function readStatement(
       }
     }
 
-    const rounded = round2(amount);
+    const rounded = Math.round(amount * factor) / factor;
     // A zero amount is nothing importable: an empty amount cell, or (Bank of
     // Cyprus) a row with both Debit and Credit blank — an informational /
     // memo line real statements carry.
@@ -210,5 +245,6 @@ export function readStatement(
   // exactly the rows that are returned.
   return {
     rows: candidates.map(({ account: _account, ...row }, index) => ({ index, ...row })),
+    ...(source ? { sourceAccounts: source.accounts, sourceAccount: source.chosen } : {}),
   };
 }

@@ -135,4 +135,53 @@ describe('ImportUpload', () => {
     await done;
     expect(component.loading()).toBe(false);
   });
+  describe('a file covering several accounts', () => {
+    const multi: ImportParseResult = {
+      ...parseResult,
+      format: 'swarmer',
+      rows: [{ index: 0 } as ImportParseResult['rows'][number]],
+      sourceAccounts: ['Main', 'Savings'],
+      sourceAccount: 'Main',
+    };
+
+    it('waits for the account choice instead of closing', async () => {
+      const parseStatement = vi.fn().mockReturnValue(of({ data: multi, error: null }));
+      const { component, completeWith } = configure({ parseStatement } as never);
+
+      await component.upload(makeFile('x'));
+
+      expect(completeWith).not.toHaveBeenCalled();
+      expect(component.sourceAccount.value).toBe('Main');
+    });
+
+    it('re-reads the file for another account and continues with it', async () => {
+      const savings = { ...multi, sourceAccount: 'Savings' };
+      const parseStatement = vi.fn()
+        .mockReturnValueOnce(of({ data: multi, error: null }))
+        .mockReturnValueOnce(of({ data: savings, error: null }));
+      const { component, completeWith } = configure({ parseStatement } as never);
+      await component.upload(makeFile('x'));
+
+      component.sourceAccount.setValue('Savings');
+      await vi.waitFor(() => expect(component.pending()?.result.sourceAccount).toBe('Savings'));
+
+      const [, content, , sourceAccount] = parseStatement.mock.calls[1];
+      expect(atob(content)).toBe('x');
+      expect(sourceAccount).toBe('Savings');
+      (component as unknown as { proceed(): void }).proceed();
+      expect(completeWith).toHaveBeenCalledWith(savings);
+    });
+
+    it('keeps the previous choice when re-reading fails', async () => {
+      const parseStatement = vi.fn()
+        .mockReturnValueOnce(of({ data: multi, error: null }))
+        .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ error: { error: 'Statement is in USD' }, status: 400 })));
+      const { component } = configure({ parseStatement } as never);
+      await component.upload(makeFile('x'));
+
+      component.sourceAccount.setValue('Savings');
+      await vi.waitFor(() => expect(component.error()).toBe('Statement is in USD'));
+      expect(component.sourceAccount.value).toBe('Main');
+    });
+  });
 });

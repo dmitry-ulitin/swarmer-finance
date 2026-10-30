@@ -9,9 +9,20 @@
         <tui-data-list-wrapper *tuiDropdown [items]="formats" [itemContent]="stringifyFormat | tuiStringifyContent" />
     </tui-textfield>
 
+    @if (pending(); as p) {
+        <tui-textfield tuiChevron [tuiTextfieldCleaner]="false">
+            <label tuiLabel>Account in the file</label>
+            <input tuiSelect [formControl]="sourceAccount" />
+            <tui-data-list-wrapper *tuiDropdown [items]="p.result.sourceAccounts ?? []" />
+        </tui-textfield>
+        @if (!loading()) {
+            <p class="target">{{ p.result.rows.length }} {{ p.result.rows.length === 1 ? 'row' : 'rows' }} to review</p>
+        }
+    }
+
     @if (loading()) {
         <tui-loader size="l" [textContent]="'Reading statement…'" />
-    } @else {
+    } @else if (!pending()) {
         <label tuiInputFiles>
             <input accept=".csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" tuiInputFiles [formControl]="form.controls.file" />
         </label>
@@ -25,5 +36,10 @@
         <button tuiButton size="s" type="button" appearance="outline" (click)="cancel()">
             Cancel
         </button>
+        @if (pending(); as p) {
+            <button tuiButton size="s" type="button" [disabled]="loading() || p.result.rows.length === 0" (click)="proceed()">
+                Continue
+            </button>
+        }
     </div>
 </form>

@@ -56,6 +56,13 @@ export class ImportUpload {
     file: new FormControl<File | null>(null),
   });
 
+  /**
+   * A parsed file covering several accounts waits here for the user to pick
+   * whose rows to import; `content` is kept to re-parse with another choice.
+   */
+  readonly pending = signal<{ content: string; format: string | null; result: ImportParseResult } | null>(null);
+  readonly sourceAccount = new FormControl<string | null>(null);
+
   readonly loading = signal(false);
   /**
    * A failed parse is shown here rather than closing the dialog: an
@@ -75,6 +82,12 @@ export class ImportUpload {
       .subscribe(file => {
         if (file) void this.upload(file);
       });
+    this.sourceAccount.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(name => {
+        const pending = this.pending();
+        if (pending && name && name !== pending.result.sourceAccount) void this.reparse(name);
+      });
   }
 
   async upload(file: File): Promise<void> {
@@ -86,8 +99,13 @@ export class ImportUpload {
       const response = await firstValueFrom(
         this.api.parseStatement(this.account.id, content, format)
       );
-      if (response.data) {
-        this.context.completeWith(response.data);
+      const result = response.data;
+      if (!result) return;
+      if ((result.sourceAccounts?.length ?? 0) > 1) {
+        this.pending.set({ content, format, result });
+        this.sourceAccount.setValue(result.sourceAccount ?? null, { emitEvent: false });
+      } else {
+        this.context.completeWith(result);
       }
     } catch (e) {
       this.error.set(this.messageOf(e));
@@ -95,6 +113,29 @@ export class ImportUpload {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async reparse(sourceAccount: string): Promise<void> {
+    const pending = this.pending()!;
+    this.error.set(null);
+    this.loading.set(true);
+    try {
+      const response = await firstValueFrom(
+        this.api.parseStatement(this.account.id, pending.content, pending.format, sourceAccount)
+      );
+      if (response.data) this.pending.set({ ...pending, result: response.data });
+    } catch (e) {
+      this.error.set(this.messageOf(e));
+      // The rows shown are still the previous account's: say so in the picker.
+      this.sourceAccount.setValue(pending.result.sourceAccount ?? null, { emitEvent: false });
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected proceed(): void {
+    const result = this.pending()?.result;
+    if (result) this.context.completeWith(result);
   }
 
   protected cancel(): void {

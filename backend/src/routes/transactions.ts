@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isoDateSchema, validate, validateIdParam } from '../middleware/validation';
 import * as transactionService from '../services/transactions';
+import * as exportService from '../services/export';
 import { TransactionFilters } from '../db/queries/transactions';
 
 const router = Router();
@@ -60,6 +61,35 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
     };
     const result = await transactionService.getTransactions(req.userId!, filters);
     res.json({ data: result, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const exportSchema = filtersSchema.omit({ offset: true, limit: true }).extend({
+  preview: z.enum(['true', 'false']).optional(),
+});
+
+router.get('/export', validate(exportSchema, 'query'), async (req: AuthRequest, res, next) => {
+  try {
+    const filters: TransactionFilters = {
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      categories: toIntArray(req.query.categories),
+      accounts: toIntArray(req.query.accounts),
+      details: req.query.details as string | undefined,
+      type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
+    };
+    if (req.query.preview === 'true') {
+      const result = await exportService.previewExport(req.userId!, filters);
+      res.json({ data: result, error: null });
+      return;
+    }
+    const csv = await exportService.exportCsv(req.userId!, filters);
+    const today = new Date().toISOString().slice(0, 10);
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="statement-${today}.csv"`);
+    res.send(csv);
   } catch (error) {
     next(error);
   }

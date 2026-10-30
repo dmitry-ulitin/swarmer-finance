@@ -1,0 +1,5 @@
+﻿Date,Account,Type,Category,Amount,Currency,Counter account,Counter amount,Counter currency,Payee,Description,Id
+2026-01-05,Main EUR,income,Salary,3000.00,EUR,,,,,January,101
+2026-01-10,Main EUR,expense,Food / Cafe,-12.50,EUR,,,,Cafe Nero,"Coffee, ""large""",102
+2026-01-15,Main EUR,transfer,,-1000.00,EUR,Cold BTC,0.01234567,BTC,,Buy BTC,103
+2026-01-15,Cold BTC,transfer,,0.01234567,BTC,Main EUR,-1000.00,EUR,,Buy BTC,103

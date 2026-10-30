@@ -29,6 +29,9 @@ export interface ImportParseResult {
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
   /** Set when the rows came from the bank: the window that was loaded. */
   bank?: { aspspName: string; dateFrom: string; dateTo: string };
+  /** Set for a file covering several accounts: their names, and whose rows these are. */
+  sourceAccounts?: string[];
+  sourceAccount?: string | null;
 }
 
 /** One row as reconcile accepts it; the extra parse-only fields are ignored. */
@@ -56,6 +59,7 @@ export const IMPORT_FORMATS = [
   { id: 'alfa', name: 'Alfa-Bank' },
   { id: 'caixa', name: 'CaixaBank' },
   { id: 'unicredit', name: 'UniCredit' },
+  { id: 'swarmer', name: 'Swarmer Finance export' },
 ] as const;
 
 export type ImportFormat = (typeof IMPORT_FORMATS)[number];

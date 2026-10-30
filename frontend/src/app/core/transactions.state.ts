@@ -79,6 +79,7 @@ export class TransactionsState {
     const { from, to } = this._filters();
     return from && to ? { from, to } : null;
   });
+  readonly filters = this._filters.asReadonly();
   readonly selectedTransaction = this._selectedTransaction.asReadonly();
   /** Bumped on every reload, so views derived from the transactions refetch too. */
   readonly revision = this._revision.asReadonly();

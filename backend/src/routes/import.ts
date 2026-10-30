@@ -15,6 +15,8 @@ const parseSchema = z.object({
   format: z.string().optional(),
   /** The statement file, base64. */
   content: z.string().min(1),
+  /** For a file covering several accounts: whose rows to read. */
+  sourceAccount: z.string().optional(),
 });
 
 const bankLoadSchema = z.object({
@@ -45,8 +47,8 @@ const reconcileSchema = z.object({
 
 router.post('/parse', validate(parseSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { accountId, format, content } = req.body;
-    const result = await importService.parseStatement(req.userId!, accountId, content, format);
+    const { accountId, format, content, sourceAccount } = req.body;
+    const result = await importService.parseStatement(req.userId!, accountId, content, format, sourceAccount);
     res.json({ data: result, error: null });
   } catch (error) {
     next(error);

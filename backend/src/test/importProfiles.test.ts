@@ -35,6 +35,11 @@ describe('profiles', () => {
     expect(detectProfile(grid)?.id).toBe('unicredit');
   });
 
+  it('detects this app\'s own statement export', () => {
+    const grid = parseCsv(fixture('swarmer', 'statement.csv'));
+    expect(detectProfile(grid)?.id).toBe('swarmer');
+  });
+
   it('returns null for an unrecognised file', () => {
     expect(detectProfile([['foo', 'bar'], ['1', '2']])).toBeNull();
   });
@@ -52,6 +57,7 @@ describe('profiles', () => {
       alfa: ['alfabank', 'statement.csv'],
       caixa: ['caixabank', 'statement.xls'],
       unicredit: ['unicredit', 'statement.xlsx'],
+      swarmer: ['swarmer', 'statement.csv'],
     };
 
     for (const profile of Object.values(PROFILES)) {

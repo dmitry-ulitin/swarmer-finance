@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Category, CategoryCreatePayload, CategoryDeletePreview, CategoryUpdatePayload } from '../models/category';
 import type { Valuation, ValuationPayload } from '../models/valuation';
 import { Account, AccountMember, AccountPayload, AccountPurgeResult, AccountSyncResult, ShareChanges } from '../models/account';
-import { CategorySummary, Transaction, TransactionFilters } from '../models/transaction';
+import { CategorySummary, ExportPreview, Transaction, TransactionFilters } from '../models/transaction';
 import { ImportParseResult, ImportReconcileResult, ImportReconcileRow } from '../models/import';
 import { BankAspsp, BankConnection, BankCredentials, bankRedirectUrl } from '../models/bank';
 import type { NetWorth } from '../models/net-worth';
@@ -23,6 +23,18 @@ export interface TransactionRequest {
   date: string;
   description?: string | null;
   payee?: string | null;
+}
+
+/** The transaction list's filters as query parameters, shared by the list and the export. */
+function filterParams(filters: TransactionFilters): HttpParams {
+  let params = new HttpParams();
+  if (filters.from) params = params.set('from', filters.from);
+  if (filters.to) params = params.set('to', filters.to);
+  if (filters.type) params = params.set('type', filters.type);
+  if (filters.details) params = params.set('details', filters.details);
+  filters.categories?.forEach(id => { params = params.append('categories', id); });
+  filters.accounts?.forEach(id => { params = params.append('accounts', id); });
+  return params;
 }
 
 @Injectable({
@@ -123,16 +135,21 @@ export class ApiService {
   }
 
   getTransactions(filters: TransactionFilters & { offset?: number; limit?: number } = {}): Observable<ApiResponse<Transaction[]>> {
-    let params = new HttpParams();
-    if (filters.from) params = params.set('from', filters.from);
-    if (filters.to) params = params.set('to', filters.to);
-    if (filters.type) params = params.set('type', filters.type);
-    if (filters.details) params = params.set('details', filters.details);
+    let params = filterParams(filters);
     if (filters.offset != null) params = params.set('offset', filters.offset);
     if (filters.limit != null) params = params.set('limit', filters.limit);
-    filters.categories?.forEach(id => { params = params.append('categories', id); });
-    filters.accounts?.forEach(id => { params = params.append('accounts', id); });
     return this.http.get<ApiResponse<Transaction[]>>('/api/transactions', { params });
+  }
+
+  /** What exporting `filters` would write: row and account counts, date span. */
+  previewExport(filters: TransactionFilters): Observable<ApiResponse<ExportPreview>> {
+    const params = filterParams(filters).set('preview', 'true');
+    return this.http.get<ApiResponse<ExportPreview>>('/api/transactions/export', { params });
+  }
+
+  /** The transactions matching `filters` as a CSV statement. */
+  exportTransactions(filters: TransactionFilters): Observable<Blob> {
+    return this.http.get('/api/transactions/export', { params: filterParams(filters), responseType: 'blob' });
   }
 
   getCategorySummary(filters: Pick<TransactionFilters, 'accounts' | 'from' | 'to'>): Observable<ApiResponse<CategorySummary>> {
@@ -153,11 +170,12 @@ export class ApiService {
 
   // Import
   /** `content` is the statement file base64-encoded; `format` omitted means detect. */
-  parseStatement(accountId: number, content: string, format?: string | null): Observable<ApiResponse<ImportParseResult>> {
+  parseStatement(accountId: number, content: string, format?: string | null, sourceAccount?: string | null): Observable<ApiResponse<ImportParseResult>> {
     return this.http.post<ApiResponse<ImportParseResult>>('/api/import/parse', {
       accountId,
       content,
       ...(format ? { format } : {}),
+      ...(sourceAccount ? { sourceAccount } : {}),
     });
   }
 

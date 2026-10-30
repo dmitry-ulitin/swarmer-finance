@@ -196,6 +196,23 @@ export const getTransactions = async (
   userId: number,
   filters: transactionQueries.TransactionFilters
 ) => {
+  const { transactions, accessibleIds } = await findVisible(userId, filters);
+  const sequential = !filters.details && !filters.categories?.length && !filters.type;
+  const result = sequential && transactions.length > 0
+    ? await attachRunningBalances(transactions, accessibleIds)
+    : transactions;
+  return result.map(toDecimalTransactionDTO);
+};
+
+/**
+ * The transactions matching `filters` that the user may see, amounts still
+ * integers at their accounts' scales. `accountIds` is the narrowed account
+ * set the query ran with.
+ */
+export const findVisible = async (
+  userId: number,
+  filters: transactionQueries.TransactionFilters
+) => {
   const accessibleIds = await getAccessibleAccountIds(userId);
   // A supplied `accounts` filter is intersected with what the user may see,
   // never trusted on its own. The result replaces `accounts` wholesale, so the
@@ -214,7 +231,7 @@ export const getTransactions = async (
     // An expansion that matched nothing means no transaction can match. The
     // query treats an empty list as "no category filter", so returning early
     // is what keeps that from widening into every transaction.
-    if (categoryIds.length === 0) return [];
+    if (categoryIds.length === 0) return { transactions: [], accessibleIds, accountIds };
   }
 
   const transactions = await transactionQueries.getTransactions({
@@ -222,11 +239,7 @@ export const getTransactions = async (
     accounts: accountIds,
     categories: categoryIds,
   });
-  const sequential = !filters.details && !filters.categories?.length && !filters.type;
-  const result = sequential && transactions.length > 0
-    ? await attachRunningBalances(transactions, accessibleIds)
-    : transactions;
-  return result.map(toDecimalTransactionDTO);
+  return { transactions, accessibleIds, accountIds };
 };
 
 /** The account with its running balance, or unchanged when it has none. */

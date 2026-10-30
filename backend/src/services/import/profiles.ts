@@ -1,6 +1,6 @@
 import { KeyField } from './categorize';
 
-export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa' | 'unicredit';
+export type ProfileId = 'lhv' | 'boc' | 'alfa' | 'caixa' | 'unicredit' | 'swarmer';
 
 /**
  * One bank's layout, as data. Everything that differs between statements is
@@ -64,6 +64,11 @@ export interface Profile {
    * double-count.
    */
   booked?: { column: string; value: string };
+  /**
+   * The file covers several accounts, named in `column`; one account's rows
+   * are imported at a time, chosen when parsing.
+   */
+  sourceAccount?: { column: string };
 }
 
 export const PROFILES: Record<ProfileId, Profile> = {
@@ -217,6 +222,25 @@ export const PROFILES: Record<ProfileId, Profile> = {
     identity: { kind: 'content' },
     // RESERVED rows are card holds, booked later with different details.
     booked: { column: 'Status', value: 'BOOKED' },
+  },
+  swarmer: {
+    // This app's own statement export (services/export.ts).
+    id: 'swarmer',
+    name: 'Swarmer Finance',
+    reader: 'csv',
+    encoding: 'utf8',
+    delimiter: ',',
+    skipLines: 0,
+    headerSignature: ['Date', 'Account', 'Type', 'Amount', 'Currency', 'Counter account', 'Id'],
+    dateFormat: 'iso',
+    decimal: 'dot',
+    amount: { kind: 'signed', column: 'Amount' },
+    columns: { date: 'Date', description: 'Description', payee: 'Payee' },
+    currency: { from: 'column', column: 'Currency' },
+    // The source database's transaction id. A transfer between two exported
+    // accounts shares it, but only one account's rows are read at a time.
+    identity: { kind: 'reference', columns: ['Id'] },
+    sourceAccount: { column: 'Account' },
   },
 };
 

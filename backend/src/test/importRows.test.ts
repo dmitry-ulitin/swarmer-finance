@@ -207,6 +207,34 @@ describe('readStatement — Alfa-Bank', () => {
   });
 });
 
+describe('readStatement — Swarmer Finance export', () => {
+  const read = (currency: string, options = {}) =>
+    readStatement(fixture('swarmer', 'statement.csv'), PROFILES.swarmer, currency, options);
+
+  it('lists the file\'s accounts and reads the first by default', () => {
+    const result = read('EUR');
+    expect(result.sourceAccounts).toEqual(['Main EUR', 'Cold BTC']);
+    expect(result.sourceAccount).toBe('Main EUR');
+    expect(result.rows.map(r => r.amount)).toEqual([3000, -12.5, -1000]);
+    expect(result.rows[1]).toMatchObject({ payee: 'Cafe Nero', description: 'Coffee, "large"', reference: '102' });
+  });
+
+  it('prefers the account named like the target account', () => {
+    expect(read('BTC', { accountName: 'Cold BTC' }).sourceAccount).toBe('Cold BTC');
+  });
+
+  it('rounds to the account scale, not to cents', () => {
+    const result = read('BTC', { sourceAccount: 'Cold BTC', scale: 8 });
+    expect(result.rows.map(r => r.amount)).toEqual([0.01234567]);
+  });
+
+  it('refuses an account the file does not have', () => {
+    expect(() => read('EUR', { sourceAccount: 'Nope' })).toThrow(
+      expect.objectContaining({ statusCode: 400 })
+    );
+  });
+});
+
 describe('readStatement — CaixaBank (Excel)', () => {
   const bytes = () => fs.readFileSync(path.join(__dirname, 'fixtures', 'banks', 'caixabank', 'statement.xls'));
   const result = () => readStatement(bytes(), PROFILES.caixa, 'EUR');

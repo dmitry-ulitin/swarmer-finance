@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { TuiButtonX, TuiInput } from '@taiga-ui/core';
+import { TuiButton, TuiButtonX, TuiInput } from '@taiga-ui/core';
 import { TuiAutoColorPipe, TuiChip } from '@taiga-ui/kit';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
 import { TransactionsState } from '../../core/transactions.state';
@@ -10,18 +10,20 @@ import { selectedAccountChips } from '../../core/account-tree';
 import { CategoriesState } from '../../core/categories.state';
 import { findCategoryById } from '../../models/category';
 import { DateRangeFilter } from './date-range-filter/date-range-filter';
+import { ExportDialogService } from '../transactions/export-dialog.service';
 
 const TYPE_LABELS = { income: 'Income', expense: 'Expenses', transfer: 'Transfers' } as const;
 
 @Component({
   selector: 'app-filters-bar',
-  imports: [DateRangeFilter, ReactiveFormsModule, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
+  imports: [DateRangeFilter, ReactiveFormsModule, TuiButton, TuiButtonX, TuiChip, TuiAutoColorPipe, TuiInput],
   templateUrl: './filters-bar.html',
   styleUrl: './filters-bar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FiltersBar {
   protected readonly transactions = inject(TransactionsState);
+  protected readonly exportDialog = inject(ExportDialogService);
   private readonly accounts = inject(AccountsState);
   private readonly categories = inject(CategoriesState);
   protected readonly accountChips = computed(() =>

@@ -35,6 +35,14 @@ export interface TransactionFilters {
     type?: 'income' | 'expense' | 'transfer';
 }
 
+/** What a CSV export of the current filters would hold. */
+export interface ExportPreview {
+    rows: number;
+    accounts: number;
+    from: string | null;
+    to: string | null;
+}
+
 /** One top-level category's income or expense, subcategories included. */
 export interface CategorySummaryItem {
     category_id: number;
