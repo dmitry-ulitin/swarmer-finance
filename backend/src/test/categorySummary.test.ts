@@ -209,4 +209,144 @@ describe('GET /api/transactions/summary', () => {
 
     expect(res.body.data.expense).toEqual([expect.objectContaining({ total: null })]);
   });
+
+  describe('transfers', () => {
+    let savings: number;
+
+    const transfer = (from: number, to: number, debit: number, credit: number, date = '2026-03-01') =>
+      pool.query(
+        `INSERT INTO transactions (user_id, debit_account_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, from, to, debit, credit, date]
+      );
+    const list = (query: string) =>
+      request(app).get(`/api/transactions${query}`).set({ Authorization: `Bearer ${token}` });
+
+    beforeAll(async () => {
+      savings = await insertAccount(userId, 'Savings', 'EUR');
+    });
+
+    it('reports zeros when there are none', async () => {
+      const res = await summary();
+
+      expect(res.body.data.transfers).toEqual({
+        net: 0,
+        in: { total: 0, amounts: [] },
+        out: { total: 0, amounts: [] },
+      });
+    });
+
+    it('nets to zero when no account is selected', async () => {
+      await transfer(eurAccount, savings, 1000, 1000);
+
+      const { transfers } = (await summary()).body.data;
+
+      expect(transfers.in.total).toBe(10);
+      expect(transfers.out.total).toBe(10);
+      expect(transfers.net).toBe(0);
+    });
+
+    it('splits the directions for a selected account and nets them', async () => {
+      await transfer(eurAccount, savings, 1000, 1000);
+      await transfer(savings, eurAccount, 400, 400);
+
+      const { transfers } = (await summary(`?accounts=${eurAccount}`)).body.data;
+
+      expect(transfers.out.total).toBe(10);
+      expect(transfers.in.total).toBe(4);
+      expect(transfers.net).toBe(-6);
+    });
+
+    it('counts a transfer inside the selection on both sides, so it does not move the net', async () => {
+      const third = await insertAccount(userId, 'Third', 'EUR');
+      await transfer(eurAccount, savings, 1000, 1000);
+      await transfer(savings, third, 300, 300);
+
+      const { transfers } = (await summary(`?accounts=${eurAccount}&accounts=${savings}`)).body.data;
+
+      expect(transfers.in.total).toBe(10);
+      expect(transfers.out.total).toBe(13);
+      expect(transfers.net).toBe(-3);
+    });
+
+    it('converts each side from its own currency', async () => {
+      await transfer(eurAccount, fxAccount, 1000, 3000);
+
+      const { transfers } = (await summary()).body.data;
+
+      expect(transfers.out).toEqual({ total: 10, amounts: [{ currency: 'EUR', scale: 2, amount: 10 }] });
+      expect(transfers.in).toEqual({ total: 60, amounts: [{ currency: FX_CURRENCY, scale: 2, amount: 30 }] });
+      expect(transfers.net).toBe(50);
+    });
+
+    it('does not drift when netting amounts in cents', async () => {
+      await transfer(savings, eurAccount, 30, 30);
+      await transfer(eurAccount, savings, 10, 10);
+
+      const { transfers } = (await summary(`?accounts=${eurAccount}`)).body.data;
+
+      expect(transfers.net).toBe(0.2);
+    });
+
+    it('returns a null net but keeps the amounts when a rate is unavailable', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+      const noRate = await insertAccount(userId, 'NoRateTransfers', 'ZZQ');
+      await transfer(noRate, eurAccount, 500, 1000);
+
+      const { transfers } = (await summary()).body.data;
+
+      expect(transfers.out).toEqual({ total: null, amounts: [{ currency: 'ZZQ', scale: 2, amount: 5 }] });
+      expect(transfers.in.total).toBe(10);
+      expect(transfers.net).toBeNull();
+    });
+
+    it('leaves out the side on an account the user cannot reach', async () => {
+      await transfer(eurAccount, otherAccount, 1000, 1000);
+      const otherSavings = await insertAccount(otherUserId, 'Foreign savings', 'EUR');
+      await pool.query(
+        `INSERT INTO transactions (user_id, debit_account_id, credit_account_id, debit, credit, date)
+         VALUES ($1, $2, $3, 7700, 7700, '2026-03-01')`,
+        [otherUserId, otherAccount, otherSavings]
+      );
+
+      const { transfers } = (await summary()).body.data;
+
+      expect(transfers.out.total).toBe(10);
+      expect(transfers.in).toEqual({ total: 0, amounts: [] });
+      expect(transfers.net).toBe(-10);
+    });
+
+    it('honours the date range', async () => {
+      await transfer(eurAccount, savings, 1000, 1000, '2026-03-01');
+      await transfer(eurAccount, savings, 200, 200, '2026-04-01');
+
+      const { transfers } = (await summary(`?from=2026-04-01&to=2026-04-30&accounts=${savings}`)).body.data;
+
+      expect(transfers.net).toBe(2);
+    });
+
+    it('filters the transaction list by direction', async () => {
+      await transfer(eurAccount, savings, 1000, 1000);
+      await transfer(savings, eurAccount, 400, 400);
+      await insertExpense(userId, food, eurAccount, 50, '2026-03-01');
+
+      const amounts = async (type: string) => {
+        const res = await list(`?type=${type}&accounts=${eurAccount}`);
+        expect(res.status).toBe(200);
+        return res.body.data.map((t: { debit: number }) => t.debit);
+      };
+
+      expect(await amounts('transfer_in')).toEqual([4]);
+      expect(await amounts('transfer_out')).toEqual([10]);
+      expect(await amounts('transfer')).toHaveLength(2);
+    });
+
+    it('shows a transfer inside the selection under both directions', async () => {
+      await transfer(eurAccount, savings, 1000, 1000);
+      const query = `&accounts=${eurAccount}&accounts=${savings}`;
+
+      expect((await list(`?type=transfer_in${query}`)).body.data).toHaveLength(1);
+      expect((await list(`?type=transfer_out${query}`)).body.data).toHaveLength(1);
+    });
+  });
 });

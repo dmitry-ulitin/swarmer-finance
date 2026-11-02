@@ -296,6 +296,13 @@ the user's `users.currency` (default EUR) at `users.currency_scale`, null
 when a rate is missing; the only place a rate becomes stored data is the
 second amount of a cross-currency transfer created by statement import.
 
+The summary's `transfers` holds `in` (credited to the selected accounts, all
+reachable ones when none is selected), `out` (debited from them) and `net`
+(`in` minus `out`), so a transfer inside the selection counts in both `in` and
+`out` and leaves `net` alone. The transaction
+list and export take the same directions as `type=transfer_in` /
+`transfer_out`; export then writes only that side of each transfer.
+
 #### Transactions — single table, double-entry style
 
 One `transactions` table covers expense, income, and transfer; the type is implied by which columns are populated — no stored `type` column:

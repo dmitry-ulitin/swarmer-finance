@@ -393,11 +393,26 @@ export interface CategorySummaryItem {
   amounts: { currency: string; scale: number; amount: number }[];
 }
 
+export interface TransferSideSummary {
+  /** In the user's currency at today's rate; null when a rate is missing. */
+  total: number | null;
+  /** The unconverted sums, one per account currency. */
+  amounts: CategorySummaryItem['amounts'];
+}
+
+export interface TransferSummary {
+  /** `in` minus `out`; null when a rate is missing. */
+  net: number | null;
+  in: TransferSideSummary;
+  out: TransferSideSummary;
+}
+
 export interface CategorySummary {
   currency: string;
   scale: number;
   income: CategorySummaryItem[];
   expense: CategorySummaryItem[];
+  transfers: TransferSummary;
 }
 
 export const getCategorySummary = async (
@@ -413,7 +428,8 @@ export const getCategorySummary = async (
     : accessibleIds;
 
   const rows = await transactionQueries.getCategorySummary({ ...filters, accounts: accountIds });
-  const rates = await getRatesTo(user.currency, rows.map(r => r.currency));
+  const transferRows = await transactionQueries.getTransferSummary({ ...filters, accounts: accountIds });
+  const rates = await getRatesTo(user.currency, [...rows, ...transferRows].map(r => r.currency));
 
   // One item per type + the category the user's tree shows for that name
   // (their own row over a co-owner's); the query splits each by currency.
@@ -432,7 +448,36 @@ export const getCategorySummary = async (
     item.amounts.push({ currency: row.currency, scale: row.scale, amount: toDecimal(row.amount, row.scale) });
   }
 
-  const result: CategorySummary = { currency: user.currency, scale: user.currency_scale, income: [], expense: [] };
+  const transferSide = (direction: transactionQueries.TransferSummaryRow['direction']) => {
+    const sideRows = transferRows.filter(r => r.direction === direction);
+    let cents: number | null = 0;
+    for (const row of sideRows) {
+      const converted = convertAmount(row.amount, row.scale, rates.get(row.currency) ?? null, user.currency_scale);
+      cents = cents === null || converted === null ? null : cents + converted;
+    }
+    return {
+      cents,
+      summary: {
+        total: cents === null ? null : toDecimal(cents, user.currency_scale),
+        amounts: sideRows.map(r => ({ currency: r.currency, scale: r.scale, amount: toDecimal(r.amount, r.scale) })),
+      } satisfies TransferSideSummary,
+    };
+  };
+  const incoming = transferSide('in');
+  const outgoing = transferSide('out');
+  const netCents = incoming.cents === null || outgoing.cents === null ? null : incoming.cents - outgoing.cents;
+
+  const result: CategorySummary = {
+    currency: user.currency,
+    scale: user.currency_scale,
+    income: [],
+    expense: [],
+    transfers: {
+      net: netCents === null ? null : toDecimal(netCents, user.currency_scale),
+      in: incoming.summary,
+      out: outgoing.summary,
+    },
+  };
   for (const { type, cents, ...item } of items.values()) {
     result[type].push({ ...item, total: cents === null ? null : toDecimal(cents, user.currency_scale) });
   }

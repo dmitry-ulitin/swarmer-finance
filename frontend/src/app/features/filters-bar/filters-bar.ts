@@ -12,7 +12,13 @@ import { findCategoryById } from '../../models/category';
 import { DateRangeFilter } from './date-range-filter/date-range-filter';
 import { ExportDialogService } from '../transactions/export-dialog.service';
 
-const TYPE_LABELS = { income: 'Income', expense: 'Expenses', transfer: 'Transfers' } as const;
+const TYPE_LABELS = {
+  income: 'Income',
+  expense: 'Expenses',
+  transfer: 'Transfers',
+  transfer_in: 'Transfers in',
+  transfer_out: 'Transfers out',
+} as const;
 
 @Component({
   selector: 'app-filters-bar',

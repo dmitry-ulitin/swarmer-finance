@@ -9,7 +9,8 @@ export interface TransactionFilters {
   categories?: number[];
   accounts?: number[];
   details?: string;
-  type?: 'income' | 'expense' | 'transfer';
+  /** `transfer_in` / `transfer_out`: credited to / debited from one of `accounts`. */
+  type?: 'income' | 'expense' | 'transfer' | 'transfer_in' | 'transfer_out';
   offset?: number;
   /** `null` returns every match (the statement export); omitted means 20. */
   limit?: number | null;
@@ -186,6 +187,10 @@ export const getTransactions = async (
     conditions.push('t.debit_account_id IS NULL AND t.credit_account_id IS NOT NULL');
   } else if (filters.type === 'transfer') {
     conditions.push('t.debit_account_id IS NOT NULL AND t.credit_account_id IS NOT NULL');
+  } else if (filters.type === 'transfer_in') {
+    conditions.push('t.debit_account_id IS NOT NULL AND t.credit_account_id = ANY($1::int[])');
+  } else if (filters.type === 'transfer_out') {
+    conditions.push('t.credit_account_id IS NOT NULL AND t.debit_account_id = ANY($1::int[])');
   }
 
   const whereClause = conditions.join(' AND ');
@@ -422,6 +427,54 @@ export const getCategorySummary = async (
      )
      SELECT g.type, g.category_id, g.name, c.color, c.icon, g.currency, g.scale, g.amount
      FROM grouped g JOIN categories c ON c.id = g.category_id`,
+    params
+  );
+  return rows.map(r => ({ ...r, amount: Number(r.amount) }));
+};
+
+export interface TransferSummaryRow {
+  direction: 'in' | 'out';
+  currency: string;
+  scale: number;
+  amount: number;
+}
+
+/**
+ * Transfer sums per direction and account currency: `in` is what `accounts`
+ * received and `out` what they sent, so a transfer between two of them is in
+ * both.
+ */
+export const getTransferSummary = async (
+  filters: Pick<TransactionQueryFilters, 'accounts' | 'from' | 'to'>
+): Promise<TransferSummaryRow[]> => {
+  // Same access gate as getTransactions: an empty list matches nothing.
+  if (filters.accounts.length === 0) return [];
+
+  const conditions = [
+    't.debit_account_id IS NOT NULL',
+    't.credit_account_id IS NOT NULL',
+    'side.account_id = ANY($1::int[])',
+  ];
+  const params: unknown[] = [filters.accounts];
+  if (filters.from) {
+    params.push(filters.from);
+    conditions.push(`t.date >= $${params.length}`);
+  }
+  if (filters.to) {
+    params.push(filters.to);
+    conditions.push(`t.date <= $${params.length}`);
+  }
+
+  const rows = await query<Omit<TransferSummaryRow, 'amount'> & { amount: string }>(
+    `SELECT side.direction, a.currency, a.scale, SUM(side.amount) AS amount
+     FROM transactions t
+     CROSS JOIN LATERAL (VALUES
+       ('in', t.credit_account_id, t.credit),
+       ('out', t.debit_account_id, t.debit)
+     ) AS side(direction, account_id, amount)
+     JOIN accounts a ON a.id = side.account_id
+     WHERE ${conditions.join(' AND ')}
+     GROUP BY side.direction, a.currency, a.scale`,
     params
   );
   return rows.map(r => ({ ...r, amount: Number(r.amount) }));

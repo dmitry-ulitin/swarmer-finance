@@ -18,7 +18,7 @@ describe('Dashboard', () => {
       disconnect() {}
     });
     getTransactions = vi.fn(() => of({ data: [], error: null }));
-    getCategorySummary = vi.fn(() => of({ data: { currency: 'EUR', scale: 2, income: [], expense: [] }, error: null }));
+    getCategorySummary = vi.fn(() => of({ data: { currency: 'EUR', scale: 2, income: [], expense: [], transfers: { net: 0, in: { total: 0, amounts: [] }, out: { total: 0, amounts: [] } } }, error: null }));
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),

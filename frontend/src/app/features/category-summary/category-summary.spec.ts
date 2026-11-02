@@ -7,10 +7,20 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { DateRange, TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
-import { CategorySummary, CategorySummaryItem } from '../../models/transaction';
+import { CategorySummary, CategorySummaryItem, TransactionFilters } from '../../models/transaction';
 
 function item(name: string, total: number | null): CategorySummaryItem {
   return { category_id: name.length, name, color: '#123456', icon: 'tag', total, amounts: [{ currency: 'EUR', scale: 2, amount: total ?? 0 }] };
+}
+
+const NO_TRANSFERS: CategorySummary['transfers'] = {
+  net: 0,
+  in: { total: 0, amounts: [] },
+  out: { total: 0, amounts: [] },
+};
+
+function side(total: number | null, currency = 'EUR', amount = total ?? 0): CategorySummary['transfers']['in'] {
+  return { total, amounts: [{ currency, scale: 2, amount }] };
 }
 
 describe('CategorySummaryPanel', () => {
@@ -21,7 +31,7 @@ describe('CategorySummaryPanel', () => {
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectCategory: ReturnType<typeof vi.fn>;
   let toggleCategory: ReturnType<typeof vi.fn>;
-  let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
+  let selectedType: ReturnType<typeof signal<TransactionFilters['type']>>;
   let selectType: ReturnType<typeof vi.fn>;
   let showError: ReturnType<typeof vi.fn>;
   let isAuthenticated: ReturnType<typeof signal<boolean>>;
@@ -29,7 +39,7 @@ describe('CategorySummaryPanel', () => {
 
   function respond(summary: Partial<CategorySummary>): void {
     getCategorySummary.mockReturnValue(of({
-      data: { currency: 'EUR', scale: 2, income: [], expense: [], ...summary }, error: null,
+      data: { currency: 'EUR', scale: 2, income: [], expense: [], transfers: NO_TRANSFERS, ...summary }, error: null,
     }));
   }
 
@@ -49,7 +59,7 @@ describe('CategorySummaryPanel', () => {
     selectedCategoryIds = signal<number[]>([]);
     selectCategory = vi.fn();
     toggleCategory = vi.fn();
-    selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
+    selectedType = signal<TransactionFilters['type']>(undefined);
     selectType = vi.fn();
     showError = vi.fn();
     isAuthenticated = signal(true);
@@ -184,7 +194,7 @@ describe('CategorySummaryPanel', () => {
     expect(selectType).toHaveBeenCalledExactlyOnceWith('transfer');
   });
 
-  it('hides transfers when there is no income or expenses', async () => {
+  it('hides transfers when there is no income, expenses or transfers', async () => {
     const el = await render();
     expect(el.querySelector('.transfers')).toBeNull();
   });
@@ -197,5 +207,79 @@ describe('CategorySummaryPanel', () => {
 
     expect(transfers.classList).toContain('selected');
     expect(transfers.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  describe('transfer amounts', () => {
+    const transferRow = (el: HTMLElement, type: string) =>
+      el.querySelector<HTMLButtonElement>(`.row[data-transfer="${type}"]`)!;
+
+    it('shows the net and both directions, bars relative to the larger', async () => {
+      respond({ transfers: { net: 50, in: side(100), out: side(50) } });
+      const el = await render();
+
+      expect(el.querySelector('.transfers .block-total')!.textContent).toContain('50');
+      const incoming = transferRow(el, 'transfer_in');
+      expect(incoming.querySelector('.name')!.textContent).toContain('Incoming');
+      expect(incoming.querySelector('.amount')!.textContent).toContain('100');
+      expect((incoming.querySelector('.bar-fill') as HTMLElement).style.width).toBe('100%');
+      const outgoing = transferRow(el, 'transfer_out');
+      expect(outgoing.querySelector('.name')!.textContent).toContain('Outgoing');
+      expect(outgoing.querySelector('.amount')!.textContent).toContain('50');
+      expect((outgoing.querySelector('.bar-fill') as HTMLElement).style.width).toBe('50%');
+    });
+
+    it('filters by a direction', async () => {
+      respond({ transfers: { net: 50, in: side(100), out: side(50) } });
+      const el = await render();
+
+      transferRow(el, 'transfer_in').click();
+      expect(selectType).toHaveBeenLastCalledWith('transfer_in');
+      transferRow(el, 'transfer_out').click();
+      expect(selectType).toHaveBeenLastCalledWith('transfer_out');
+    });
+
+    it('marks the selected direction only', async () => {
+      respond({ transfers: { net: 50, in: side(100), out: side(50) } });
+      selectedType.set('transfer_out');
+      const el = await render();
+
+      expect(transferRow(el, 'transfer_out').classList).toContain('selected');
+      expect(transferRow(el, 'transfer_out').getAttribute('aria-pressed')).toBe('true');
+      expect(transferRow(el, 'transfer_in').classList).not.toContain('selected');
+      expect(el.querySelector('.transfers')!.classList).not.toContain('selected');
+    });
+
+    it('shows the block when transfers are all there is', async () => {
+      respond({ transfers: { net: 10, in: side(10), out: { total: 0, amounts: [] } } });
+      const el = await render();
+
+      expect(el.querySelector('.transfers')).not.toBeNull();
+      expect(transferRow(el, 'transfer_out').querySelector('.amount')!.textContent).toContain('0');
+      expect(el.querySelector('.empty')).toBeNull();
+    });
+
+    it('shows the button but no directions when there are no transfers', async () => {
+      respond({ expense: [item('Food', 75)] });
+      const el = await render();
+
+      expect(el.querySelector('.transfers')).not.toBeNull();
+      expect(el.querySelector('.transfers .block-total')).toBeNull();
+      expect(transferRow(el, 'transfer_in')).toBeNull();
+    });
+
+    it('shows a dash when a rate is missing', async () => {
+      respond({ transfers: { net: null, in: side(null, 'ZZQ', 5), out: side(10) } });
+      const el = await render();
+
+      expect(el.querySelector('.transfers .block-total')).toBeNull();
+      expect(transferRow(el, 'transfer_in').querySelector('.amount')!.textContent).toContain('—');
+    });
+
+    it('shows a zero net when the directions balance', async () => {
+      respond({ transfers: { net: 0, in: side(10), out: side(10) } });
+      const el = await render();
+
+      expect(el.querySelector('.transfers .block-total')!.textContent).toContain('0');
+    });
   });
 });

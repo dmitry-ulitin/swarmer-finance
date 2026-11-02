@@ -39,9 +39,10 @@ interface ExportRow {
 /**
  * One row per side of a transaction on an exported account: a transfer
  * between two exported accounts is two rows, as it is in two bank
- * statements. Money leaving the account is negative.
+ * statements. Money leaving the account is negative. A direction filter keeps
+ * only the side it asked for.
  */
-function toRows(transactions: TransactionDTO[], exported: Set<number>): ExportRow[] {
+function toRows(transactions: TransactionDTO[], exported: Set<number>, type: TransactionFilters['type']): ExportRow[] {
   const rows: ExportRow[] = [];
   const side = (t: TransactionDTO, account: TransactionAccount, amount: number,
     counter: TransactionAccount | null, counterAmount: number) => {
@@ -61,10 +62,10 @@ function toRows(transactions: TransactionDTO[], exported: Set<number>): ExportRo
     ] });
   };
   for (const t of transactions) {
-    if (t.debit_account && exported.has(t.debit_account.id)) {
+    if (t.debit_account && exported.has(t.debit_account.id) && type !== 'transfer_in') {
       side(t, t.debit_account, -t.debit, t.credit_account, t.credit);
     }
-    if (t.credit_account && exported.has(t.credit_account.id)) {
+    if (t.credit_account && exported.has(t.credit_account.id) && type !== 'transfer_out') {
       side(t, t.credit_account, t.credit, t.debit_account, -t.debit);
     }
   }
@@ -75,7 +76,7 @@ async function exportRows(userId: number, filters: TransactionFilters): Promise<
   const { transactions, accountIds } = await findVisible(userId, {
     ...filters, offset: undefined, limit: null, ascending: true,
   });
-  return toRows(transactions, new Set(accountIds));
+  return toRows(transactions, new Set(accountIds), filters.type);
 }
 
 /** The transactions list's current filter as a CSV statement, UTF-8 with a BOM for Excel. */

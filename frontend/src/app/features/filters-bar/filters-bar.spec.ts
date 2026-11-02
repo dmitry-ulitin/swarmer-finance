@@ -8,6 +8,7 @@ import { buildAccountTree } from '../../core/account-tree';
 import { Account } from '../../models/account';
 import { CategoriesState } from '../../core/categories.state';
 import { Category } from '../../models/category';
+import { TransactionFilters } from '../../models/transaction';
 
 function makeAccount(id: number, name: string): Account {
   return {
@@ -22,7 +23,7 @@ describe('FiltersBar', () => {
   let toggleCategory: ReturnType<typeof vi.fn>;
   let selectedCategoryIds: ReturnType<typeof signal<number[]>>;
   let selectedAccountIds: ReturnType<typeof signal<number[]>>;
-  let selectedType: ReturnType<typeof signal<'income' | 'expense' | 'transfer' | undefined>>;
+  let selectedType: ReturnType<typeof signal<TransactionFilters['type']>>;
   let clearType: ReturnType<typeof vi.fn>;
   let fixture: ComponentFixture<FiltersBar>;
   let input: HTMLInputElement;
@@ -34,7 +35,7 @@ describe('FiltersBar', () => {
     toggleCategory = vi.fn();
     selectedCategoryIds = signal<number[]>([]);
     selectedAccountIds = signal<number[]>([]);
-    selectedType = signal<'income' | 'expense' | 'transfer' | undefined>(undefined);
+    selectedType = signal<TransactionFilters['type']>(undefined);
     clearType = vi.fn();
     const groupedAccounts = signal(buildAccountTree([
       makeAccount(1, 'Cash'), makeAccount(2, 'Bank/A'), makeAccount(3, 'Bank/B'),
@@ -133,6 +134,10 @@ describe('FiltersBar', () => {
     expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Income');
     selectedType.set('transfer');
     expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Transfers');
+    selectedType.set('transfer_in');
+    expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Transfers in');
+    selectedType.set('transfer_out');
+    expect(typeChip()!.textContent!.replace('Remove', '').trim()).toBe('Transfers out');
   });
 
   it('clears the type with its X button', () => {

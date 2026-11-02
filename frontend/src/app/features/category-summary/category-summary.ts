@@ -7,7 +7,7 @@ import { TransactionsState } from '../../core/transactions.state';
 import { MoneyPipe } from '../../core/money.pipe';
 import { NotificationService } from '../../core/notification.service';
 import { amountsHint } from '../../core/money-hint';
-import { CategorySummaryItem } from '../../models/transaction';
+import { CategorySummaryItem, TransferSideSummary } from '../../models/transaction';
 
 interface SummaryRow extends CategorySummaryItem {
   /** Width of the bar, as a share of the block total. */
@@ -24,7 +24,17 @@ interface SummaryBlock {
   rows: SummaryRow[];
 }
 
-/** Income and expenses per top-level category, for the current account and date filters. */
+interface TransferRow {
+  type: 'transfer_in' | 'transfer_out';
+  name: string;
+  icon: string;
+  total: number | null;
+  /** Width of the bar, relative to the larger direction. */
+  share: number;
+  hint: string | null;
+}
+
+/** Income, expenses and transfers, for the current account and date filters. */
 @Component({
   selector: 'app-category-summary',
   imports: [MoneyPipe, TuiHint, TuiIcon, TuiLoader],
@@ -78,6 +88,31 @@ export class CategorySummaryPanel {
     ];
     return blocks.filter(b => b.rows.length > 0);
   });
+
+  protected readonly transfersNet = computed(() => this.value()?.transfers.net ?? null);
+
+  /** Empty when no transfer matches, so the directions do not show two zeros. */
+  protected readonly transferRows = computed<TransferRow[]>(() => {
+    const summary = this.value();
+    if (!summary) return [];
+    const { in: incoming, out: outgoing } = summary.transfers;
+    if (incoming.amounts.length === 0 && outgoing.amounts.length === 0) return [];
+    const largest = Math.max(incoming.total ?? 0, outgoing.total ?? 0);
+    const row = (type: TransferRow['type'], name: string, icon: string, side: TransferSideSummary): TransferRow => ({
+      type,
+      name,
+      icon,
+      total: side.total,
+      share: largest && side.total !== null ? Math.round((side.total / largest) * 100) : 0,
+      hint: amountsHint(this.money, side.amounts, summary.currency) || null,
+    });
+    return [
+      row('transfer_in', 'Incoming', '@tui.arrow-down-left', incoming),
+      row('transfer_out', 'Outgoing', '@tui.arrow-up-right', outgoing),
+    ];
+  });
+
+  protected readonly showTransfers = computed(() => this.blocks().length > 0 || this.transferRows().length > 0);
 
   private block(type: SummaryBlock['type'], title: string, items: CategorySummaryItem[], currency: string): SummaryBlock {
     const total = items.some(i => i.total === null) ? null : items.reduce((sum, i) => sum + i.total!, 0);

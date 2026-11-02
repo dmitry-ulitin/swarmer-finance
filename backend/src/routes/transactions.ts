@@ -35,7 +35,7 @@ const filtersSchema = z.object({
   categories: arrayOfIds,
   accounts: arrayOfIds,
   details: z.string().optional(),
-  type: z.enum(['income', 'expense', 'transfer']).optional(),
+  type: z.enum(['income', 'expense', 'transfer', 'transfer_in', 'transfer_out']).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
@@ -55,7 +55,7 @@ router.get('/', validate(filtersSchema, 'query'), async (req: AuthRequest, res, 
       categories: toIntArray(req.query.categories),
       accounts: toIntArray(req.query.accounts),
       details: req.query.details as string | undefined,
-      type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
+      type: req.query.type as TransactionFilters['type'],
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     };
@@ -78,7 +78,7 @@ router.get('/export', validate(exportSchema, 'query'), async (req: AuthRequest, 
       categories: toIntArray(req.query.categories),
       accounts: toIntArray(req.query.accounts),
       details: req.query.details as string | undefined,
-      type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
+      type: req.query.type as TransactionFilters['type'],
     };
     if (req.query.preview === 'true') {
       const result = await exportService.previewExport(req.userId!, filters);

@@ -32,7 +32,8 @@ export interface TransactionFilters {
     categories?: number[];
     accounts?: number[];
     details?: string;
-    type?: 'income' | 'expense' | 'transfer';
+    /** `transfer_in` / `transfer_out`: credited to / debited from the selected accounts. */
+    type?: 'income' | 'expense' | 'transfer' | 'transfer_in' | 'transfer_out';
 }
 
 /** What a CSV export of the current filters would hold. */
@@ -55,11 +56,25 @@ export interface CategorySummaryItem {
     amounts: { currency: string; scale: number; amount: number }[];
 }
 
+/** One direction of transfers, seen from the selected accounts. */
+export interface TransferSideSummary {
+    /** In the user's currency; null when an exchange rate is missing. */
+    total: number | null;
+    /** The unconverted sums, one per account currency. */
+    amounts: CategorySummaryItem['amounts'];
+}
+
 export interface CategorySummary {
     currency: string;
     scale: number;
     income: CategorySummaryItem[];
     expense: CategorySummaryItem[];
+    transfers: {
+        /** `in` minus `out`; null when an exchange rate is missing. */
+        net: number | null;
+        in: TransferSideSummary;
+        out: TransferSideSummary;
+    };
 }
 
 export enum TransactionType {

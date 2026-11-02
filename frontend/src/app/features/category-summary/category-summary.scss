@@ -88,6 +88,10 @@
   height: 100%;
 }
 
+.transfer-fill {
+  background: var(--tui-text-tertiary);
+}
+
 .empty {
   color: var(--tui-text-tertiary);
   font-size: 0.875rem;

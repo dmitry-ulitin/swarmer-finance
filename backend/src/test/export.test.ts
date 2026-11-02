@@ -133,6 +133,17 @@ describe('GET /api/transactions/export', () => {
     expect(rows[0][1]).toBe('Cold BTC');
   });
 
+  it('writes only the side a direction filter asks for', async () => {
+    const incoming = grid((await exportCsv('?type=transfer_in')).text).slice(1);
+    expect(incoming.map(r => [r[1], r[4]])).toEqual([['Cold BTC', '0.01234567'], ['Cash', '50.00']]);
+
+    const outgoing = grid((await exportCsv('?type=transfer_out')).text).slice(1);
+    expect(outgoing.map(r => [r[1], r[4]])).toEqual([['Main EUR', '-1000.00'], ['Main EUR', '-50.00']]);
+
+    const preview = await exportCsv('?type=transfer_in&preview=true');
+    expect(preview.body.data).toMatchObject({ rows: 2, accounts: 2 });
+  });
+
   it('applies the list filters', async () => {
     const rows = grid((await exportCsv('?type=expense&from=2026-01-01&to=2026-01-31')).text).slice(1);
     expect(rows.map(r => r[11])).toEqual([String(expenseId)]);
