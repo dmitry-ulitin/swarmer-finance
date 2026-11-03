@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, inject, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { BalancePrivacy } from '../../core/balance-privacy';
 import { MoneyPipe } from '../../core/money.pipe';
 import { TransactionsState } from '../../core/transactions.state';
 import { TuiButton, TuiLoader } from '@taiga-ui/core';
@@ -16,6 +17,7 @@ export class TransactionList {
   protected readonly TransactionType = TransactionType;
 
   readonly state = inject(TransactionsState);
+  protected readonly privacy = inject(BalancePrivacy);
   private readonly destroyRef = inject(DestroyRef);
   private readonly sentinel = viewChild.required<ElementRef<HTMLElement>>('sentinel');
 

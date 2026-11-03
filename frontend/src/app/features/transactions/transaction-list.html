@@ -22,7 +22,7 @@
                 {{ t.amount | money: t.amountCurrency : t.amountScale }}
             </span>
             @if (t.balance !== null) {
-                <span class="balance">{{ t.balance | money: t.balanceCurrency : t.balanceScale }}</span>
+                <span class="balance" [class.balance-blurred]="privacy.hidden()">{{ t.balance | money: t.balanceCurrency : t.balanceScale }}</span>
             }
         </div>
     </div>

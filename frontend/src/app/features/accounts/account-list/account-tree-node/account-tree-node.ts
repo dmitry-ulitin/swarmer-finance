@@ -4,6 +4,7 @@ import { AccountGroupItem, AccountLeafItem, AccountTreeItem, collectAccountIds, 
 import { amountsHint } from '../../../../core/money-hint';
 import { gainPct } from '../../../../core/account-gain';
 import { AccountListStore } from '../account-list.store';
+import { BalancePrivacy } from '../../../../core/balance-privacy';
 import { TransactionsState } from '../../../../core/transactions.state';
 import { AuthService } from '../../../../core/auth.service';
 import { TuiExpand, TuiButton, TuiHint } from '@taiga-ui/core';
@@ -27,6 +28,7 @@ export class AccountTreeNode {
   protected readonly store = inject(AccountListStore);
   protected readonly transactions = inject(TransactionsState);
   protected readonly auth = inject(AuthService);
+  protected readonly privacy = inject(BalancePrivacy);
   private readonly importDialog = inject(ImportDialogService);
   protected readonly sync = inject(AccountSyncService);
   private readonly money = inject(MoneyPipe);
@@ -46,7 +48,7 @@ export class AccountTreeNode {
   protected readonly accountHint = computed(() => {
     const item = this.item();
     const user = this.auth.user();
-    if (item.kind !== 'account' || !user) return null;
+    if (item.kind !== 'account' || !user || this.privacy.hidden()) return null;
     const { currency, user_balance } = item.account;
     if (currency === user.currency || user_balance === null) return null;
     return this.money.transform(user_balance, user.currency, user.currency_scale);
@@ -56,7 +58,7 @@ export class AccountTreeNode {
   protected readonly groupHint = computed(() => {
     const item = this.item();
     const user = this.auth.user();
-    if (item.kind !== 'group' || !user) return null;
+    if (item.kind !== 'group' || !user || this.privacy.hidden()) return null;
     return amountsHint(this.money, sumByCurrency(collectAccounts(item)), user.currency);
   });
 

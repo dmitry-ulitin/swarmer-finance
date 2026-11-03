@@ -31,3 +31,9 @@ tui-dialog > header h2 {
 tui-dialog > [tuiButtonX] {
   inset-block-start: 0.125rem !important;
 }
+
+// Account balances while the account list's privacy toggle is on.
+.balance-blurred {
+  filter: blur(6px);
+  user-select: none;
+}

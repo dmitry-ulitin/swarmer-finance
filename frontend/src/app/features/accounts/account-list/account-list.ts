@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { TuiHint } from '@taiga-ui/core';
+import { TuiButton, TuiHint } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
+import { BalancePrivacy } from '../../../core/balance-privacy';
 import { AccountListStore } from './account-list.store';
 import { AccountTreeNode } from './account-tree-node/account-tree-node';
 import { TransactionsState } from '../../../core/transactions.state';
@@ -11,7 +12,7 @@ import { amountsHint } from '../../../core/money-hint';
 
 @Component({
   selector: 'app-account-list',
-  imports: [AccountTreeNode, MoneyPipe, TuiHint],
+  imports: [AccountTreeNode, MoneyPipe, TuiButton, TuiHint],
   providers: [AccountListStore, MoneyPipe],
   templateUrl: './account-list.html',
   styleUrl: './account-list.scss',
@@ -20,13 +21,14 @@ import { amountsHint } from '../../../core/money-hint';
 export class AccountList {
   protected readonly state = inject(AccountsState);
   protected readonly transactions = inject(TransactionsState);
+  protected readonly privacy = inject(BalancePrivacy);
   private readonly accountDialogs = inject(AccountDialogService);
   private readonly money = inject(MoneyPipe);
 
   /** The unconverted balances behind the total. */
   protected readonly totalHint = computed(() => {
     const summary = this.state.summary();
-    if (!summary) return null;
+    if (!summary || this.privacy.hidden()) return null;
     return amountsHint(this.money, sumByCurrency(this.state.visibleAccounts()), summary.currency);
   });
 

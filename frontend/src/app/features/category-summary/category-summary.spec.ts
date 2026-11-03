@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { CategorySummaryPanel } from './category-summary';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { BalancePrivacy } from '../../core/balance-privacy';
 import { DateRange, TransactionsState } from '../../core/transactions.state';
 import { NotificationService } from '../../core/notification.service';
 import { CategorySummary, CategorySummaryItem, TransactionFilters } from '../../models/transaction';
@@ -281,5 +282,29 @@ describe('CategorySummaryPanel', () => {
 
       expect(el.querySelector('.transfers .block-total')!.textContent).toContain('0');
     });
+  });
+
+  it('blurs every amount and drops the hints while balances are hidden', async () => {
+    const usd: CategorySummaryItem = { ...item('Food', 1000), amounts: [{ currency: 'USD', scale: 2, amount: 1100 }] };
+    respond({
+      expense: [usd],
+      transfers: { net: 500, in: side(1000, 'USD', 1100), out: side(500) },
+    });
+    const privacy = TestBed.inject(BalancePrivacy);
+    const el = await render();
+    const amounts = () => [...el.querySelectorAll('.amount, .block-total')];
+
+    expect(amounts().length).toBe(5);
+    expect(el.querySelectorAll('.balance-blurred').length).toBe(0);
+    expect(el.querySelectorAll('[aria-description]').length).toBe(2);
+
+    privacy.toggle();
+    await render();
+    expect(amounts().every(a => a.classList.contains('balance-blurred'))).toBe(true);
+    expect(el.querySelectorAll('[aria-description]').length).toBe(0);
+
+    privacy.toggle();
+    await render();
+    expect(el.querySelectorAll('.balance-blurred').length).toBe(0);
   });
 });

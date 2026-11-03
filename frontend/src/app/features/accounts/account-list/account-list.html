@@ -7,6 +7,16 @@
       (click)="transactions.selectAllAccounts()"
     >All accounts</button>
     <button
+      appearance="gray"
+      size="xs"
+      tuiIconButton
+      type="button"
+      [iconStart]="privacy.hidden() ? '@tui.eye-off' : '@tui.eye'"
+      [attr.aria-pressed]="privacy.hidden()"
+      [attr.title]="privacy.hidden() ? 'Show balances' : 'Hide balances'"
+      (click)="privacy.toggle()"
+    >{{ privacy.hidden() ? 'Show balances' : 'Hide balances' }}</button>
+    <button
       class="add-account"
       type="button"
       aria-label="Add account"
@@ -26,13 +36,13 @@
   @if (state.accountSections().length > 0 && state.summary(); as summary) {
     @if (totalHint(); as hint) {
       <div class="summary-row">
-        <span class="summary-balance" [tuiHint]="hint">
+        <span class="summary-balance" [class.balance-blurred]="privacy.hidden()" [tuiHint]="hint">
           {{ summary.incomplete ? '—' : (summary.total | money: summary.currency : summary.scale) }}
         </span>
       </div>
     } @else if (!summary.incomplete) {
       <div class="summary-row">
-        <span class="summary-balance">{{ summary.total | money: summary.currency : summary.scale }}</span>
+        <span class="summary-balance" [class.balance-blurred]="privacy.hidden()">{{ summary.total | money: summary.currency : summary.scale }}</span>
       </div>
     }
   }

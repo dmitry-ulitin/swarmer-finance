@@ -9,7 +9,7 @@
     >
       <span class="block-title">{{ block.title }}</span>
       @if (block.total !== null) {
-        <span class="block-total">{{ block.total | money: currency() : scale() }}</span>
+        <span class="block-total" [class.balance-blurred]="privacy.hidden()">{{ block.total | money: currency() : scale() }}</span>
       }
     </button>
     @for (row of block.rows; track row.category_id) {
@@ -24,11 +24,11 @@
         <tui-icon class="icon" [icon]="'@tui.' + row.icon" [style.color]="row.color" />
         <span class="name">{{ row.name }}</span>
         @if (row.hint) {
-          <span class="amount" [tuiHint]="row.hint">
+          <span class="amount" [class.balance-blurred]="privacy.hidden()" [tuiHint]="row.hint">
             {{ row.total === null ? '—' : (row.total | money: currency() : scale()) }}
           </span>
         } @else {
-          <span class="amount">{{ row.total | money: currency() : scale() }}</span>
+          <span class="amount" [class.balance-blurred]="privacy.hidden()">{{ row.total | money: currency() : scale() }}</span>
         }
         <span class="bar" aria-hidden="true">
           <span class="bar-fill" [style.width.%]="row.share" [style.background]="row.color"></span>
@@ -49,7 +49,7 @@
     >
       <span class="block-title">Transfers</span>
       @if (transfersNet() !== null && transferRows().length > 0) {
-        <span class="block-total" tuiHint="Incoming minus outgoing">{{ transfersNet() | money: currency() : scale() }}</span>
+        <span class="block-total" [class.balance-blurred]="privacy.hidden()" tuiHint="Incoming minus outgoing">{{ transfersNet() | money: currency() : scale() }}</span>
       }
     </button>
     @for (row of transferRows(); track row.type) {
@@ -65,11 +65,11 @@
         <tui-icon class="icon" [icon]="row.icon" />
         <span class="name">{{ row.name }}</span>
         @if (row.hint) {
-          <span class="amount" [tuiHint]="row.hint">
+          <span class="amount" [class.balance-blurred]="privacy.hidden()" [tuiHint]="row.hint">
             {{ row.total === null ? '—' : (row.total | money: currency() : scale()) }}
           </span>
         } @else {
-          <span class="amount">{{ row.total | money: currency() : scale() }}</span>
+          <span class="amount" [class.balance-blurred]="privacy.hidden()">{{ row.total | money: currency() : scale() }}</span>
         }
         <span class="bar" aria-hidden="true">
           <span class="bar-fill transfer-fill" [style.width.%]="row.share"></span>

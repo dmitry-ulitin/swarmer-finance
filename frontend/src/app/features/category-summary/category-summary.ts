@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { TuiHint, TuiIcon, TuiLoader } from '@taiga-ui/core';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { BalancePrivacy } from '../../core/balance-privacy';
 import { TransactionsState } from '../../core/transactions.state';
 import { MoneyPipe } from '../../core/money.pipe';
 import { NotificationService } from '../../core/notification.service';
@@ -47,6 +48,7 @@ export class CategorySummaryPanel {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   protected readonly transactions = inject(TransactionsState);
+  protected readonly privacy = inject(BalancePrivacy);
   private readonly money = inject(MoneyPipe);
   private readonly notifications = inject(NotificationService);
 
@@ -104,7 +106,7 @@ export class CategorySummaryPanel {
       icon,
       total: side.total,
       share: largest && side.total !== null ? Math.round((side.total / largest) * 100) : 0,
-      hint: amountsHint(this.money, side.amounts, summary.currency) || null,
+      hint: this.privacy.hidden() ? null : amountsHint(this.money, side.amounts, summary.currency) || null,
     });
     return [
       row('transfer_in', 'Incoming', '@tui.arrow-down-left', incoming),
@@ -119,7 +121,7 @@ export class CategorySummaryPanel {
     const rows = items.map(i => ({
       ...i,
       share: total && i.total !== null ? Math.round((i.total / total) * 100) : 0,
-      hint: amountsHint(this.money, i.amounts, currency),
+      hint: this.privacy.hidden() ? null : amountsHint(this.money, i.amounts, currency),
     }));
     return { type, title, total, rows };
   }
