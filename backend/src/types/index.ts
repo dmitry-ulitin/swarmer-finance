@@ -33,6 +33,7 @@ export interface Account {
   id: number;
   user_id: number;
   name: string;
+  description?: string | null;
   currency: string;
   start_balance: number;
   scale: number;

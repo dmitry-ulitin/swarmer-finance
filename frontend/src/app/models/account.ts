@@ -50,6 +50,8 @@ interface AccountBase {
   id: number;
   user_id: number;
   name: string;
+  /** Free-form notes; null when there are none. Optional so fixtures need not supply it. */
+  description?: string | null;
   currency: string;
   scale: number;
   start_balance: number;
@@ -95,6 +97,7 @@ export const accessLevelOf = (account: Account): AccessLevel => account.access_l
 // together, and the backend requires `type` on PUT as well as POST.
 export type AccountPayload = {
   name: string;
+  description: string | null;
   currency: string;
   startBalance: number;
   /** The bank account to load from; null unlinks, omitted keeps the current link. */

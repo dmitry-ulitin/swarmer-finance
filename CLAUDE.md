@@ -97,7 +97,7 @@ All API responses use this envelope format consistently.
   `AccountsState` reloads (its `version` signal); stacked `tui-bar-chart` (`@taiga-ui/addon-charts`, imported from its subpaths, the barrel hits a circular import), breakdowns, and accounts table with the in-net-worth checkbox
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→019)
+- Migrations in `backend/src/db/migrations/` — run in order (001→020)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -108,6 +108,8 @@ All API responses use this envelope format consistently.
 - Accounts table added in migration 003 (`name`, `currency`, `start_balance`); `start_balance` stored as an **INTEGER** at the account's `scale` (see
   below; e.g. 1000 = $10.00). The API takes and returns decimals; services
   convert with `toCents` / `toDecimal` (`services/currency.ts`)
+- `description` (migration 020): free-form notes shown only in the account
+  form; blank is stored as NULL, omitted on PUT keeps it
 - Migration 008 adds `type` (`cash` / `bank` / `crypto`) and per-type
   `settings` JSONB to accounts
 - Once an account has transactions its `start_balance` cannot change (400;

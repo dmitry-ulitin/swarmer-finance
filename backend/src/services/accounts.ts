@@ -137,7 +137,8 @@ export const createAccount = async (
   type: AccountType = 'cash',
   settings: Record<string, unknown> = {},
   bankLink: BankLinkInput | null = null,
-  inNetWorth?: boolean
+  inNetWorth?: boolean,
+  description: string | null = null
 ) => {
   const user = await getUserOrThrow(userId);
   if (bankLink) await checkLink(userId, { type, currency }, bankLink);
@@ -147,7 +148,7 @@ export const createAccount = async (
   }
   settings = normalizeSettings(provider, settings);
   const scale = getCurrencyScale(currency);
-  const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings);
+  const account = await accountQueries.createAccount(userId, name, currency, toCents(startBalance, scale), scale, type, settings, description);
   if (bankLink) await applyLink(account.id, bankLink);
   await applyNetWorthFlag(account.id, userId, inNetWorth);
   const [converted] = await withConvertedBalances(user, [{ ...account, balance: Number(account.start_balance), invested: Number(account.start_balance), last_transaction_date: null, last_valuation_date: null }]);
@@ -177,6 +178,8 @@ export const updateAccount = async (
   userId: number,
   data: {
     name?: string;
+    /** Omitted keeps the current description, null clears it. */
+    description?: string | null;
     currency?: string;
     startBalance?: number;
     type: AccountType;
@@ -297,7 +300,8 @@ export const updateAccount = async (
       await requireLevelOnAll(peers, userId, LEVEL.WRITE);
     }
     if (walletChanges) await clearSeenTxids(tx, id);
-    return accountQueries.updateAccount(id, { ...data, scale, startBalance }, tx);
+    const description = data.description === undefined ? existing.description ?? null : data.description;
+    return accountQueries.updateAccount(id, { ...data, description, scale, startBalance }, tx);
   });
   // Soft-deleted by a concurrent request since the check above.
   if (!account) {

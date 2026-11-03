@@ -184,6 +184,39 @@ describe('Accounts API — balance field', () => {
       await pool.query('DELETE FROM accounts WHERE user_id = $1', [testUserId]);
     });
 
+    it('stores a trimmed description and returns it', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Noted', currency: 'EUR', description: '  my card  ' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.description).toBe('my card');
+    });
+
+    it('stores a missing or blank description as null', async () => {
+      const missing = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'No note', currency: 'EUR' });
+      const blank = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Blank note', currency: 'EUR', description: '   ' });
+
+      expect(missing.body.data.description).toBeNull();
+      expect(blank.body.data.description).toBeNull();
+    });
+
+    it('rejects a description over 1000 characters', async () => {
+      const res = await request(app)
+        .post('/api/accounts')
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ name: 'Long', currency: 'EUR', description: 'x'.repeat(1001) });
+
+      expect(res.status).toBe(400);
+    });
+
     it('returns balance equal to startBalance on creation', async () => {
       const res = await request(app)
         .post('/api/accounts')
@@ -280,6 +313,20 @@ describe('Accounts API — balance field', () => {
         [testUserId]
       );
       accountId = result.rows[0].id;
+    });
+
+    it('sets, keeps and clears the description', async () => {
+      const put = (body: object) => request(app)
+        .put(`/api/accounts/${accountId}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .send({ type: 'cash', settings: {}, ...body });
+
+      expect((await put({ description: 'note' })).body.data.description).toBe('note');
+      expect((await put({ name: 'Renamed' })).body.data.description).toBe('note');
+      expect((await put({ description: null })).body.data.description).toBeNull();
+
+      await put({ description: 'again' });
+      expect((await put({ description: '  ' })).body.data.description).toBeNull();
     });
 
     it('reflects updated startBalance in balance when no transactions exist', async () => {

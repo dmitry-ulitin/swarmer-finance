@@ -33,9 +33,22 @@ describe('AccountForm payload', () => {
     form.form.patchValue({ name: 'Wallet', currency: 'USD', startBalance: 0 });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Wallet', currency: 'USD', startBalance: 0, inNetWorth: true,
+      name: 'Wallet', currency: 'USD', startBalance: 0, description: null, inNetWorth: true,
       type: 'cash', settings: {},
     });
+  });
+
+  it('takes the description from the account and sends it back trimmed', () => {
+    const form = createForm({ id: 1, name: 'Old', currency: 'USD', type: 'cash', description: 'note' });
+    expect(form.form.controls.description.value).toBe('note');
+    form.form.patchValue({ description: '  changed  ' });
+    expect(form.buildPayload().description).toBe('changed');
+  });
+
+  it('sends a cleared description as null', () => {
+    const form = createForm({ id: 1, name: 'Old', currency: 'USD', type: 'cash', description: 'note' });
+    form.form.patchValue({ description: '   ' });
+    expect(form.buildPayload().description).toBeNull();
   });
 
   it('takes the net worth flag from the account and sends it back', () => {
@@ -55,7 +68,7 @@ describe('AccountForm payload', () => {
     const form = createForm({ currency: 'USD' });
     form.form.patchValue({ name: 'X', currency: 'USD', startBalance: 0, type });
 
-    expect(form.buildPayload()).toEqual({ name: 'X', currency: 'USD', startBalance: 0, inNetWorth: true, type, settings: {} });
+    expect(form.buildPayload()).toEqual({ name: 'X', currency: 'USD', startBalance: 0, description: null, inNetWorth: true, type, settings: {} });
   });
 
   it('sends a typed currency trimmed and upper-cased', () => {
@@ -74,7 +87,7 @@ describe('AccountForm payload', () => {
     });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Ledger', currency: 'BTC', startBalance: 0, inNetWorth: true,
+      name: 'Ledger', currency: 'BTC', startBalance: 0, description: null, inNetWorth: true,
       type: 'crypto', settings: { address: 'bc1qxy2k', blockchain: 'bitcoin' },
     });
   });
@@ -87,7 +100,7 @@ describe('AccountForm payload', () => {
     });
 
     expect(form.buildPayload()).toEqual({
-      name: 'Checking', currency: 'USD', startBalance: 0, inNetWorth: true,
+      name: 'Checking', currency: 'USD', startBalance: 0, description: null, inNetWorth: true,
       type: 'bank', settings: {}, bankLink: null,
     });
   });

@@ -53,8 +53,18 @@ const bankLinkSchema = z
   .nullable()
   .optional();
 
+// Blank means no description. On PUT null clears it, omitted keeps it.
+const descriptionSchema = z
+  .string()
+  .trim()
+  .max(1000)
+  .transform(value => value || null)
+  .nullable()
+  .optional();
+
 const createBase = {
   name: z.string().min(1).max(255),
+  description: descriptionSchema,
   currency: currencySchema,
   startBalance: z.number().default(0),
   bankLink: bankLinkSchema,
@@ -83,6 +93,7 @@ const createAccountSchema = z.preprocess(
 // submits its full value, so no caller is affected.
 const updateBase = {
   name: z.string().min(1).max(255).optional(),
+  description: descriptionSchema,
   currency: currencySchema.optional(),
   startBalance: z.number().optional(),
   bankLink: bankLinkSchema,
@@ -131,8 +142,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', validate(createAccountSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { name, currency, startBalance, type, settings, bankLink, inNetWorth } = req.body;
-    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, type, settings, bankLink, inNetWorth);
+    const { name, currency, startBalance, type, settings, bankLink, inNetWorth, description } = req.body;
+    const account = await accountService.createAccount(req.userId!, name, currency, startBalance, type, settings, bankLink, inNetWorth, description);
     res.json({ data: account, error: null });
   } catch (error) {
     next(error);

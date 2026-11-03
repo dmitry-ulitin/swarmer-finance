@@ -33,12 +33,13 @@ export const createAccount = async (
   startBalance: number,
   scale: number,
   type: AccountType,
-  settings: Record<string, unknown>
+  settings: Record<string, unknown>,
+  description: string | null = null
 ): Promise<Account> => {
   const result = await query<Account>(
-    `INSERT INTO accounts (user_id, name, currency, start_balance, scale, type, settings)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [userId, name, currency, startBalance, scale, type, JSON.stringify(settings)]
+    `INSERT INTO accounts (user_id, name, currency, start_balance, scale, type, settings, description)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [userId, name, currency, startBalance, scale, type, JSON.stringify(settings), description]
   );
   return result[0];
 };
@@ -47,6 +48,7 @@ export const updateAccount = async (
   id: number,
   data: {
     name?: string;
+    description: string | null;
     currency?: string;
     startBalance?: number;
     scale?: number;
@@ -68,8 +70,9 @@ export const updateAccount = async (
          start_balance = COALESCE($3, start_balance),
          scale = COALESCE($4, scale),
          type = $5,
-         settings = $6
-     WHERE id = $7 AND deleted = false RETURNING *`,
+         settings = $6,
+         description = $7
+     WHERE id = $8 AND deleted = false RETURNING *`,
     [
       data.name ?? null,
       data.currency ?? null,
@@ -77,6 +80,7 @@ export const updateAccount = async (
       data.scale ?? null,
       data.type,
       JSON.stringify(data.settings),
+      data.description,
       id,
     ]
   );

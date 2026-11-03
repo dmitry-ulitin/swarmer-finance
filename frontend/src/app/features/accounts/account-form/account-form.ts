@@ -2,7 +2,7 @@ import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, 
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TuiButton, TuiCheckbox, TuiDataList, TuiDialogService, TuiError, TuiFilterByInputPipe, TuiInput, TuiLabel, TuiNumberFormat } from '@taiga-ui/core';
-import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe } from '@taiga-ui/kit';
+import { TUI_CONFIRM, type TuiConfirmData, TuiChevron, TuiComboBox, TuiDataListWrapper, TuiInputNumber, TuiSelect, TuiStringifyContentPipe, TuiTextarea } from '@taiga-ui/kit';
 import { POLYMORPHEUS_CONTEXT } from '@taiga-ui/polymorpheus';
 import type { TuiDialogContext } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
@@ -33,7 +33,7 @@ const normalizeCurrency = (currency: string): string => currency.trim().toUpperC
 
 @Component({
   selector: 'app-account-form',
-  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat, TuiDataList, TuiCheckbox, TuiLabel],
+  imports: [ReactiveFormsModule, TuiInput, TuiInputNumber, TuiButton, TuiError, TuiChevron, TuiComboBox, TuiSelect, TuiDataListWrapper, TuiFilterByInputPipe, TuiAutoFocus, TuiStringifyContentPipe, TuiNumberFormat, TuiDataList, TuiCheckbox, TuiLabel, TuiTextarea],
   templateUrl: './account-form.html',
   styleUrl: './account-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -59,6 +59,7 @@ export class AccountForm {
   readonly form = new FormGroup({
     type: new FormControl<AccountType>(this.context.data?.type ?? 'cash', { nonNullable: true, validators: [Validators.required] }),
     name: new FormControl<string>(this.context.data?.name ?? '', { nonNullable: true, validators: [Validators.required] }),
+    description: new FormControl<string>(this.context.data?.description ?? '', { nonNullable: true }),
     currency: new FormControl<string>(this.context.data?.currency ?? '', { nonNullable: true, validators: [Validators.required] }),
     startBalance: new FormControl<number>(this.context.data?.start_balance ?? 0, { nonNullable: true, validators: [Validators.required] }),
     accountNumber: new FormControl<string>('', { nonNullable: true }),
@@ -216,7 +217,7 @@ export class AccountForm {
   // stored settings hold only keys the user actually filled in.
   buildPayload(): AccountPayload {
     const raw = this.form.getRawValue();
-    const base = { name: raw.name, currency: normalizeCurrency(raw.currency), startBalance: raw.startBalance, inNetWorth: raw.inNetWorth };
+    const base = { name: raw.name, description: raw.description.trim() || null, currency: normalizeCurrency(raw.currency), startBalance: raw.startBalance, inNetWorth: raw.inNetWorth };
     const clean = (value: string): string | undefined => {
       const trimmed = value.trim();
       return trimmed === '' ? undefined : trimmed;
