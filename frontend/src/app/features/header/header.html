@@ -15,6 +15,9 @@
 }
 <div class="fill"></div>
 @if(authService.isAuthenticated()) {
+@if (onTransactions()) {
+<button tuiIconButton tuiTheme="dark" appearance="flat-grayscale" size="xs" type="button" (click)="privacy.toggle()" [iconStart]="privacy.hidden() ? '@tui.eye-off' : '@tui.eye'" [attr.aria-pressed]="privacy.hidden()" [attr.aria-label]="privacy.hidden() ? 'Show balances' : 'Hide balances'" [tuiHint]="privacy.hidden() ? 'Show balances' : 'Hide balances'" tuiHintDirection="bottom"></button>
+}
 <button #settingsButton tuiButton tuiChevron type="button" appearance="flat-grayscale" size="xs" class="light" [tuiDropdown]="settingsDropdown" tuiDropdownAuto><tui-icon icon="@tui.settings"></tui-icon></button>
 <ng-template #settingsDropdown>
   <tui-data-list [size]="'s'" class="nowrap">

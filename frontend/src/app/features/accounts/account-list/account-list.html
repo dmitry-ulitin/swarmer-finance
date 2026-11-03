@@ -7,16 +7,6 @@
       (click)="transactions.selectAllAccounts()"
     >All accounts</button>
     <button
-      appearance="gray"
-      size="xs"
-      tuiIconButton
-      type="button"
-      [iconStart]="privacy.hidden() ? '@tui.eye-off' : '@tui.eye'"
-      [attr.aria-pressed]="privacy.hidden()"
-      [attr.title]="privacy.hidden() ? 'Show balances' : 'Hide balances'"
-      (click)="privacy.toggle()"
-    >{{ privacy.hidden() ? 'Show balances' : 'Hide balances' }}</button>
-    <button
       class="add-account"
       type="button"
       aria-label="Add account"

@@ -16,6 +16,7 @@ import { ChangePasswordDialogService } from '../auth/change-password-dialog.serv
 import { ProfileDialogService } from '../profile/profile-dialog.service';
 import { BankDialogService } from '../bank/bank-dialog.service';
 import { PageReload } from '../../core/page-reload';
+import { BalancePrivacy } from '../../core/balance-privacy';
 
 @Component({
   selector: 'app-header',
@@ -37,6 +38,7 @@ export class Header {
   private readonly bankDialog = inject(BankDialogService);
   readonly sync = inject(AccountSyncService);
   readonly pageReload = inject(PageReload);
+  readonly privacy = inject(BalancePrivacy);
   /** The transaction actions belong to the transactions page only. */
   readonly onTransactions = isActive('/dashboard', inject(Router));
 

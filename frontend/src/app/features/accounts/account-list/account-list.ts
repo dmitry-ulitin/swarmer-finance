@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { TuiButton, TuiHint } from '@taiga-ui/core';
+import { TuiHint } from '@taiga-ui/core';
 import { AccountsState } from '../../../core/accounts.state';
 import { BalancePrivacy } from '../../../core/balance-privacy';
 import { AccountListStore } from './account-list.store';
@@ -12,7 +12,7 @@ import { amountsHint } from '../../../core/money-hint';
 
 @Component({
   selector: 'app-account-list',
-  imports: [AccountTreeNode, MoneyPipe, TuiButton, TuiHint],
+  imports: [AccountTreeNode, MoneyPipe, TuiHint],
   providers: [AccountListStore, MoneyPipe],
   templateUrl: './account-list.html',
   styleUrl: './account-list.scss',
