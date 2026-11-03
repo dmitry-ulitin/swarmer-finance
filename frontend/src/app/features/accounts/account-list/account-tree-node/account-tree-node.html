@@ -8,7 +8,19 @@
         [class.active]="transactions.selectedAccountIds().includes(account.id)"
         (click)="$event.ctrlKey || $event.metaKey ? transactions.toggleAccount(account.id) : transactions.selectAccount(account.id)"
       >{{ account.displayName }}</button>
-      @if (account.type === 'bank' && canWrite(account)) {
+      @if (canLoadFromBank(account)) {
+      <button
+        appearance="gray"
+        class="small"
+        [class.hidden]="!hovered()"
+        iconStart="@tui.cloud-download"
+        size="xs"
+        tuiIconButton
+        (click)="onLoadFromBank(account)"
+        type="button">
+        Load from bank
+      </button>
+      } @else if (account.type === 'bank' && canWrite(account)) {
       <button
         appearance="gray"
         class="small"

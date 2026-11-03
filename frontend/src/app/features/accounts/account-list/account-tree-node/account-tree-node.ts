@@ -77,6 +77,12 @@ export class AccountTreeNode {
     return accessLevelOf(account) >= 2;
   }
 
+  /** An expired or unmapped link would only answer 409, so the file import stays on offer then. */
+  protected canLoadFromBank(account: Account): boolean {
+    const status = account.bank_link?.status;
+    return (status === 'active' || status === 'expiring') && this.canWrite(account);
+  }
+
   /** Rounded gain of a valued account, e.g. '+30%' or '−5%'; null when it has none. */
   protected gain(account: Account): { text: string; positive: boolean } | null {
     const pct = gainPct(account);
@@ -87,6 +93,10 @@ export class AccountTreeNode {
 
   protected onImport(account: Account): void {
     void this.importDialog.open(account);
+  }
+
+  protected onLoadFromBank(account: Account): void {
+    void this.importDialog.openFromBank(account);
   }
 
   protected onSync(account: Account): void {
