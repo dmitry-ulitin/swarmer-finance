@@ -34,6 +34,7 @@ tui-dialog > [tuiButtonX] {
 
 // Account balances while the account list's privacy toggle is on.
 .balance-blurred {
-  filter: blur(6px);
+  filter: blur(4px);
   user-select: none;
+  font-weight: bold;
 }
