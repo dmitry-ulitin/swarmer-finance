@@ -156,7 +156,7 @@ export const listLinks = (accountIds: number[]) =>
 export const hasLink = async (accountId: number) =>
   (await queryOne<{ one: number }>('SELECT 1 AS one FROM bank_account_links WHERE account_id = $1', [accountId])) !== null;
 
-/** Sets the link; loaded_to survives only when it still points at the same bank account. */
+/** Sets the link; loaded_to and bank_balance survive only when it still points at the same bank account. */
 export const upsertLink = (accountId: number, connectionId: number, uid: string) =>
   execute(
     `INSERT INTO bank_account_links (account_id, connection_id, uid)
@@ -164,17 +164,36 @@ export const upsertLink = (accountId: number, connectionId: number, uid: string)
      ON CONFLICT (account_id) DO UPDATE
        -- The marker survives relinking within the same connection when the
        -- old uid is gone (the bank renumbered its accounts on a reconnect):
-       -- it is the same bank account under a new id.
-       SET loaded_to = CASE WHEN bank_account_links.connection_id = EXCLUDED.connection_id
-                             AND (bank_account_links.uid = EXCLUDED.uid
-                                  OR NOT EXISTS (SELECT 1 FROM bank_connection_accounts a
-                                                  WHERE a.connection_id = bank_account_links.connection_id
-                                                    AND a.uid = bank_account_links.uid))
-                            THEN bank_account_links.loaded_to END,
+       -- it is the same bank account under a new id. So does the stored balance.
+       SET (loaded_to, bank_balance) = (
+             SELECT CASE WHEN k.same THEN bank_account_links.loaded_to END,
+                    CASE WHEN k.same THEN bank_account_links.bank_balance END
+               FROM (SELECT bank_account_links.connection_id = EXCLUDED.connection_id
+                            AND (bank_account_links.uid = EXCLUDED.uid
+                                 OR NOT EXISTS (SELECT 1 FROM bank_connection_accounts a
+                                                 WHERE a.connection_id = bank_account_links.connection_id
+                                                   AND a.uid = bank_account_links.uid)) AS same) k),
            connection_id = EXCLUDED.connection_id,
            uid = EXCLUDED.uid`,
     [accountId, connectionId, uid]
   );
+
+/** The bank's booked balance of a linked account, as last fetched; `amount` is the bank's decimal string. */
+export interface StoredBankBalance {
+  amount: string;
+  type: string;
+  asOf: string;
+  fetchedAt: string;
+}
+
+export const setBankBalance = (accountId: number, balance: StoredBankBalance) =>
+  execute('UPDATE bank_account_links SET bank_balance = $2 WHERE account_id = $1', [accountId, balance]);
+
+export const getBankBalance = async (accountId: number) =>
+  (await queryOne<{ bank_balance: StoredBankBalance | null }>(
+    'SELECT bank_balance FROM bank_account_links WHERE account_id = $1',
+    [accountId]
+  ))?.bank_balance ?? null;
 
 /** Moves loaded_to forward to `date`, never back; false when the account has no link. */
 export const advanceLoadedTo = async (accountId: number, date: string) =>

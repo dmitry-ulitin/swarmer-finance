@@ -27,8 +27,13 @@ export interface ImportParseResult {
   account: { id: number; name: string; currency: string; scale: number };
   rows: ImportRow[];
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
-  /** Set when the rows came from the bank: the window that was loaded. */
-  bank?: { aspspName: string; dateFrom: string; dateTo: string };
+  /** Set when the rows came from the bank: the window that was loaded, and its booked balance (null when none). */
+  bank?: {
+    aspspName: string;
+    dateFrom: string;
+    dateTo: string;
+    balance?: { amount: number; type: string; asOf: string } | null;
+  };
   /** Set for a file covering several accounts: their names, and whose rows these are. */
   sourceAccounts?: string[];
   sourceAccount?: string | null;
@@ -49,6 +54,21 @@ export interface ImportReconcileRow {
 export interface ImportReconcileResult {
   created: number;
   skipped: number;
+  /**
+   * Bank loads only: the app's balance against the bank's last booked
+   * balance, both on `asOf`; null when the bank never reported one.
+   */
+  balanceCheck?: BalanceCheck | null;
+}
+
+export interface BalanceCheck {
+  app: number;
+  bank: number;
+  /** app − bank */
+  difference: number;
+  asOf: string;
+  type: string;
+  currency: string;
 }
 
 /** Statement formats the backend knows; `null` asks it to detect one. */

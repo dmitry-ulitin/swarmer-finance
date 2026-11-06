@@ -97,7 +97,7 @@ All API responses use this envelope format consistently.
   `AccountsState` reloads (its `version` signal); stacked `tui-bar-chart` (`@taiga-ui/addon-charts`, imported from its subpaths, the barrel hits a circular import), breakdowns, and accounts table with the in-net-worth checkbox
 
 ### Database
-- Migrations in `backend/src/db/migrations/` — run in order (001→020)
+- Migrations in `backend/src/db/migrations/` — run in order (001→021)
 - Raw SQL queries in `backend/src/db/queries/`
 - System root categories (Income id=1, Expenses id=2) seeded in migration 002; `user_id` is NULL for system categories
 - Categories support parent/child hierarchy via `parent_id`; `root_id` tracks the Income/Expenses root
@@ -278,7 +278,14 @@ connection owner's keys; only `BOOK` transactions come in. The window is
 afterwards, ending today (UTC). Row hashes are `sha256("eb|<country>|<bank>|<entry_reference>")`,
 else `transaction_id`, else the content hash, so they never collide with
 other sources. `POST /api/import/reconcile` takes `bankLoadedTo` and moves
-the marker only then (also with zero rows, never backwards). A link whose
+the marker only then (also with zero rows, never backwards). Each load also
+fetches the bank's booked balance (`ITBD`, else `CLBD`, in the app account's
+currency; available balances are ignored, a failed call never fails the load)
+and keeps the latest in `bank_account_links.bank_balance` (migration 021,
+JSONB; a relink to another bank account clears it). A confirm with
+`bankLoadedTo` returns `balanceCheck` (`app`, `bank`, `difference` on the
+bank's `asOf` date, or null when no balance was ever stored), and the
+frontend warns on a mismatch. A link whose
 `uid` vanished after a reconnect has status `unmapped` ("needs relinking") and loading it is
 409; relinking it within the same connection keeps `loaded_to`; an expired or pending connection is 409 `Bank access expired —
 reconnect` (expiry is flagged 7 days ahead, and when the bank refuses the

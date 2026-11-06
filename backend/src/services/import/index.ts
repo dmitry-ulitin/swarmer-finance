@@ -1,7 +1,7 @@
 import * as accountQueries from '../../db/queries/accounts';
 import * as transactionQueries from '../../db/queries/transactions';
 import { LEVEL, getAccessibleAccountIds, requireLevel } from '../access';
-import { convertAmount, getOrRefreshRate, toCents } from '../currency';
+import { convertAmount, getOrRefreshRate, toCents, toDecimal } from '../currency';
 import { detectProfile, getProfile, Profile } from './profiles';
 import { readStatement, ParsedRow } from './rows';
 import { computeImportHashes } from './hash';
@@ -37,7 +37,13 @@ export interface ParseResult {
   rows: ImportRow[];
   summary: { total: number; new: number; duplicate: number; possibleDuplicate: number };
   /** Set when the rows come from a bank connection rather than a file. */
-  bank?: { aspspName: string; dateFrom: string; dateTo: string };
+  bank?: {
+    aspspName: string;
+    dateFrom: string;
+    dateTo: string;
+    /** The bank's booked balance; null when it reported none. */
+    balance?: { amount: number; type: string; asOf: string } | null;
+  };
   /** For a file covering several accounts: their names, and whose rows these are. */
   sourceAccounts?: string[];
   sourceAccount?: string | null;
@@ -225,14 +231,15 @@ export interface ReconcileRow {
  * exactly the rows the user made a decision about.
  *
  * `bankLoadedTo` confirms a bank load: the account's "loaded up to" marker
- * moves to it once the rows are in (also when there are none).
+ * moves to it once the rows are in (also when there are none), and the
+ * result carries `balanceCheck` against the bank's stored balance.
  */
 export const reconcile = async (
   userId: number,
   accountId: number,
   rows: ReconcileRow[],
   opts: { bankLoadedTo?: string } = {}
-): Promise<{ created: number; skipped: number }> => {
+): Promise<{ created: number; skipped: number; balanceCheck?: BalanceCheck | null }> => {
   const account = await loadWritableAccount(accountId, userId);
 
   const { bankLoadedTo } = opts;
@@ -247,9 +254,35 @@ export const reconcile = async (
 
   const result = await insertRows(userId, account, rows);
   // Only after the rows are in: a failed confirm leaves the marker alone.
-  if (bankLoadedTo !== undefined) await advanceLoadedTo(accountId, bankLoadedTo);
-  return result;
+  if (bankLoadedTo === undefined) return result;
+  await advanceLoadedTo(accountId, bankLoadedTo);
+  return { ...result, balanceCheck: await checkBankBalance(account) };
 };
+
+/** The app's balance against the bank's last fetched booked balance, both on the bank's date. */
+export interface BalanceCheck {
+  app: number;
+  bank: number;
+  difference: number;
+  asOf: string;
+  type: string;
+  currency: string;
+}
+
+async function checkBankBalance(account: Account): Promise<BalanceCheck | null> {
+  const stored = await bankQueries.getBankBalance(account.id);
+  if (!stored) return null;
+  const bank = toCents(Number(stored.amount), account.scale);
+  const app = await transactionQueries.getBalanceThrough(account.id, stored.asOf);
+  return {
+    app: toDecimal(app, account.scale),
+    bank: toDecimal(bank, account.scale),
+    difference: toDecimal(app - bank, account.scale),
+    asOf: stored.asOf,
+    type: stored.type,
+    currency: account.currency,
+  };
+}
 
 async function insertRows(
   userId: number,

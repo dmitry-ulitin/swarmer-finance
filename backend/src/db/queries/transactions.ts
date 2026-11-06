@@ -806,3 +806,21 @@ export const purgeAccountTransactions = async (
   await db.query('DELETE FROM chain_seen_txids WHERE account_id = $1', [accountId]);
   return { deleted: deleted.length, detached: out.length + into.length };
 };
+
+/** The account's transactional balance at the end of `date` (start balance plus flows dated on or before it). */
+export const getBalanceThrough = async (accountId: number, date: string): Promise<number> => {
+  const row = await queryOne<{ balance: string }>(
+    `SELECT (a.start_balance
+             + COALESCE(SUM(t.credit) FILTER (WHERE t.credit_account_id = a.id), 0)
+             - COALESCE(SUM(t.debit)  FILTER (WHERE t.debit_account_id  = a.id), 0)
+            )::numeric AS balance
+       FROM accounts a
+       LEFT JOIN transactions t
+              ON (t.credit_account_id = a.id OR t.debit_account_id = a.id)
+             AND t.date <= $2::date
+      WHERE a.id = $1
+      GROUP BY a.id, a.start_balance`,
+    [accountId, date]
+  );
+  return Number(row?.balance ?? 0);
+};

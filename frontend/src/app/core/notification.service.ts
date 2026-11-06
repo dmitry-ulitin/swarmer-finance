@@ -17,6 +17,11 @@ export class NotificationService {
     this.notifications.open(message, { label: 'Success', appearance: 'positive' }).subscribe();
   }
 
+  /** Stays until closed: a warning the user has to act on. */
+  showWarning(message: string, label = 'Warning'): void {
+    this.notifications.open(message, { label, appearance: 'warning', autoClose: 0 }).subscribe();
+  }
+
   private extractErrorMessage(err: unknown, fallback: string | undefined): string {
     fallback = fallback || 'An unknown error occurred';
     if (err instanceof HttpErrorResponse) {

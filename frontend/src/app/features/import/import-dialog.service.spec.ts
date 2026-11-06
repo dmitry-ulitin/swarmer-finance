@@ -33,26 +33,29 @@ describe('ImportDialogService.openFromBank', () => {
   const linked = (loadedTo: string | null) =>
     ({ ...account, bank_link: { loadedTo } }) as unknown as Account;
   const parsed = (rows: unknown[]) =>
-    ({ account, rows, bank: { dateFrom: '2026-07-01', dateTo: '2026-10-27' } }) as never;
+    ({ account: { ...account, scale: 2 }, rows, bank: { dateFrom: '2026-07-01', dateTo: '2026-10-27' } }) as never;
+  const check = (app: number, bank: number) =>
+    ({ app, bank, difference: Math.round((app - bank) * 100) / 100, asOf: '2026-10-26', type: 'CLBD', currency: 'EUR' });
 
   function setup(loaded: ReturnType<typeof parsed>) {
     const open = vi.fn().mockReturnValue(of('2026-08-01'));
     const loadFromBank = vi.fn().mockReturnValue(of({ data: loaded, error: null }));
     const reconcileImport = vi.fn().mockReturnValue(of({ data: { created: 0, skipped: 0 }, error: null }));
     const showSuccess = vi.fn();
+    const showWarning = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: TuiDialogService, useValue: { open } },
         { provide: ApiService, useValue: { loadFromBank, reconcileImport } },
         { provide: TransactionsState, useValue: { reload: vi.fn() } },
         { provide: AccountsState, useValue: { reload: vi.fn() } },
-        { provide: NotificationService, useValue: { showError: vi.fn(), showSuccess } },
+        { provide: NotificationService, useValue: { showError: vi.fn(), showSuccess, showWarning } },
       ],
     });
     const service = TestBed.inject(ImportDialogService);
     const openReview = vi.fn().mockResolvedValue({ created: 2, skipped: 0 });
     (service as unknown as { openReview: unknown }).openReview = openReview;
-    return { service, open, loadFromBank, reconcileImport, showSuccess, openReview };
+    return { service, open, loadFromBank, reconcileImport, showSuccess, showWarning, openReview };
   }
 
   beforeEach(() => TestBed.resetTestingModule());
@@ -85,5 +88,34 @@ describe('ImportDialogService.openFromBank', () => {
     expect(s.reconcileImport).toHaveBeenCalledWith(1, [], '2026-10-27');
     expect(s.openReview).not.toHaveBeenCalled();
     expect(s.showSuccess).toHaveBeenCalledWith('No new transactions in the bank');
+  });
+  it('confirms a matching balance in the success message', async () => {
+    const s = setup(parsed([{}]));
+    s.openReview.mockResolvedValue({ created: 2, skipped: 0, balanceCheck: check(100, 100) });
+    await s.service.openFromBank(linked('2026-10-01'));
+    expect(s.showSuccess).toHaveBeenCalledWith('2 transactions imported. Balance matches the bank');
+    expect(s.showWarning).not.toHaveBeenCalled();
+  });
+
+  it('warns about a mismatch with both balances and the difference', async () => {
+    const s = setup(parsed([]));
+    s.reconcileImport.mockReturnValue(of({ data: { created: 0, skipped: 0, balanceCheck: check(100, 112.4) }, error: null }));
+    await s.service.openFromBank(linked('2026-10-01'));
+    expect(s.showSuccess).toHaveBeenCalledWith('No new transactions in the bank');
+    const [message, label] = s.showWarning.mock.calls[0];
+    expect(label).toBe('Balance differs from the bank');
+    expect(message).toContain('2026-10-26');
+    expect(message).toMatch(/100\.00/);
+    expect(message).toMatch(/112\.40/);
+    expect(message).toMatch(/12\.40/);
+  });
+
+  it('says when the bank reported no balance', async () => {
+    const s = setup(parsed([{}]));
+    s.openReview.mockResolvedValue({ created: 1, skipped: 0, balanceCheck: null });
+    await s.service.openFromBank(linked('2026-10-01'));
+    expect(s.showSuccess).toHaveBeenCalledWith(
+      '1 transaction imported. The bank did not report a balance, so it was not checked'
+    );
   });
 });

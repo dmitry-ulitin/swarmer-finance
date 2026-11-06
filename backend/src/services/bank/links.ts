@@ -1,13 +1,13 @@
 import { Tx } from '../../db';
 import * as bankQueries from '../../db/queries/bank';
-import { BankLinkRow } from '../../db/queries/bank';
+import { BankLinkRow, StoredBankBalance } from '../../db/queries/bank';
 import { getAccountById } from '../../db/queries/accounts';
 import { LEVEL, requireLevel } from '../access';
 import { BankConnectionStatus, connectionStatus, getConnection, loadCredentials, markExpired } from './connections';
-import { BankAccessError, EbTransaction, PsuContext, fetchTransactions } from './client';
+import { BankAccessError, EbBalance, EbTransaction, PsuContext, fetchBalances, fetchTransactions } from './client';
 import { computeBankHashes, toParsedRows } from './rows';
 import { ParseResult, buildParseResult, loadWritableAccount } from '../import';
-import { addDays, todayUtc } from '../date';
+import { addDays, isIsoDate, todayUtc } from '../date';
 
 const FIRST_LOAD_DAYS = 90;
 /** A later load re-reads this many days before the marker, for late bookings. */
@@ -123,8 +123,10 @@ export async function loadFromBank(
     : opts.dateFrom ?? addDays(dateTo, -FIRST_LOAD_DAYS);
 
   let txs: EbTransaction[];
+  let balance: StoredBankBalance | null;
   try {
     txs = await fetchTransactions(cred, link.uid, dateFrom, dateTo, opts.psu);
+    balance = await fetchBookedBalance(cred, link.uid, account.currency, opts.psu);
   } catch (error) {
     if (error instanceof BankAccessError) {
       await markExpired(link.connection_id);
@@ -132,11 +134,63 @@ export async function loadFromBank(
     }
     throw error;
   }
+  // A bank fact, whether or not the user goes on to confirm the rows.
+  if (balance) await bankQueries.setBankBalance(accountId, balance);
 
   const rows = toParsedRows(txs, account.currency);
   const hashes = computeBankHashes(rows, { name: link.aspsp_name, country: link.aspsp_country });
   const result = await buildParseResult(userId, account, rows, hashes, 'enablebanking');
-  return { ...result, bank: { aspspName: link.aspsp_name, dateFrom, dateTo } };
+  return {
+    ...result,
+    bank: {
+      aspspName: link.aspsp_name,
+      dateFrom,
+      dateTo,
+      balance: balance && { amount: Number(balance.amount), type: balance.type, asOf: balance.asOf },
+    },
+  };
+}
+
+/** Booked balances only: available ones (ITAV, CLAV) include pending payments and credit limits. */
+const BOOKED_TYPES = ['ITBD', 'CLBD'];
+
+/**
+ * The bank's booked balance in `currency`, or null when the bank reports
+ * none or the call fails: the balance only backs a check, so its absence
+ * never fails a load. A refused session still throws BankAccessError.
+ */
+async function fetchBookedBalance(
+  cred: Parameters<typeof fetchBalances>[0],
+  uid: string,
+  currency: string,
+  psu: PsuContext
+): Promise<StoredBankBalance | null> {
+  let balances: EbBalance[];
+  try {
+    balances = await fetchBalances(cred, uid, psu);
+  } catch (error) {
+    if (error instanceof BankAccessError) throw error;
+    return null;
+  }
+  return pickBookedBalance(balances, currency);
+}
+
+export function pickBookedBalance(balances: EbBalance[], currency: string): StoredBankBalance | null {
+  for (const type of BOOKED_TYPES) {
+    const b = balances.find(
+      (x) => x?.balance_type === type && x.balance_amount?.currency === currency
+    );
+    const amount = b?.balance_amount.amount;
+    if (typeof amount !== 'string' || amount.trim() === '' || !Number.isFinite(Number(amount))) continue;
+    const ref = b!.reference_date;
+    return {
+      amount: amount.trim(),
+      type,
+      asOf: ref && isIsoDate(ref) && ref <= todayUtc() ? ref : todayUtc(),
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+  return null;
 }
 
 /** Moves the account's "loaded up to" marker forward to `date`; it never goes back. */

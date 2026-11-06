@@ -3,11 +3,12 @@ import { TuiDialogService } from '@taiga-ui/core';
 import { PolymorpheusComponent } from '@taiga-ui/polymorpheus';
 import { firstValueFrom } from 'rxjs';
 import type { Account } from '../../models/account';
-import type { ImportParseResult, ImportReconcileResult } from '../../models/import';
+import type { BalanceCheck, ImportParseResult, ImportReconcileResult } from '../../models/import';
 import { TransactionsState } from '../../core/transactions.state';
 import { AccountsState } from '../../core/accounts.state';
 import { NotificationService } from '../../core/notification.service';
 import { ApiService } from '../../core/api.service';
+import { MoneyPipe } from '../../core/money.pipe';
 
 /**
  * Runs the import as two dialogs in sequence: upload (which parses) and
@@ -26,6 +27,7 @@ export class ImportDialogService {
   private readonly accounts = inject(AccountsState);
   private readonly notifications = inject(NotificationService);
   private readonly api = inject(ApiService);
+  private readonly money = new MoneyPipe();
 
   async open(account: Account): Promise<ImportReconcileResult | null> {
     let result: ImportReconcileResult | null;
@@ -51,7 +53,6 @@ export class ImportDialogService {
    * The first load asks how far back to go; later ones continue from the marker.
    */
   async openFromBank(account: Account): Promise<ImportReconcileResult | null> {
-    let result: ImportReconcileResult | null;
     try {
       let dateFrom: string | undefined;
       if (!account.bank_link?.loadedTo) {
@@ -67,26 +68,45 @@ export class ImportDialogService {
         // Nothing to review, but the window was still checked: move the marker.
         const marked = await firstValueFrom(this.api.reconcileImport(account.id, [], parsed.bank?.dateTo));
         this.reloadLists();
-        this.notifications.showSuccess('No new transactions in the bank');
+        this.notifications.showSuccess(
+          'No new transactions in the bank' + this.balanceNote(marked.data?.balanceCheck, parsed.account.scale)
+        );
         return marked.data ?? null;
       }
 
-      result = await this.openReview(parsed);
+      return this.finish(await this.openReview(parsed), parsed.account.scale);
     } catch (e) {
       this.notifications.showError(e, 'Failed to load from the bank');
       return null;
     }
-    return this.finish(result);
   }
 
-  private finish(result: ImportReconcileResult | null): ImportReconcileResult | null {
+  private finish(result: ImportReconcileResult | null, scale = 2): ImportReconcileResult | null {
     if (!result) return null;
     this.reloadLists();
     const imported = `${result.created} transaction${result.created === 1 ? '' : 's'} imported`;
     this.notifications.showSuccess(
-      result.skipped > 0 ? `${imported}, ${result.skipped} already present` : imported
+      (result.skipped > 0 ? `${imported}, ${result.skipped} already present` : imported) +
+        this.balanceNote(result.balanceCheck, scale)
     );
     return result;
+  }
+
+  /**
+   * The tail of the success message for a bank load; a mismatch gets its own
+   * warning instead. Statement imports carry no check (undefined) and get nothing.
+   */
+  private balanceNote(check: BalanceCheck | null | undefined, scale: number): string {
+    if (check === undefined) return '';
+    if (check === null) return '. The bank did not report a balance, so it was not checked';
+    if (check.difference === 0) return '. Balance matches the bank';
+    const fmt = (v: number) => this.money.transform(v, check.currency, scale);
+    this.notifications.showWarning(
+      `In the app ${fmt(check.app)}, in the bank ${fmt(check.bank)} as of ${check.asOf}: ` +
+        `difference ${fmt(check.difference)}.`,
+      'Balance differs from the bank'
+    );
+    return '';
   }
 
   /** Reconcile reports only counts, so the lists have to be refetched; balances move too, hence both. */

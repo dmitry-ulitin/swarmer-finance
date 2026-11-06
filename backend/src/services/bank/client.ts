@@ -29,6 +29,13 @@ export interface EbTransaction {
   creditor?: { name?: string | null } | null;
   debtor?: { name?: string | null } | null;
 }
+export interface EbBalance {
+  name?: string;
+  balance_amount: { amount: string; currency: string };
+  balance_type: string;
+  reference_date?: string | null;
+  last_change_date_time?: string | null;
+}
 export interface PsuContext { ip?: string; userAgent?: string }
 
 /** The bank session is no longer usable (expired or revoked consent). */
@@ -147,4 +154,14 @@ export async function fetchTransactions(
     key = res.continuation_key;
   }
   throw unavailable();
+}
+
+export async function fetchBalances(cred: EbCredentials, uid: string, psu: PsuContext): Promise<EbBalance[]> {
+  const res = await call<{ balances?: EbBalance[] }>(
+    cred,
+    'GET',
+    `/accounts/${encodeURIComponent(uid)}/balances`,
+    { psu, accessErrors: true }
+  );
+  return Array.isArray(res?.balances) ? res.balances : [];
 }

@@ -29,6 +29,8 @@ describe('POST /api/import/bank', () => {
   let fetchMock: jest.Mock;
   let txUrls: URL[];
   let txStatus: number;
+  let balances: unknown;
+  let balanceStatus: number;
   type U = { token: string; id: number };
   const users: U[] = [];
 
@@ -42,12 +44,17 @@ describe('POST /api/import/bank', () => {
   beforeEach(() => {
     txUrls = [];
     txStatus = 200;
+    balances = undefined;
+    balanceStatus = 200;
     fetchMock = jest.fn((url: string) => {
       const u = new URL(url);
       if (u.pathname.includes('/transactions')) {
         txUrls.push(u);
         if (txStatus !== 200) return respond(txStatus, { message: 'nope' });
         return respond(200, u.searchParams.get('continuation_key') === 'k2' ? page2 : page1);
+      }
+      if (u.pathname.endsWith('/balances')) {
+        return balanceStatus === 200 ? respond(200, { balances }) : respond(balanceStatus, { message: 'nope' });
       }
       // Exchange rates and anything else: no data.
       return respond(200, { date: today(), rates: {} });
@@ -145,7 +152,7 @@ describe('POST /api/import/bank', () => {
     expect(res.status).toBe(200);
     const data = res.body.data;
     expect(data.format).toBe('enablebanking');
-    expect(data.bank).toEqual({ aspspName: 'LHV Pank', dateFrom: shiftDays(today(), -90), dateTo: today() });
+    expect(data.bank).toEqual({ aspspName: 'LHV Pank', dateFrom: shiftDays(today(), -90), dateTo: today(), balance: null });
     expect(data.rows.map((r: any) => r.description)).toEqual([
       'CARD PURCHASE Example Shop Tallinn', 'Rent January', 'Salary', 'Service fee',
     ]);
@@ -217,7 +224,7 @@ describe('POST /api/import/bank', () => {
     const first = (await load(u, acc)).body.data;
     const ok = await confirm(u, acc, toReconcile(first.rows), first.bank.dateTo);
     expect(ok.status).toBe(200);
-    expect(ok.body.data).toEqual({ created: 4, skipped: 0 });
+    expect(ok.body.data).toEqual({ created: 4, skipped: 0, balanceCheck: null });
     expect(await loadedTo(acc)).toBe(first.bank.dateTo);
 
     txUrls = [];
@@ -242,7 +249,7 @@ describe('POST /api/import/bank', () => {
     const { u, acc } = await setup();
     const ok = await confirm(u, acc, [], today());
     expect(ok.status).toBe(200);
-    expect(ok.body.data).toEqual({ created: 0, skipped: 0 });
+    expect(ok.body.data).toEqual({ created: 0, skipped: 0, balanceCheck: null });
     expect(await loadedTo(acc)).toBe(today());
     expect((await confirm(u, acc, [])).status).toBe(400);
   });
@@ -342,6 +349,107 @@ describe('POST /api/import/bank', () => {
     const res = await load(u, acc);
     expect(res.status).toBe(200);
     expect(res.body.data.rows).toEqual([]);
+  });
+
+  describe('balance check', () => {
+    const bal = (type: string, amount: string, currency = 'EUR', reference_date: string | null = null) => ({
+      name: type, balance_amount: { amount, currency }, balance_type: type, reference_date,
+    });
+    const storedBalance = async (accountId: number) =>
+      (await pool.query('SELECT bank_balance FROM bank_account_links WHERE account_id = $1', [accountId]))
+        .rows[0].bank_balance;
+    /** A hand-entered income of `cents` on `date`. */
+    const income = (u: U, accountId: number, cents: number, date: string) =>
+      pool.query(
+        `INSERT INTO transactions (user_id, credit_account_id, debit, credit, category_id, date)
+         VALUES ($1, $2, $3, $3, 3, $4)`,
+        [u.id, accountId, cents, date]
+      );
+
+    it('picks the booked balance in the account currency, interim before closing', async () => {
+      const { u, acc } = await setup();
+      balances = [
+        bal('ITAV', '999.00'),
+        bal('CLBD', '100.00', 'EUR', shiftDays(today(), -1)),
+        bal('ITBD', '50.00', 'USD'),
+        bal('ITBD', '120.50'),
+      ];
+      const res = await load(u, acc);
+      expect(res.status).toBe(200);
+      expect(res.body.data.bank.balance).toEqual({ amount: 120.5, type: 'ITBD', asOf: today() });
+      expect(await storedBalance(acc)).toMatchObject({ amount: '120.50', type: 'ITBD', asOf: today() });
+    });
+
+    it('falls back to the closing balance on its own date', async () => {
+      const { u, acc } = await setup();
+      balances = [bal('ITAV', '999.00'), bal('CLBD', '100.00', 'EUR', shiftDays(today(), -1))];
+      const res = await load(u, acc);
+      expect(res.body.data.bank.balance).toEqual({ amount: 100, type: 'CLBD', asOf: shiftDays(today(), -1) });
+    });
+
+    it('no booked balance or a failed call: null, the load still works, the stored one stays', async () => {
+      const { u, acc } = await setup();
+      balances = [bal('ITBD', '10.00')];
+      await load(u, acc);
+      balances = [bal('ITAV', '999.00')];
+      const none = await load(u, acc);
+      expect(none.status).toBe(200);
+      expect(none.body.data.bank.balance).toBeNull();
+      balanceStatus = 500;
+      const failed = await load(u, acc);
+      expect(failed.status).toBe(200);
+      expect(failed.body.data.bank.balance).toBeNull();
+      expect(failed.body.data.rows).toHaveLength(4);
+      expect(await storedBalance(acc)).toMatchObject({ amount: '10.00' });
+    });
+
+    it('a refused balance call expires the connection', async () => {
+      const { u, acc } = await setup();
+      balanceStatus = 401;
+      const res = await load(u, acc);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('Bank access expired — reconnect');
+    });
+
+    it('confirm reports a match and a mismatch on the bank date', async () => {
+      const { u, acc } = await setup();
+      await income(u, acc, 10000, shiftDays(today(), -5));
+      // After the bank's closing date: not in its balance, not in the check.
+      await income(u, acc, 700, today());
+      balances = [bal('CLBD', '100.00', 'EUR', shiftDays(today(), -1))];
+      await load(u, acc);
+      const ok = await confirm(u, acc, [], today());
+      expect(ok.body.data.balanceCheck).toEqual({
+        app: 100, bank: 100, difference: 0, asOf: shiftDays(today(), -1), type: 'CLBD', currency: 'EUR',
+      });
+
+      balances = [bal('ITBD', '112.40')];
+      await load(u, acc);
+      const off = await confirm(u, acc, [], today());
+      expect(off.body.data.balanceCheck).toEqual({
+        app: 107, bank: 112.4, difference: -5.4, asOf: today(), type: 'ITBD', currency: 'EUR',
+      });
+    });
+
+    it('relinking keeps the stored balance only for the same bank account', async () => {
+      const { u, acc, conn } = await setup();
+      balances = [bal('ITBD', '10.00')];
+      await load(u, acc);
+      await pool.query(
+        `INSERT INTO bank_connection_accounts (connection_id, uid, iban, name, currency)
+         VALUES ($1, 'uid-2', 'EE02', 'Other', 'EUR')`,
+        [conn]
+      );
+      const relink = (uid: string) =>
+        request(app)
+          .put(`/api/accounts/${acc}`)
+          .set(auth(u))
+          .send({ type: 'bank', settings: {}, bankLink: { connectionId: conn, uid } });
+      expect((await relink('uid-1')).status).toBe(200);
+      expect(await storedBalance(acc)).toMatchObject({ amount: '10.00' });
+      expect((await relink('uid-2')).status).toBe(200);
+      expect(await storedBalance(acc)).toBeNull();
+    });
   });
 
   it('503 when bank sync is not configured', async () => {
